@@ -111,3 +111,7 @@ The dashboard is built on a robust, multi-threaded architecture designed to keep
 
 * **Initial Data Population Delay:** When you first launch the script, you will notice that the widgets may show placeholders or zeros, and the full array of data takes a few minutes to completely appear on the screen. This is an intentional design choice to stagger initial network requests. It prevents sudden spikes in CPU usage, avoids overwhelming the Raspberry Pi's network stack, and respects the rate limits of the external APIs.
 * **Hardware Refresh Limits:** The 60-second rendering interval is strictly enforced. Refreshing the screen more frequently than once a minute is strongly discouraged by the display manufacturer (Waveshare). Aggressive refresh rates on large e-paper panels can lead to severe ghosting and may cause permanent hardware damage to the display.
+
+## The 3d printed case
+
+You can download the case stl files [here](https://makerworld.com/en/models/2322517-epaper-dashboard-waveshare-10-85).
