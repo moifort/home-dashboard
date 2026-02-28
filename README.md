@@ -73,7 +73,8 @@ Since the official Spotify API requires running a local web server for complex t
 1. Connect your Spotify account to Last.fm.
 2. Create a Last.fm API account to generate an **API Key**.
 3. Update `LASTFM_CONF` in the script with your API Key and Last.fm Username.
-** After configuration, you don't need to use last.fm service, Payed last.fm account is not required. You can coutinue use only spotify service **
+   
+**After configuration, you don't need to use last.fm service, Payed last.fm account is not required. You can coutinue use only spotify service.**
 
 ### Gmail
 1. Go to the Google Cloud Console.
