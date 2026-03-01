@@ -16,6 +16,7 @@ import asyncio
 import pickle
 import subprocess
 import math
+import calendar
 import urllib.parse
 from collections import deque
 from datetime import datetime
@@ -42,7 +43,6 @@ ICON_DIR = os.path.join(BASE_DIR, 'icons')
 LOG_FILE = os.path.join(BASE_DIR, 'dashboard.log')
 
 # --- WIDGET TOGGLES ---
-# -- Enable them to demonstrate on the screen ---
 ENABLE_STRAVA = False
 ENABLE_BAMBU = False
 ENABLE_ROBOROCK = False
@@ -61,10 +61,9 @@ API_ENDPOINTS = {
 }
 
 # --- CONFIGURATION ---
-# Geo for weather
-# Currently Serbia for demonstration
-LOCATION_LAT = 44.8150855
-LOCATION_LON = 20.3944273
+# Set your geo location for weather widget
+LOCATION_LAT = 44.8240855
+LOCATION_LON = 20.3834273
 
 PRINTER_CONF = {
     'IP': '',
@@ -73,12 +72,12 @@ PRINTER_CONF = {
 }
 
 ROBOROCK_CONF = {
-    'EMAIL': 'your@email.com'
+    'EMAIL': ''
 }
 
 LASTFM_CONF = {
-    'API_KEY': 'your_api_key',
-    'USERNAME': 'your_lastfm_user_name'
+    'API_KEY': 'YOUR_LASTFM_API_KEY',
+    'USERNAME': ''
 }
 
 STRAVA_CONF = {
@@ -133,7 +132,7 @@ def timeout_handler(signum, frame):
     raise HardwareTimeoutError("Hardware Busy-Wait Timeout")
 
 
-# --- NETWORK MANAGER ---
+# --- ROBUST NETWORK MANAGER ---
 class NetworkManager:
     def __init__(self):
         self.session = None
@@ -181,7 +180,7 @@ class NetworkManager:
 net = NetworkManager()
 
 
-# --- DATA STORE ---
+# --- GLOBAL DATA STORE ---
 class DataStore:
     def __init__(self):
         self.lock = threading.Lock()
@@ -449,7 +448,6 @@ def roborock_update_thread(user_data, email):
                     current_area = (status_trait.clean_area / 1000000) if status_trait.clean_area else 0
 
                     is_cleaning = status_trait.state in [5, 17, 18, 22, 23, 26, 29]
-
                     status_str = short_states.get(status_trait.state, f"S:{status_trait.state}")
 
                     if not is_cleaning and current_area > 0 and current_area != ref_area:
@@ -826,7 +824,6 @@ def render_screen(epd, fonts):
         uv_val_x, uv_val_y = uv_x + 45, 5
         if uv_rounded >= 6:
             pad = 5
-            # Inverted block for high UV
             draw.rectangle((uv_val_x - pad, uv_val_y - pad + 10, uv_val_x + tw + pad, uv_val_y + th + pad), fill=0)
             draw.text((uv_val_x, uv_val_y), uv_val_str, font=fonts['60'], fill=255)
         else:
@@ -840,9 +837,11 @@ def render_screen(epd, fonts):
         # Cell 2: Compass & AQI
         y_c2 = 160
 
+        # Miniature wind icon
+        draw_icon(draw, col2_x + 5, y_c2, "icon_wind", (30, 30))
+
         # Compass Center
         cx, cy, r = col2_x + 80, y_c2 + 80, 60
-        draw_icon(draw, col2_x + 5, y_c2, "icon_wind", (30, 30))
         draw.ellipse((cx - r, cy - r, cx + r, cy + r), outline=0, width=2)
 
         for angle in range(0, 360, 45):
@@ -878,7 +877,7 @@ def render_screen(epd, fonts):
         draw.text((cx - tw / 2, cy + 25), spd_text, font=fonts['20'], fill=0)
 
         # AQI Block
-        aqi_x = col2_x + 200
+        aqi_x = col2_x + 180
         draw.text((aqi_x, y_c2 + 10), "AIR QUALITY", font=fonts['20'], fill=0)
         draw.text((aqi_x, y_c2 + 55), "AQI:", font=fonts['28'], fill=0)
 
@@ -889,11 +888,10 @@ def render_screen(epd, fonts):
         except AttributeError:
             tw, th = draw.textsize(aqi_str, font=fonts['80'])
 
-        val_x, val_y = aqi_x + 75, y_c2 + 46
+        val_x, val_y = aqi_x + 80, y_c2 + 66
 
-        if aqi >= 60:
-            pad = 5
-            # Inverted block for high pollution
+        if aqi >= 50:
+            pad = 20
             draw.rectangle((val_x - pad, val_y - pad + 15, val_x + tw + pad, val_y + th + pad - 5), fill=0)
             draw.text((val_x, val_y), aqi_str, font=fonts['80'], fill=255)
         else:
@@ -924,21 +922,32 @@ def render_screen(epd, fonts):
 
     draw.line((col_w * 2, 10, col_w * 2, 470), fill=0, width=2)
 
-    # --- COLUMN 3 (Time, Spotify, Gmail) ---
+    # --- COLUMN 3 (Time, Spotify/Progress, Gmail) ---
     col3_x = col_w * 2 + 30
     dt = datetime.now()
 
     # 1. Time & Date
     draw.text((col3_x, 10), dt.strftime("%H:%M"), font=fonts['clock'], fill=0)
-    draw.text((col3_x + 10, 160), dt.strftime("%A, %d %B %Y"), font=fonts['35'], fill=0)
+
+    date_str = dt.strftime("%d %B %Y")
+    day_str = dt.strftime("%a").upper()
+
+    draw.text((col3_x, 170), date_str, font=fonts['32'], fill=0)
+
+    try:
+        bbox = draw.textbbox((0, 0), date_str, font=fonts['32'])
+        date_w = bbox[2] - bbox[0]
+    except AttributeError:
+        date_w = draw.textsize(date_str, font=fonts['32'])[0]
+
+    draw.text((col3_x + 340, 170), day_str, font=fonts['32'], fill=0)
 
     draw.line((col3_x, 220, epd.width - 20, 220), fill=0, width=2)
 
-    # 2. Spotify
+    # 2. Spotify OR Time Progress
     sp_y = 240
 
-    # Clear the entire zone with white to prevent ghosting
-    draw.rectangle((col3_x, sp_y, col3_x + 420, sp_y + 125), fill=255)
+    draw.rectangle((col3_x, sp_y, col3_x + 420, sp_y + 130), fill=255)
 
     if ENABLE_SPOTIFY:
         if spotify['cover']:
@@ -956,8 +965,31 @@ def render_screen(epd, fonts):
             draw.text((col3_x + 180, sp_y + 10), artist[:20], font=fonts['28'], fill=0)
             draw.text((col3_x + 140, sp_y + 50), track[:25], font=fonts['24'], fill=0)
     else:
-        draw_icon(draw, col3_x + 140, sp_y + 20, "icon_spotify", (80, 80))
-        draw.text((col3_x + 230, sp_y + 40), "SPOTIFY", font=fonts['28'], fill=0)
+        # Fallback: Time Progress (Memento Mori)
+        tp_y = sp_y
+        draw.text((col3_x, tp_y), "TIME PROGRESS", font=fonts['28'], fill=0)
+
+        day_pct = (dt.hour * 3600 + dt.minute * 60 + dt.second) / 86400.0
+        days_in_m = calendar.monthrange(dt.year, dt.month)[1]
+        month_pct = (dt.day - 1 + (dt.hour / 24.0)) / days_in_m
+        days_in_y = 366 if calendar.isleap(dt.year) else 365
+        year_pct = (dt.timetuple().tm_yday - 1 + (dt.hour / 24.0)) / days_in_y
+
+        def draw_prog(y_offset, label, pct):
+            draw.text((col3_x, tp_y + y_offset), label, font=fonts['24'], fill=0)
+            bx = col3_x + 110
+            bw = 200
+            bh = 20
+            draw.rectangle((bx, tp_y + y_offset + 2, bx + bw, tp_y + y_offset + bh + 2), outline=0, width=2)
+            if pct > 0:
+                fill_w = int((bw - 4) * min(pct, 1.0))
+                if fill_w > 0:
+                    draw.rectangle((bx + 2, tp_y + y_offset + 4, bx + 2 + fill_w, tp_y + y_offset + bh), fill=0)
+            draw.text((bx + bw + 15, tp_y + y_offset), f"{int(pct * 100)}%", font=fonts['24'], fill=0)
+
+        draw_prog(40, "DAY", day_pct)
+        draw_prog(75, "MONTH", month_pct)
+        draw_prog(110, "YEAR", year_pct)
 
     draw.line((col3_x, 380, epd.width - 20, 380), fill=0, width=2)
 
@@ -991,10 +1023,12 @@ def main():
             '20': load_font('Aldrich-Regular.ttc', 20),
             '24': load_font('Aldrich-Regular.ttc', 24),
             '28': load_font('Aldrich-Regular.ttc', 28),
+            '32': load_font('Aldrich-Regular.ttc', 32),
             '35': load_font('Aldrich-Regular.ttc', 35),
+            '40': load_font('Aldrich-Regular.ttc', 40),
             '60': load_font('Aldrich-Regular.ttc', 60),
             '80': load_font('Aldrich-Regular.ttc', 80),
-            'clock': load_font('advanced_led_board-7.ttc', 165),
+            'clock': load_font('advanced_led_board-7.ttc', 180),
         }
 
         t_data = threading.Thread(target=update_data_thread)
