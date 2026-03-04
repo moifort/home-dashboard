@@ -447,7 +447,7 @@ def roborock_update_thread(user_data, email):
                     await status_trait.refresh()
                     current_area = (status_trait.clean_area / 1000000) if status_trait.clean_area else 0
 
-                    is_cleaning = status_trait.state in [5, 17, 18, 22, 23, 26, 29]
+                    is_cleaning = status_trait.state in [5, 6, 10, 17, 18, 22, 23, 26, 29]
                     status_str = short_states.get(status_trait.state, f"S:{status_trait.state}")
 
                     if not is_cleaning and current_area > 0 and current_area != ref_area:
@@ -1094,3 +1094,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
