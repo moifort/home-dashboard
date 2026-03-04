@@ -116,3 +116,8 @@ The dashboard is built on a robust, multi-threaded architecture designed to keep
 ## The 3d printed case
 
 You can download the case stl files [here](https://makerworld.com/en/models/2322517-epaper-dashboard-waveshare-10-85).
+
+## Video assembly guide
+
+[![Video Title](https://img.youtube.com/vi/H964RpaJvu0/0.jpg)](https://youtu.be/H964RpaJvu0)
+
