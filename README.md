@@ -4,6 +4,7 @@ A fully functional E-ink dashboard running on a Raspberry Pi Zero 2W. Designed f
 
 ## Key Features
 
+* **(NEW!) Claude Code usage data:** Displays usage data for Claude Code, showing the daily limit, weekly limit, and limit reset time.
 * **Weather & Air Quality:** Real-time temperature, humidity, wind direction/speed, UV index, 4-hour forecast, and AQI (with visual inversion for high pollution levels) using the Open-Meteo API.
 * **Strava Integration:** Displays total and yearly activity statistics (distance and ride counts), including specific breakdowns for biking and hiking.
 * **Bambu Lab 3D Printer:** Live monitoring of print status, completion percentage, remaining time, and current layer progress.
@@ -47,6 +48,12 @@ The **patched** version of the epd10in85 library with fixed partial refresh issu
 ## Configuration & Widget Setup
 
 All widget toggles and API configurations are located at the top of the `main.py` script. You can enable or disable specific widgets using the `ENABLE_*` boolean variables.
+
+### Claude Code
+1. Run the `main.py` script from the terminal for the first time.
+2. The script will pause, ask for your to copy the authorization URL and paste it on real browser.
+3. Open that URL in your browser, click "Authorize", and you will be redirected to a dead `localhost` page.
+7. Copy the whole URL containing `code=...` portion from your browser's address bar and paste it back into the terminal. The script will automatically fetch and save the required tokens to `claude_creds.json`.
 
 ### Strava
 1. Go to your Strava API Settings and create an API Application.
