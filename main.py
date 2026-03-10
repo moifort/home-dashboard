@@ -19,7 +19,7 @@ import math
 import calendar
 import urllib.parse
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance
 from logging.handlers import RotatingFileHandler
 
@@ -43,9 +43,10 @@ ICON_DIR = os.path.join(BASE_DIR, 'icons')
 LOG_FILE = os.path.join(BASE_DIR, 'dashboard.log')
 
 # --- WIDGET TOGGLES ---
-ENABLE_STRAVA = False
-ENABLE_BAMBU = False
-ENABLE_ROBOROCK = False
+ENABLE_STRAVA = True
+ENABLE_BAMBU = True
+ENABLE_ROBOROCK = True
+ENABLE_CLAUDE = True
 ENABLE_SPOTIFY = False
 
 # --- API ENDPOINTS ---
@@ -61,7 +62,7 @@ API_ENDPOINTS = {
 }
 
 # --- CONFIGURATION ---
-# Set your geo location for weather widget
+# Change the geo location to your own for the weather widget.
 LOCATION_LAT = 44.8240855
 LOCATION_LON = 20.3834273
 
@@ -72,12 +73,12 @@ PRINTER_CONF = {
 }
 
 ROBOROCK_CONF = {
-    'EMAIL': ''
+    'EMAIL': 'your@email.com'
 }
 
 LASTFM_CONF = {
-    'API_KEY': 'YOUR_LASTFM_API_KEY',
-    'USERNAME': ''
+    'API_KEY': 'key...',
+    'USERNAME': 'username'
 }
 
 STRAVA_CONF = {
@@ -195,6 +196,7 @@ class DataStore:
         self.printer = {'status': 'OFFLINE'}
         self.gmail_unread = 0
         self.spotify = {'status': 'PAUSED', 'text': '', 'cover': None}
+        self.claude = {'error': False, 'five_hour': {}, 'seven_day': {}}
         self.roborock = {
             'status': 'OFFLINE', 'battery': 0, 'is_cleaning': False,
             'current_area': 0.0, 'ref_area': 0.0, 'pct': 0.0, 'last_date': '-'
@@ -205,7 +207,8 @@ class DataStore:
 
         self.last_update = {
             'weather': 0, 'strava': 0, 'printer': 0, 'gmail': 0,
-            'spotify': 0, 'crypto': 0, 'sysload': 0, 'ping': 0
+            'spotify': 0, 'crypto': 0, 'sysload': 0, 'ping': 0,
+            'claude': 0
         }
 
 
@@ -242,7 +245,40 @@ def get_cached_icon(name, size, is_white=False):
     return icon_cache.get(key)
 
 
+def time_until(iso_str):
+    if not iso_str: return "N/A"
+    try:
+        # Handling the explicit +00:00 timezone format
+        target = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        diff = target - now
+        if diff.total_seconds() < 0: return "Resetting..."
+        hours, rem = divmod(diff.total_seconds(), 3600)
+        days, hours = divmod(hours, 24)
+        if days > 0:
+            return f"{int(days)}d {int(hours)}h"
+        else:
+            minutes = rem // 60
+            return f"{int(hours)}h {int(minutes)}m"
+    except Exception:
+        return "N/A"
+
+
 # --- AUTH & FETCH THREADS ---
+
+def auth_claude():
+    global ENABLE_CLAUDE
+    if not ENABLE_CLAUDE: return
+    try:
+        import claude
+        success = claude.interactive_auth()
+        if not success:
+            ENABLE_CLAUDE = False
+            print("Claude widget is disabled.")
+    except ImportError:
+        print("claude.py not found. Claude widget disabled.")
+        ENABLE_CLAUDE = False
+
 
 def auth_strava():
     global ENABLE_STRAVA
@@ -609,6 +645,29 @@ def update_data_thread():
                 pass
             data_store.last_update['gmail'] = now
 
+        # Claude Data Fetching (Run external script every 10 min)
+        if ENABLE_CLAUDE and now - data_store.last_update['claude'] > 600:
+            try:
+                subprocess.run([sys.executable, os.path.join(BASE_DIR, 'claude.py')], capture_output=True, timeout=30)
+                usage_path = os.path.join(BASE_DIR, 'usage.json')
+                if os.path.exists(usage_path):
+                    with open(usage_path, 'r') as f:
+                        usage_data = json.load(f)
+                    with data_store.lock:
+                        data_store.claude = usage_data
+                        if "error" in usage_data and "five_hour" not in usage_data:
+                            data_store.claude['error'] = True
+                        else:
+                            data_store.claude['error'] = False
+                else:
+                    with data_store.lock:
+                        data_store.claude['error'] = True
+            except Exception as e:
+                logging.error(f"Claude update error: {e}")
+                with data_store.lock:
+                    data_store.claude['error'] = True
+            data_store.last_update['claude'] = now
+
         if ENABLE_SPOTIFY and now - data_store.last_update['spotify'] > 20:
             url = f"{API_ENDPOINTS['lastfm']}?method=user.getrecenttracks&user={LASTFM_CONF['USERNAME']}&api_key={LASTFM_CONF['API_KEY']}&format=json&limit=2&rnd={int(now)}"
             s_data = net.get_json(url, timeout=5)
@@ -708,6 +767,7 @@ def render_screen(epd, fonts):
         rob = data_store.roborock.copy()
         gmail_unread = data_store.gmail_unread
         spotify = data_store.spotify.copy()
+        claude = data_store.claude.copy()
         sysload = data_store.sysload.copy()
         crypto = data_store.crypto.copy()
         ping = data_store.ping.copy()
@@ -780,7 +840,6 @@ def render_screen(epd, fonts):
         if rob['is_cleaning']:
             draw.text((col1_x + 60, y3 + 35), f"Clean: {rob['current_area']:.1f} m2 ({rob['pct']:.0f}%)",
                       font=fonts['24'], fill=0)
-            # Show progress bar ONLY if currently cleaning
             clamped_pct = min(rob['pct'], 100)
             draw.rectangle((col1_x + 60, y3 + 70, col1_x + 390, y3 + 90), outline=0)
             draw.rectangle((col1_x + 60, y3 + 70, col1_x + 60 + int(330 * (clamped_pct / 100)), y3 + 90), fill=0)
@@ -810,11 +869,9 @@ def render_screen(epd, fonts):
 
         temp_rounded = math.floor(temp + 0.5)
 
-        # Cell 1: Main Temp
         draw_icon(draw, col2_x, 20, get_weather_icon(w_code, is_day), (90, 90))
         draw.text((col2_x + 100, 10), f"{temp_rounded}°C", font=fonts['80'], fill=0)
 
-        # UV Index
         uv_x, uv_y = col2_x + 320, 25
         uv_rounded = math.floor(uv_index + 0.5)
         draw.text((uv_x, uv_y), "UV", font=fonts['28'], fill=0)
@@ -838,13 +895,9 @@ def render_screen(epd, fonts):
 
         draw.line((col2_x, 140, col2_x + col_w - 40, 140), fill=0, width=2)
 
-        # Cell 2: Compass & AQI
         y_c2 = 160
-
-        # Miniature wind icon
         draw_icon(draw, col2_x + 5, y_c2, "icon_wind", (30, 30))
 
-        # Compass Center
         cx, cy, r = col2_x + 80, y_c2 + 80, 60
         draw.ellipse((cx - r, cy - r, cx + r, cy + r), outline=0, width=2)
 
@@ -880,7 +933,6 @@ def render_screen(epd, fonts):
 
         draw.text((cx - tw / 2, cy + 25), spd_text, font=fonts['20'], fill=0)
 
-        # AQI Block
         aqi_x = col2_x + 180
         draw.text((aqi_x, y_c2 + 10), "AIR QUALITY", font=fonts['20'], fill=0)
         draw.text((aqi_x, y_c2 + 55), "AQI:", font=fonts['28'], fill=0)
@@ -903,7 +955,6 @@ def render_screen(epd, fonts):
 
         draw.line((col2_x, 320, col2_x + col_w - 40, 320), fill=0, width=2)
 
-        # Cell 3: Forecast
         hourly = weather.get('hourly', {})
         times = hourly.get('time', [])
         temps = hourly.get('temperature_2m', [])
@@ -926,7 +977,7 @@ def render_screen(epd, fonts):
 
     draw.line((col_w * 2, 10, col_w * 2, 470), fill=0, width=2)
 
-    # --- COLUMN 3 (Time, Spotify/Progress, Gmail) ---
+    # --- COLUMN 3 (Time, Claude/Spotify/Progress, Gmail) ---
     col3_x = col_w * 2 + 30
     dt = datetime.now()
 
@@ -937,23 +988,43 @@ def render_screen(epd, fonts):
     day_str = dt.strftime("%a").upper()
 
     draw.text((col3_x, 170), date_str, font=fonts['32'], fill=0)
-
-    try:
-        bbox = draw.textbbox((0, 0), date_str, font=fonts['32'])
-        date_w = bbox[2] - bbox[0]
-    except AttributeError:
-        date_w = draw.textsize(date_str, font=fonts['32'])[0]
-
     draw.text((col3_x + 340, 170), day_str, font=fonts['32'], fill=0)
 
     draw.line((col3_x, 220, epd.width - 20, 220), fill=0, width=2)
 
-    # 2. Spotify OR Time Progress
+    # 2. Claude AI OR Spotify OR Time Progress
     sp_y = 240
-
+    # Clear background for widget
     draw.rectangle((col3_x, sp_y, col3_x + 420, sp_y + 130), fill=255)
 
-    if ENABLE_SPOTIFY:
+    if ENABLE_CLAUDE:
+        draw.text((col3_x, sp_y), "CLAUDE AI USAGE", font=fonts['28'], fill=0)
+
+        if claude.get('error'):
+            draw.text((col3_x, sp_y + 50), "Claude Usage Error", font=fonts['24'], fill=0)
+        else:
+            # 5-Hour Limit
+            pct_5h = claude.get('five_hour', {}).get('utilization', 0)
+            resets_5h = claude.get('five_hour', {}).get('resets_at')
+            rem_5h = time_until(resets_5h)
+
+            draw.text((col3_x, sp_y + 40), f"5-Hour Limit: {pct_5h}% (Resets in {rem_5h})", font=fonts['20'], fill=0)
+            bx, bw, bh = col3_x, 400, 15
+            draw.rectangle((bx, sp_y + 65, bx + bw, sp_y + 65 + bh), outline=0, width=2)
+            fill_w = int((bw - 4) * min(pct_5h / 100.0, 1.0))
+            if fill_w > 0: draw.rectangle((bx + 2, sp_y + 67, bx + 2 + fill_w, sp_y + 65 + bh - 2), fill=0)
+
+            # 7-Day Limit
+            pct_7d = claude.get('seven_day', {}).get('utilization', 0)
+            resets_7d = claude.get('seven_day', {}).get('resets_at')
+            rem_7d = time_until(resets_7d)
+
+            draw.text((col3_x, sp_y + 90), f"7-Day Limit: {pct_7d}% (Resets in {rem_7d})", font=fonts['20'], fill=0)
+            draw.rectangle((bx, sp_y + 115, bx + bw, sp_y + 115 + bh), outline=0, width=2)
+            fill_w = int((bw - 4) * min(pct_7d / 100.0, 1.0))
+            if fill_w > 0: draw.rectangle((bx + 2, sp_y + 117, bx + 2 + fill_w, sp_y + 115 + bh - 2), fill=0)
+
+    elif ENABLE_SPOTIFY:
         if spotify['cover']:
             Himage.paste(spotify['cover'], (col3_x, sp_y))
         else:
@@ -968,8 +1039,9 @@ def render_screen(epd, fonts):
             track = words[1] if len(words) > 1 else ""
             draw.text((col3_x + 180, sp_y + 10), artist[:20], font=fonts['28'], fill=0)
             draw.text((col3_x + 140, sp_y + 50), track[:25], font=fonts['24'], fill=0)
+
     else:
-        # Fallback: Time Progress (Memento Mori)
+        # Fallback: Time Progress
         tp_y = sp_y
         draw.text((col3_x, tp_y), "TIME PROGRESS", font=fonts['28'], fill=0)
 
@@ -1008,6 +1080,7 @@ def render_screen(epd, fonts):
 # --- MAIN LOOP ---
 def main():
     auth_strava()
+    auth_claude()
     roborock_user_data = auth_roborock(ROBOROCK_CONF['EMAIL'])
 
     signal.signal(signal.SIGALRM, timeout_handler)
@@ -1095,8 +1168,5 @@ def main():
             pass
         exit()
 
-
 if __name__ == '__main__':
     main()
-
-
