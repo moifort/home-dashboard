@@ -42,11 +42,14 @@ FONT_DIR = os.path.join(BASE_DIR, 'fnt')
 ICON_DIR = os.path.join(BASE_DIR, 'icons')
 LOG_FILE = os.path.join(BASE_DIR, 'dashboard.log')
 
+# ######################
 # --- WIDGET TOGGLES ---
-ENABLE_STRAVA = True
-ENABLE_BAMBU = True
-ENABLE_ROBOROCK = True
-ENABLE_CLAUDE = True
+# ######################
+ENABLE_STRAVA = False
+ENABLE_BAMBU = False
+ENABLE_ROBOROCK = False
+ENABLE_ANTIGRAVITY = False
+ENABLE_CLAUDE = False
 ENABLE_SPOTIFY = False
 
 # --- API ENDPOINTS ---
@@ -62,23 +65,23 @@ API_ENDPOINTS = {
 }
 
 # --- CONFIGURATION ---
-# Change the geo location to your own for the weather widget.
+# Change to your GEO location
 LOCATION_LAT = 44.8240855
-LOCATION_LON = 20.3834273
+LOCATION_LON = 20.4934273
 
 PRINTER_CONF = {
-    'IP': '',
+    'IP': '192.168....',
     'SERIAL': '',
     'ACCESS_CODE': ''
 }
 
 ROBOROCK_CONF = {
-    'EMAIL': 'your@email.com'
+    'EMAIL': 'email...'
 }
 
 LASTFM_CONF = {
-    'API_KEY': 'key...',
-    'USERNAME': 'username'
+    'API_KEY': '',
+    'USERNAME': ''
 }
 
 STRAVA_CONF = {
@@ -197,6 +200,7 @@ class DataStore:
         self.gmail_unread = 0
         self.spotify = {'status': 'PAUSED', 'text': '', 'cover': None}
         self.claude = {'error': False, 'five_hour': {}, 'seven_day': {}}
+        self.antigravity = {'error': False, 'models': []}
         self.roborock = {
             'status': 'OFFLINE', 'battery': 0, 'is_cleaning': False,
             'current_area': 0.0, 'ref_area': 0.0, 'pct': 0.0, 'last_date': '-'
@@ -208,7 +212,7 @@ class DataStore:
         self.last_update = {
             'weather': 0, 'strava': 0, 'printer': 0, 'gmail': 0,
             'spotify': 0, 'crypto': 0, 'sysload': 0, 'ping': 0,
-            'claude': 0
+            'claude': 0, 'antigravity': 0
         }
 
 
@@ -278,6 +282,20 @@ def auth_claude():
     except ImportError:
         print("claude.py not found. Claude widget disabled.")
         ENABLE_CLAUDE = False
+
+
+def auth_antigravity():
+    global ENABLE_ANTIGRAVITY
+    if not ENABLE_ANTIGRAVITY: return
+    try:
+        import antigravity
+        success = antigravity.interactive_auth()
+        if not success:
+            ENABLE_ANTIGRAVITY = False
+            print("Antigravity widget is disabled.")
+    except ImportError:
+        print("antigravity.py not found. Antigravity widget disabled.")
+        ENABLE_ANTIGRAVITY = False
 
 
 def auth_strava():
@@ -617,7 +635,7 @@ def update_data_thread():
                             data_store.crypto['eth_hist'] = prices[::len(prices) // 50][:50]
                 data_store.last_update['crypto'] = now
 
-        if not ENABLE_ROBOROCK:
+        if not ENABLE_ROBOROCK and not ENABLE_ANTIGRAVITY:
             if now - data_store.last_update['ping'] > 20:
                 try:
                     out = subprocess.check_output(['ping', '-c', '1', '-W', '1', '8.8.8.8']).decode('utf-8')
@@ -667,6 +685,28 @@ def update_data_thread():
                 with data_store.lock:
                     data_store.claude['error'] = True
             data_store.last_update['claude'] = now
+
+        if ENABLE_ANTIGRAVITY and now - data_store.last_update['antigravity'] > 60:
+            try:
+                subprocess.run([sys.executable, os.path.join(BASE_DIR, 'antigravity.py')], capture_output=True, timeout=30)
+                limits_path = os.path.join(BASE_DIR, 'limits.json')
+                if os.path.exists(limits_path):
+                    with open(limits_path, 'r', encoding='utf-8') as f:
+                        limits_data = json.load(f)
+                    with data_store.lock:
+                        data_store.antigravity = limits_data
+                        if "error" in limits_data:
+                            data_store.antigravity['error'] = True
+                        else:
+                            data_store.antigravity['error'] = False
+                else:
+                    with data_store.lock:
+                        data_store.antigravity['error'] = True
+            except Exception as e:
+                logging.error(f"Antigravity update error: {e}")
+                with data_store.lock:
+                    data_store.antigravity['error'] = True
+            data_store.last_update['antigravity'] = now
 
         if ENABLE_SPOTIFY and now - data_store.last_update['spotify'] > 20:
             url = f"{API_ENDPOINTS['lastfm']}?method=user.getrecenttracks&user={LASTFM_CONF['USERNAME']}&api_key={LASTFM_CONF['API_KEY']}&format=json&limit=2&rnd={int(now)}"
@@ -768,6 +808,7 @@ def render_screen(epd, fonts):
         gmail_unread = data_store.gmail_unread
         spotify = data_store.spotify.copy()
         claude = data_store.claude.copy()
+        antigravity = data_store.antigravity.copy()
         sysload = data_store.sysload.copy()
         crypto = data_store.crypto.copy()
         ping = data_store.ping.copy()
@@ -846,6 +887,32 @@ def render_screen(epd, fonts):
         else:
             draw.text((col1_x + 60, y3 + 35), f"Last: {rob['last_date']} | {rob['ref_area']:.1f} m2", font=fonts['24'],
                       fill=0)
+    elif ENABLE_ANTIGRAVITY:
+        draw_icon(draw, col1_x, y3, "icon_cpu", (50, 50))
+        draw.text((col1_x + 60, y3), "ANTIGRAVITY USAGE", font=fonts['28'], fill=0)
+        
+        if antigravity.get('error'):
+            draw.text((col1_x + 60, y3 + 35), "Error loading data", font=fonts['20'], fill=0)
+        else:
+            models = antigravity.get('models', [])
+            opus = next((m for m in models if m.get('modelId') == 'claude-opus-4-6-thinking'), None)
+            gemini = next((m for m in models if m.get('modelId') == 'gemini-3-pro-high'), None)
+            
+            y_off = y3 + 35
+            for m_data in (opus, gemini):
+                if m_data:
+                    label = "Opus 4.6" if m_data.get('modelId') == 'claude-opus-4-6-thinking' else "Gemini 3Pro"
+                    pct = m_data.get('usedPercentage', 0)
+                    rem_time = time_until(m_data.get('resetDate'))
+                    
+                    draw.text((col1_x + 60, y_off), f"{label} {pct}% | In {rem_time}", font=fonts['20'], fill=0)
+                    
+                    bx, bw, bh = col1_x + 60, 330, 15
+                    draw.rectangle((bx, y_off + 25, bx + bw, y_off + 25 + bh), outline=0, width=2)
+                    fill_w = int((bw - 4) * min(pct / 100.0, 1.0))
+                    if fill_w > 0: draw.rectangle((bx + 2, y_off + 27, bx + 2 + fill_w, y_off + 25 + bh - 2), fill=0)
+                    
+                    y_off += 50
     else:
         draw_icon(draw, col1_x, y3, "icon_wifi", (50, 50))
         draw.text((col1_x + 60, y3), f"Internet Quality: {ping['current']} ms", font=fonts['28'], fill=0)
@@ -1081,6 +1148,7 @@ def render_screen(epd, fonts):
 def main():
     auth_strava()
     auth_claude()
+    auth_antigravity()
     roborock_user_data = auth_roborock(ROBOROCK_CONF['EMAIL'])
 
     signal.signal(signal.SIGALRM, timeout_handler)
@@ -1167,6 +1235,7 @@ def main():
         except:
             pass
         exit()
+
 
 if __name__ == '__main__':
     main()
