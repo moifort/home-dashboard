@@ -4,7 +4,8 @@ A fully functional E-ink dashboard running on a Raspberry Pi Zero 2W. Designed f
 
 ## Key Features
 
-* **(NEW!) Claude Code usage data:** Displays usage data for Claude Code, showing the daily limit, weekly limit, and limit reset time.
+* **(NEW!) Antigravity usage data:** Displays usage data for Antigravity, showing the limit, and limit reset time.
+* ** Claude Code usage data:** Displays usage data for Claude Code, showing the daily limit, weekly limit, and limit reset time.
 * **Weather & Air Quality:** Real-time temperature, humidity, wind direction/speed, UV index, 4-hour forecast, and AQI (with visual inversion for high pollution levels) using the Open-Meteo API.
 * **Strava Integration:** Displays total and yearly activity statistics (distance and ride counts), including specific breakdowns for biking and hiking.
 * **Bambu Lab 3D Printer:** Live monitoring of print status, completion percentage, remaining time, and current layer progress.
