@@ -206,10 +206,11 @@ def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
         return avg_kwh, hc_ratio, avg_price
 
     avg_kwh, hc_ratio, avg_price = _avg_and_ratios(current)
+    has_prev = len(previous) > 0
     avg_kwh_prev, hc_ratio_prev, avg_price_prev = _avg_and_ratios(previous)
 
     def _pct(cur, prev):
-        if prev == 0:
+        if not has_prev or prev == 0:
             return 0
         return round((cur - prev) / prev * 100, 1)
 
@@ -217,7 +218,7 @@ def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
         "avg_kwh": round(avg_kwh, 1),
         "avg_kwh_pct": _pct(avg_kwh, avg_kwh_prev),
         "hc_ratio": round(hc_ratio, 1),
-        "hc_ratio_pct": round(hc_ratio - hc_ratio_prev, 1),
+        "hc_ratio_pct": round(hc_ratio - hc_ratio_prev, 1) if has_prev else 0,
         "avg_price": round(avg_price, 2),
         "avg_price_pct": _pct(avg_price, avg_price_prev),
     }
