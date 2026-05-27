@@ -4,14 +4,33 @@ Monitor your electricity consumption from a Linky smart meter on an e-paper disp
 
 ![Dashboard preview](docs/preview.png)
 
-## What it does
+## Dashboard readings
 
-- **Daily consumption** — stacked bar chart with off-peak (HC) and peak (HP) breakdown for each day
-- **Average kWh/day** — with progression compared to the previous 4 weeks
-- **Off-peak ratio** — to verify you're shifting consumption to off-peak hours
-- **Average cost per day** — to track savings in euros
-- **Red progressions** — when things go the wrong way (consuming more, spending more)
-- **Automatic refresh** — the server updates data every hour
+### Bar chart
+
+Each bar represents one day of electricity consumption. Bars are stacked:
+
+- **Black fill** — peak hours (HP) consumption
+- **Top line separator** — marks the boundary between off-peak and peak
+- **White section above the line** — off-peak hours (HC) consumption
+- **Value above the bar** — total kWh for that day
+- **N/A** — incomplete data (less than 1 kWh recorded, typically a meter reporting gap)
+
+### Stats banner
+
+Three indicators are displayed above the chart. Each shows a **current value** and a **trend** compared to the previous 4 weeks.
+
+| Indicator | Value | Trend calculation |
+|-----------|-------|-------------------|
+| **kWh/j** | Average daily consumption over the last 9 days | `(current_avg - prev_avg) / prev_avg × 100` — ▼ means you're consuming less |
+| **HC %** | Ratio of off-peak consumption to total | `current_ratio - prev_ratio` (points) — ▲ means more off-peak usage (good) |
+| **€/j** | Average daily cost (HP×price_hp + HC×price_hc + subscription/30.44) | Same % formula as kWh/j — ▼ means you're spending less |
+
+- **▼ in black** = improving (less consumption or cost)
+- **▲ in black** = improving (more off-peak ratio)
+- **▼ in red** = degrading (less off-peak ratio)
+- **▲ in red** = degrading (more consumption or cost)
+- Days with less than 1 kWh are excluded from all calculations
 
 ## Hardware
 
@@ -76,20 +95,39 @@ Import the CasaOS compose file from the CasaOS interface using this URL:
 https://raw.githubusercontent.com/moifort/dashboard/main/docker-compose.casaos.yml
 ```
 
-Or manually:
-
-```bash
-curl -O https://raw.githubusercontent.com/moifort/dashboard/main/docker-compose.casaos.yml
-docker compose -f docker-compose.casaos.yml up -d
-```
-
 ### 5. Flash the ESP32
 
-Flash the firmware from `../esp32-display/` to your XIAO ESP32-S3 using PlatformIO. The ESP32 must be on the same WiFi network as your server.
+Requires [Arduino CLI](https://arduino.github.io/arduino-cli/) with `esp32:esp32` core:
 
-### 6. Connect the ESP32 to the server
+```bash
+brew install arduino-cli
+arduino-cli core install esp32:esp32
+```
 
-The ESP32 must call `GET http://your-server:5000/display` to retrieve the image to display. The endpoint returns the raw binary buffer of 163,200 bytes.
+Compile and flash:
+
+```bash
+arduino-cli compile --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" esp32-display/
+arduino-cli upload --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" --port /dev/cu.usbmodem101 esp32-display/
+```
+
+### 6. Configure the ESP32
+
+On first boot, open the serial monitor:
+
+```bash
+arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
+```
+
+The ESP32 will prompt for:
+- **WiFi SSID** and **password**
+- **Server URL** (default: `http://192.168.1.50:5000`)
+
+To reconfigure later, type `reset` within 3 seconds of boot.
+
+### Refresh schedule
+
+The ESP32 refreshes the display twice a day at **8:00** and **17:00** (CET/CEST). Time is synced via NTP on each wake cycle.
 
 ## Endpoints
 
@@ -99,48 +137,6 @@ The ESP32 must call `GET http://your-server:5000/display` to retrieve the image 
 | `GET` | `/` | HTML preview of the dashboard in a browser |
 | `GET` | `/status` | Server status as JSON (last fetch, cache, config) |
 | `POST` | `/refresh` | Force a data refresh |
-
-## ESP32 Firmware
-
-The ESP32 firmware handles WiFi provisioning and display rendering. On first boot, it creates a WiFi access point for setup. On subsequent boots, it fetches the dashboard image from the server and displays it.
-
-### First boot (setup)
-
-1. The ESP32 starts a WiFi access point named **Linky-Setup**
-2. The e-paper display shows setup instructions
-3. Connect to the "Linky-Setup" WiFi with your phone
-4. A captive portal opens — enter your WiFi credentials and server URL
-5. The ESP32 saves the config and reboots
-
-### Normal operation
-
-1. Connects to WiFi
-2. Fetches the dashboard image from `GET {server_url}/display`
-3. Renders on the e-paper display
-4. Deep sleeps for 1 hour, then repeats
-
-### Flash the firmware
-
-Prerequisites: [PlatformIO CLI](https://docs.platformio.org/en/latest/core/installation/methods/installer-script.html) or VS Code with PlatformIO extension.
-
-```bash
-cd esp32-display
-pio run -t upload
-```
-
-Monitor serial output:
-
-```bash
-pio device monitor
-```
-
-### Reset WiFi config
-
-If you need to change WiFi or server settings, the ESP32 will automatically clear its config and return to setup mode if it fails to connect 3 times in a row. You can also erase the flash manually:
-
-```bash
-pio run -t erase
-```
 
 ## 3D Printed Case
 
