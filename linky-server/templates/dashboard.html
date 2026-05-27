@@ -123,9 +123,10 @@
       {val: 'HC ' + s.hc_ratio + '%', pct: pctInfo(s.hc_ratio_pct, false)},
       {val: s.avg_price + ' €/j', pct: pctInfo(s.avg_price_pct, true)}
     ];
-    items.forEach(function(item) {
+    items.forEach(function(item, i) {
       var div = document.createElement('div');
       div.className = 'stat-item';
+      if (i === items.length - 1) div.style.marginLeft = 'auto';
       var pctClass = 'stat-pct' + (item.pct.bad ? ' stat-pct-bad' : '');
       div.innerHTML = '<span class="stat-val">' + item.val + '</span> ' +
         '<span class="' + pctClass + '">' + item.pct.text + '</span>';
