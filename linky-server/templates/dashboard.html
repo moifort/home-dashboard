@@ -59,11 +59,10 @@
 
   .stats {
     position: absolute;
-    top: 10px;
     left: 20px;
     display: flex;
     align-items: center;
-    gap: 32px;
+    gap: 24px;
     font-size: 13px;
   }
 
@@ -71,6 +70,7 @@
     display: flex;
     align-items: center;
     gap: 3px;
+    white-space: nowrap;
   }
 
   .stat-num {
@@ -191,6 +191,9 @@
     col.appendChild(label);
     chart.appendChild(col);
   });
+
+  var chartRect = chart.getBoundingClientRect();
+  statsEl.style.bottom = (480 - chartRect.top + 4) + 'px';
 
   document.body.classList.add('ready');
 </script>
