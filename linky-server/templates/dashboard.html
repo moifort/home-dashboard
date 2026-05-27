@@ -81,8 +81,8 @@
   }
 
   .stat-pct {
-    font-weight: 400;
-    font-size: 11px;
+    font-weight: 700;
+    font-size: 13px;
     margin-left: 2px;
   }
 
@@ -108,26 +108,24 @@
   var s = data.stats || {};
   var statsEl = document.getElementById('stats');
 
-  function pctStr(pct, invert) {
-    if (pct === 0) return '';
+  function pctStr(pct) {
+    if (pct === 0) return '—';
     var arrow = pct > 0 ? '↑' : '↓';
-    var sign = pct > 0 ? '+' : '';
-    return arrow + sign + pct + '%';
+    return arrow + Math.abs(pct) + '%';
   }
 
   if (s.avg_kwh) {
     var items = [
-      {num: s.avg_kwh, unit: 'kWh/j', pct: pctStr(s.avg_kwh_pct, true)},
-      {num: 'HC ' + s.hc_ratio, unit: '%', pct: pctStr(s.hc_ratio_pct, false)},
-      {num: s.avg_price, unit: '€/j', pct: pctStr(s.avg_price_pct, true)}
+      {num: s.avg_kwh, unit: 'kWh/j', pct: pctStr(s.avg_kwh_pct)},
+      {num: 'HC ' + s.hc_ratio, unit: '%', pct: pctStr(s.hc_ratio_pct)},
+      {num: s.avg_price, unit: '€/j', pct: pctStr(s.avg_price_pct)}
     ];
     items.forEach(function(item) {
       var div = document.createElement('div');
       div.className = 'stat-item';
-      var html = '<span class="stat-num">' + item.num + '</span>' +
-        '<span class="stat-unit">' + item.unit + '</span>';
-      if (item.pct) html += '<span class="stat-pct">' + item.pct + '</span>';
-      div.innerHTML = html;
+      div.innerHTML = '<span class="stat-num">' + item.num + '</span>' +
+        '<span class="stat-unit">' + item.unit + '</span>' +
+        '<span class="stat-pct">' + item.pct + '</span>';
       statsEl.appendChild(div);
     });
   }
