@@ -43,6 +43,13 @@
 - Après chaque modification du template, **analyser le PNG rendu** avant d'envoyer à l'ESP32
 - Vérifier : alignement avec la ligne de séparation, netteté du texte, espacement des chiffres
 
+## Git Workflow
+
+- **Ne jamais `git push` automatiquement** — pousser uniquement quand l'utilisateur dit "push" ou "pousse"
+- Quand on pousse : vérifier les commits locaux (`git log --oneline origin/main..HEAD`), squash les reverts/fix en série, nettoyer l'historique, mettre à jour le README si nécessaire
+- Proposer de pousser quand on a bien avancé ou qu'un milestone est atteint
+- Commit après chaque modification vérifiée, mais le push est un acte délibéré
+
 ## Linky / Conso API
 
 - **API** : `conso.boris.sh/api/consumption_load_curve` (intervalles 30 min, en W)
