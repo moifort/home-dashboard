@@ -18,20 +18,18 @@
 
 ### Pin Mapping (XIAO ↔ HAT+ 10-pin connector)
 
-| HAT+ label | XIAO pin | GPIO |
-|------------|----------|------|
-| VCC        | 3V3      | —    |
-| GND        | GND      | —    |
-| DIN        | D9       | 8    |
-| CLK        | D8       | 7    |
-| CS_M       | D2       | 3    |
-| CS_S       | D10      | 9    |
-| DC         | D1       | 2    |
-| RST        | D0       | 1    |
-| BUSY       | D3       | 4    |
-| PWR        | D4       | 5    |
-
-**WARNING**: on the XIAO, GPIO numbers ≠ Dx labels (e.g. D3=GPIO4, D4=GPIO5). Always use Dx labels for wiring.
+| HAT+ label | XIAO pin |
+|------------|----------|
+| VCC        | 3V3      |
+| GND        | GND      |
+| DIN        | D9       |
+| CLK        | D8       |
+| CS_M       | D2       |
+| CS_S       | D10      |
+| DC         | D1       |
+| RST        | D0       |
+| BUSY       | D3       |
+| PWR        | D4       |
 
 ### Build & Flash
 
