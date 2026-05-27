@@ -28,7 +28,7 @@ services:
       PRICE_ABO_MONTHLY: "15.65"
       REFRESH_INTERVAL: "3600"
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:5000/status || exit 1
+      test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/status')" || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
