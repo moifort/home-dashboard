@@ -157,7 +157,7 @@
 
     var valueDiv = document.createElement('div');
     valueDiv.className = 'bar-value';
-    valueDiv.textContent = total.toFixed(1);
+    valueDiv.textContent = total.toFixed(1).replace('.', ',');
 
     var stack = document.createElement('div');
     stack.className = 'bar-stack';
