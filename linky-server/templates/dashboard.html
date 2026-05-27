@@ -42,20 +42,8 @@
     width: 100%;
   }
 
-  .bar-hp-weekend {
-    background: #ffff00;
-    width: 100%;
-  }
-
   .bar-hc {
     background: #fff;
-    border-top: 2px solid #000;
-    border-bottom: 2px solid #000;
-    width: 100%;
-  }
-
-  .bar-hc-weekend {
-    background: #ffff00;
     border-top: 2px solid #000;
     border-bottom: 2px solid #000;
     width: 100%;
@@ -98,10 +86,6 @@
 
   .stat-pct-bad {
     color: #ff0000;
-  }
-
-  .weekend {
-    color: #ffff00;
   }
 
   .day-label {
@@ -167,13 +151,12 @@
     var totalHeight = Math.round((total / maxKwh) * barMaxHeight);
     var hpHeight = Math.round((hp / maxKwh) * barMaxHeight);
     var hcHeight = totalHeight - hpHeight;
-    var isWeekend = d.day === 'Sam' || d.day === 'Dim';
 
     var col = document.createElement('div');
     col.className = 'day-col';
 
     var valueDiv = document.createElement('div');
-    valueDiv.className = 'bar-value' + (isWeekend ? ' weekend' : '');
+    valueDiv.className = 'bar-value';
     valueDiv.textContent = total.toFixed(1);
 
     var stack = document.createElement('div');
@@ -182,19 +165,19 @@
 
     if (hcHeight > 0) {
       var hcBar = document.createElement('div');
-      hcBar.className = isWeekend ? 'bar-hc-weekend' : 'bar-hc';
+      hcBar.className = 'bar-hc';
       hcBar.style.height = hcHeight + 'px';
       stack.appendChild(hcBar);
     }
     if (hpHeight > 0) {
       var hpBar = document.createElement('div');
-      hpBar.className = isWeekend ? 'bar-hp-weekend' : 'bar-hp';
+      hpBar.className = 'bar-hp';
       hpBar.style.height = hpHeight + 'px';
       stack.appendChild(hpBar);
     }
 
     var label = document.createElement('div');
-    label.className = 'day-label' + (isWeekend ? ' weekend' : '');
+    label.className = 'day-label';
     label.textContent = d.day;
 
     col.appendChild(valueDiv);
