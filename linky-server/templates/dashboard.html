@@ -62,10 +62,10 @@
     left: 20px;
     display: flex;
     align-items: center;
-    gap: 24px;
+    justify-content: space-between;
     font-size: 13px;
-    padding-bottom: 6px;
-    border-bottom: 2px solid #000;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #000;
   }
 
   .stat-item {
@@ -195,6 +195,7 @@
   });
 
   var chartRect = chart.getBoundingClientRect();
+  statsEl.style.width = chartRect.width + 'px';
   statsEl.style.bottom = (480 - chartRect.top + 4) + 'px';
 
   document.body.classList.add('ready');
