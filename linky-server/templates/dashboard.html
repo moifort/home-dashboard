@@ -73,22 +73,15 @@
     align-items: center;
     gap: 3px;
     white-space: nowrap;
-  }
-
-  .stat-num {
-    font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
 
-  .stat-unit {
-    font-weight: 400;
+  .stat-val {
+    font-weight: 700;
   }
 
   .stat-pct {
     font-weight: 700;
-    font-size: 13px;
-    margin-left: 2px;
-    font-variant-numeric: tabular-nums;
   }
 
   .stat-pct-bad {
@@ -126,16 +119,15 @@
 
   if (s.avg_kwh) {
     var items = [
-      {num: s.avg_kwh, unit: 'kWh/j', pct: pctInfo(s.avg_kwh_pct, true)},
-      {num: 'HC ' + s.hc_ratio + '%', unit: '', pct: pctInfo(s.hc_ratio_pct, false)},
-      {num: s.avg_price, unit: '€/j', pct: pctInfo(s.avg_price_pct, true)}
+      {val: s.avg_kwh + ' kWh/j', pct: pctInfo(s.avg_kwh_pct, true)},
+      {val: 'HC ' + s.hc_ratio + '%', pct: pctInfo(s.hc_ratio_pct, false)},
+      {val: s.avg_price + ' €/j', pct: pctInfo(s.avg_price_pct, true)}
     ];
     items.forEach(function(item) {
       var div = document.createElement('div');
       div.className = 'stat-item';
       var pctClass = 'stat-pct' + (item.pct.bad ? ' stat-pct-bad' : '');
-      div.innerHTML = '<span class="stat-num">' + item.num + '</span>' +
-        '<span class="stat-unit">' + item.unit + '</span>' +
+      div.innerHTML = '<span class="stat-val">' + item.val + '</span> ' +
         '<span class="' + pctClass + '">' + item.pct.text + '</span>';
       statsEl.appendChild(div);
     });
