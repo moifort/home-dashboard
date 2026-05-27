@@ -19,6 +19,7 @@ from linky_client import (
     LinkyAuthError,
     compute_daily_hc_hp,
     fetch_load_curve,
+    parse_hc_windows,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -33,8 +34,10 @@ DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
 TOKEN = os.environ.get("LINKY_TOKEN", "")
 PRM = os.environ.get("LINKY_PRM", "REDACTED_PRM")
 REFRESH_INTERVAL = int(os.environ.get("REFRESH_INTERVAL", "3600"))
-HC_START = int(os.environ.get("HC_START", "22"))
-HC_END = int(os.environ.get("HC_END", "6"))
+HC_WINDOWS = parse_hc_windows(os.environ.get("HC_WINDOWS", "23:32-5:32,15:02-17:02"))
+PRICE_HP = float(os.environ.get("PRICE_HP", "0.2065"))
+PRICE_HC = float(os.environ.get("PRICE_HC", "0.1579"))
+PRICE_ABO_MONTHLY = float(os.environ.get("PRICE_ABO_MONTHLY", "15.65"))
 RENDER_MODE = os.environ.get("RENDER_MODE", "bw")
 DITHER = os.environ.get("DITHER", "none")
 DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")
@@ -127,40 +130,53 @@ def fetch_and_cache() -> list[dict]:
     global last_fetch_time, last_error
     now = datetime.now(PARIS_TZ)
     end_date = now.strftime("%Y-%m-%d")
-    start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    # 5 weeks of history for stats comparison
+    full_start = (now - timedelta(days=35)).strftime("%Y-%m-%d")
+    week_start = (now - timedelta(days=7)).strftime("%Y-%m-%d")
 
-    if not needs_refresh(start_date, end_date):
+    if not needs_refresh(week_start, end_date):
         logger.info("Cache is fresh, skipping API call")
-        return get_cached_days(start_date, end_date)
+        return get_cached_days(full_start, end_date)
 
-    logger.info("Fetching load curve from Conso API: %s to %s", start_date, end_date)
-    try:
-        raw = fetch_load_curve(TOKEN, PRM, start_date, end_date)
-        days = compute_daily_hc_hp(raw, HC_START, HC_END)
-        if days:
-            upsert_days(days)
-            last_fetch_time = now.isoformat()
-            last_error = ""
-            logger.info("Fetched and cached %d days", len(days))
-        else:
-            logger.warning("API returned no data")
-            last_error = "API returned no data"
-    except LinkyAuthError as e:
-        logger.critical("Auth error: %s — token may be expired", e)
-        last_error = str(e)
-    except LinkyApiError as e:
-        logger.error("API error: %s — using cached data", e)
-        last_error = str(e)
+    # API limits to 7 days per request — fetch in weekly chunks
+    for week_offset in range(5):
+        chunk_end = now - timedelta(days=week_offset * 7)
+        chunk_start = chunk_end - timedelta(days=7)
+        s = chunk_start.strftime("%Y-%m-%d")
+        e = chunk_end.strftime("%Y-%m-%d")
+        if get_cached_days(s, e) and week_offset > 0:
+            continue
+        logger.info("Fetching load curve: %s to %s", s, e)
+        try:
+            raw = fetch_load_curve(TOKEN, PRM, s, e)
+            days = compute_daily_hc_hp(raw, HC_WINDOWS)
+            if days:
+                upsert_days(days)
+        except LinkyAuthError as exc:
+            logger.critical("Auth error: %s", exc)
+            last_error = str(exc)
+            break
+        except LinkyApiError as exc:
+            logger.warning("API error for %s-%s: %s", s, e, exc)
+            last_error = str(exc)
+            continue
 
-    return get_cached_days(start_date, end_date)
+    last_fetch_time = now.isoformat()
+    if not last_error:
+        last_error = ""
+    return get_cached_days(full_start, end_date)
 
 
 def build_dashboard_data(days: list[dict]) -> dict:
     now = datetime.now(PARIS_TZ)
     today = now.strftime("%Y-%m-%d")
     complete_days = [d for d in days if d["date"] < today]
+
+    current_week = complete_days[-7:]
+    prev_weeks = complete_days[-35:-7]
+
     result = []
-    for d in complete_days[-7:]:
+    for d in current_week:
         dt = datetime.strptime(d["date"], "%Y-%m-%d")
         day_name = DAYS_FR[dt.weekday()]
         result.append({
@@ -169,7 +185,42 @@ def build_dashboard_data(days: list[dict]) -> dict:
             "hc_kwh": d["hc_kwh"],
             "hp_kwh": d["hp_kwh"],
         })
-    return {"days": result, "last_updated": now.isoformat()}
+
+    stats = _compute_stats(current_week, prev_weeks)
+    return {"days": result, "stats": stats, "last_updated": now.isoformat()}
+
+
+def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
+    daily_abo = PRICE_ABO_MONTHLY / 30.44
+
+    def _avg_and_ratios(days):
+        if not days:
+            return 0, 0, 0
+        total_hc = sum(d["hc_kwh"] for d in days)
+        total_hp = sum(d["hp_kwh"] for d in days)
+        total = total_hc + total_hp
+        n = len(days)
+        avg_kwh = total / n
+        hc_ratio = (total_hc / total * 100) if total > 0 else 0
+        avg_price = ((total_hp * PRICE_HP + total_hc * PRICE_HC) / n) + daily_abo
+        return avg_kwh, hc_ratio, avg_price
+
+    avg_kwh, hc_ratio, avg_price = _avg_and_ratios(current)
+    avg_kwh_prev, hc_ratio_prev, avg_price_prev = _avg_and_ratios(previous)
+
+    def _pct(cur, prev):
+        if prev == 0:
+            return 0
+        return round((cur - prev) / prev * 100, 1)
+
+    return {
+        "avg_kwh": round(avg_kwh, 1),
+        "avg_kwh_pct": _pct(avg_kwh, avg_kwh_prev),
+        "hc_ratio": round(hc_ratio, 1),
+        "hc_ratio_pct": round(hc_ratio - hc_ratio_prev, 1),
+        "avg_price": round(avg_price, 2),
+        "avg_price_pct": _pct(avg_price, avg_price_prev),
+    }
 
 
 # --- Rendering ---
@@ -273,7 +324,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "buffer_size": len(epd_buffer),
             "prm": PRM,
             "refresh_interval": REFRESH_INTERVAL,
-            "hc_hours": f"{HC_START}h-{HC_END}h",
+            "hc_windows": os.environ.get("HC_WINDOWS", "23:32-5:32,15:02-17:02"),
         }
         body = json.dumps(status, indent=2).encode()
         self.send_response(200)

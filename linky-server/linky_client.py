@@ -68,26 +68,31 @@ def fetch_load_curve(
     raise LinkyApiError("Max retries exceeded")
 
 
+def parse_hc_windows(windows_str: str) -> list[tuple[int, int, int, int]]:
+    """Parse HC windows string into list of (start_h, start_m, end_h, end_m) tuples.
+
+    Example: "23:32-5:32,15:02-17:02" -> [(23, 32, 5, 32), (15, 2, 17, 2)]
+    """
+    windows = []
+    for part in windows_str.split(","):
+        start_str, end_str = part.strip().split("-")
+        sh, sm = start_str.split(":")
+        eh, em = end_str.split(":")
+        windows.append((int(sh), int(sm), int(eh), int(em)))
+    return windows
+
+
 def compute_daily_hc_hp(
-    api_response: list | dict, hc_start: int = 22, hc_end: int = 6
+    api_response: list | dict,
+    hc_windows: list[tuple[int, int, int, int]] | None = None,
 ) -> list[dict]:
     """Aggregate load curve data into daily HC/HP totals.
 
-    The Conso API returns interval_reading entries with:
-    - date or timestamp field
-    - value in W (average power over interval)
-
     Each 30-min interval: energy_Wh = power_W * 0.5
-
-    Args:
-        api_response: Raw API response (varies in structure)
-        hc_start: Hour when off-peak starts (e.g., 22 for 10 PM)
-        hc_end: Hour when off-peak ends (e.g., 6 for 6 AM)
-
-    Returns:
-        List of {"date": "YYYY-MM-DD", "hc_kwh": float, "hp_kwh": float}
-        sorted by date ascending.
     """
+    if hc_windows is None:
+        hc_windows = [(23, 32, 5, 32), (15, 2, 17, 2)]
+
     readings = _extract_readings(api_response)
     if not readings:
         return []
@@ -98,15 +103,8 @@ def compute_daily_hc_hp(
         ts = reading["timestamp"]
         watts = reading["watts"]
         wh = watts * 0.5
-
-        hour = ts.hour
-        is_hc = _is_off_peak(hour, hc_start, hc_end)
-
+        is_hc = _is_off_peak(ts.hour, ts.minute, hc_windows)
         date_key = ts.strftime("%Y-%m-%d")
-        # Slots before hc_end belong to the previous day's night
-        if hour < hc_end:
-            prev = ts.replace(hour=0, minute=0)
-            date_key = prev.strftime("%Y-%m-%d")
 
         if is_hc:
             daily[date_key]["hc_wh"] += wh
@@ -126,10 +124,18 @@ def compute_daily_hc_hp(
     )
 
 
-def _is_off_peak(hour: int, hc_start: int, hc_end: int) -> bool:
-    if hc_start > hc_end:
-        return hour >= hc_start or hour < hc_end
-    return hc_start <= hour < hc_end
+def _is_off_peak(hour: int, minute: int, hc_windows: list[tuple[int, int, int, int]]) -> bool:
+    t = hour * 60 + minute
+    for sh, sm, eh, em in hc_windows:
+        start = sh * 60 + sm
+        end = eh * 60 + em
+        if start > end:
+            if t >= start or t < end:
+                return True
+        else:
+            if start <= t < end:
+                return True
+    return False
 
 
 def _extract_readings(api_response) -> list[dict]:
