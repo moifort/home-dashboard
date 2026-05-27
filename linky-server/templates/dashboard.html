@@ -197,8 +197,8 @@
   });
 
   var chartRect = chart.getBoundingClientRect();
-  statsEl.style.width = chartRect.width + 'px';
-  statsEl.style.bottom = (480 - chartRect.top + 4) + 'px';
+  statsEl.style.width = Math.round(chartRect.width) + 'px';
+  statsEl.style.bottom = Math.round(480 - chartRect.top + 5) + 'px';
 
   document.body.classList.add('ready');
 </script>
