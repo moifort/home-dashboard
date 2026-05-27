@@ -172,8 +172,8 @@ def build_dashboard_data(days: list[dict]) -> dict:
     today = now.strftime("%Y-%m-%d")
     complete_days = [d for d in days if d["date"] < today]
 
-    current_week = complete_days[-7:]
-    prev_weeks = complete_days[-35:-7]
+    current_week = complete_days[-9:]
+    prev_weeks = complete_days[-37:-9]
 
     result = []
     for d in current_week:
