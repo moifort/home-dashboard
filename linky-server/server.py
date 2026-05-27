@@ -274,6 +274,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_display()
         elif self.path == "/" or self.path == "/dashboard":
             self._serve_html()
+        elif self.path.startswith("/static/"):
+            self._serve_static()
         elif self.path == "/status":
             self._serve_status()
         elif self.path == "/api/data":
@@ -298,6 +300,25 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(buf)))
         self.end_headers()
         self.wfile.write(buf)
+
+    def _serve_static(self):
+        rel_path = self.path.lstrip("/")
+        file_path = ROOT / rel_path
+        if file_path.exists() and file_path.is_file():
+            self.send_response(200)
+            ct = "application/octet-stream"
+            if file_path.suffix == ".woff2":
+                ct = "font/woff2"
+            elif file_path.suffix == ".woff":
+                ct = "font/woff"
+            elif file_path.suffix == ".css":
+                ct = "text/css"
+            self.send_header("Content-Type", ct)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(file_path.read_bytes())
+        else:
+            self.send_error(404)
 
     def _serve_html(self):
         html_path = TEMPLATES_DIR / "dashboard.html"
