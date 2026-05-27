@@ -4,14 +4,14 @@ import json
 import logging
 import os
 import sqlite3
+import subprocess
 import threading
 import time
 from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from io import BytesIO
 from pathlib import Path
 from zoneinfo import ZoneInfo
-
-from playwright.sync_api import sync_playwright
 
 from converter import png_to_epd_buffer
 from linky_client import (
@@ -21,12 +21,12 @@ from linky_client import (
     fetch_load_curve,
     parse_hc_windows,
 )
+from renderer import render_dashboard
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).parent
-TEMPLATES_DIR = ROOT / "templates"
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
 DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
@@ -39,7 +39,6 @@ PRICE_HP = float(os.environ.get("PRICE_HP", "0.2065"))
 PRICE_HC = float(os.environ.get("PRICE_HC", "0.1579"))
 PRICE_ABO_MONTHLY = float(os.environ.get("PRICE_ABO_MONTHLY", "15.65"))
 RENDER_MODE = os.environ.get("RENDER_MODE", "4color")
-DITHER = os.environ.get("DITHER", "none")
 DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")
 PORT = int(os.environ.get("PORT", "5000"))
 SAVE_PNG = os.environ.get("SAVE_PNG", "false").lower() == "true"
@@ -51,6 +50,22 @@ data_lock = threading.Lock()
 last_fetch_time: str = ""
 last_render_time: str = ""
 last_error: str = ""
+
+
+def get_version() -> str:
+    version_file = ROOT / ".version"
+    if version_file.exists():
+        return version_file.read_text().strip()
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=ROOT, stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        return "unknown"
+
+
+VERSION = get_version()
 
 
 # --- SQLite Cache ---
@@ -130,7 +145,6 @@ def fetch_and_cache() -> list[dict]:
     global last_fetch_time, last_error
     now = datetime.now(PARIS_TZ)
     end_date = now.strftime("%Y-%m-%d")
-    # 5 weeks of history for stats comparison
     full_start = (now - timedelta(days=35)).strftime("%Y-%m-%d")
     week_start = (now - timedelta(days=7)).strftime("%Y-%m-%d")
 
@@ -138,7 +152,6 @@ def fetch_and_cache() -> list[dict]:
         logger.info("Cache is fresh, skipping API call")
         return get_cached_days(full_start, end_date)
 
-    # API limits to 7 days per request — fetch in weekly chunks
     for week_offset in range(5):
         chunk_end = now - timedelta(days=week_offset * 7)
         chunk_start = chunk_end - timedelta(days=7)
@@ -228,43 +241,23 @@ def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
     }
 
 
-# --- Rendering ---
-
-browser_instance = None
-page_instance = None
-pw_instance = None
-
-
-def init_browser():
-    global browser_instance, page_instance, pw_instance
-    logger.info("Launching Chromium...")
-    pw_instance = sync_playwright().start()
-    browser_instance = pw_instance.chromium.launch(
-        headless=True,
-        args=[
-            "--disable-lcd-text",
-            "--disable-font-subpixel-positioning",
-            "--font-render-hinting=none",
-        ],
-    )
-    page_instance = browser_instance.new_page(
-        viewport={"width": 1360, "height": 480},
-    )
-    logger.info("Browser ready")
-
+# --- Rendering (Pillow) ---
 
 def render_to_buffer() -> bytes:
     global last_render_time
-    page_instance.goto(f"http://127.0.0.1:{PORT}/")
-    page_instance.wait_for_selector("body.ready", timeout=5000)
-    png_bytes = page_instance.screenshot(type="png")
+    with data_lock:
+        data = dashboard_data
+
+    img = render_dashboard(data)
 
     if SAVE_PNG:
         out = Path(DB_PATH).parent / "last_render.png"
-        out.write_bytes(png_bytes)
-        logger.info("Saved screenshot to %s", out)
+        img.save(str(out))
+        logger.info("Saved render to %s", out)
 
-    buf = png_to_epd_buffer(png_bytes, mode=RENDER_MODE, dither=DITHER)
+    buf_io = BytesIO()
+    img.save(buf_io, format="PNG")
+    buf = png_to_epd_buffer(buf_io.getvalue(), mode=RENDER_MODE)
     last_render_time = datetime.now(PARIS_TZ).isoformat()
     logger.info("Rendered EPD buffer: %d bytes", len(buf))
     return buf
@@ -276,10 +269,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/display":
             self._serve_display()
-        elif self.path == "/" or self.path == "/dashboard":
-            self._serve_html()
-        elif self.path.startswith("/static/"):
-            self._serve_static()
         elif self.path == "/status":
             self._serve_status()
         elif self.path == "/api/data":
@@ -305,43 +294,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(buf)
 
-    def _serve_static(self):
-        rel_path = self.path.lstrip("/")
-        file_path = ROOT / rel_path
-        if file_path.exists() and file_path.is_file():
-            self.send_response(200)
-            ct = "application/octet-stream"
-            if file_path.suffix == ".woff2":
-                ct = "font/woff2"
-            elif file_path.suffix == ".woff":
-                ct = "font/woff"
-            elif file_path.suffix == ".css":
-                ct = "text/css"
-            self.send_header("Content-Type", ct)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(file_path.read_bytes())
-        else:
-            self.send_error(404)
-
-    def _serve_html(self):
-        html_path = TEMPLATES_DIR / "dashboard.html"
-        html = html_path.read_text()
-        with data_lock:
-            data_json = json.dumps(dashboard_data)
-        html = html.replace(
-            "window.__DASHBOARD_DATA__ = {};",
-            f"window.__DASHBOARD_DATA__ = {data_json};",
-        )
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.end_headers()
-        self.wfile.write(html.encode())
-
     def _serve_status(self):
         with data_lock:
             days_count = len(dashboard_data.get("days", []))
         status = {
+            "version": VERSION,
             "last_fetch": last_fetch_time,
             "last_render": last_render_time,
             "last_error": last_error,
@@ -412,13 +369,14 @@ def schedule_loop():
 # --- Main ---
 
 def main():
+    logger.info("Linky Dashboard v%s", VERSION)
+
     if not TOKEN:
         logger.critical("LINKY_TOKEN environment variable is required")
         raise SystemExit(1)
 
     init_db()
     start_http_server(PORT)
-    init_browser()
     schedule_loop()
 
 
