@@ -62,26 +62,18 @@
     left: 20px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     font-size: 13px;
     padding: 0 0 4px 0;
     border-bottom: 1px solid #000;
   }
 
   .stat-item {
-    flex: 1;
     display: flex;
     align-items: center;
     gap: 3px;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
-  }
-
-  .stat-item-center {
-    justify-content: center;
-  }
-
-  .stat-item-right {
-    justify-content: flex-end;
   }
 
   .stat-val {
@@ -134,10 +126,8 @@
     items.forEach(function(item, i) {
       var div = document.createElement('div');
       div.className = 'stat-item';
-      if (i === 1) div.className += ' stat-item-center';
-      if (i === items.length - 1) div.className += ' stat-item-right';
       var pctClass = 'stat-pct' + (item.pct.bad ? ' stat-pct-bad' : '');
-      div.innerHTML = '<span class="stat-val">' + item.val + '</span> ' +
+      div.innerHTML = '<span class="stat-val">' + item.val + '</span>' +
         '<span class="' + pctClass + '">' + item.pct.text + '</span>';
       statsEl.appendChild(div);
     });
@@ -198,7 +188,7 @@
 
   var chartRect = chart.getBoundingClientRect();
   statsEl.style.width = Math.round(chartRect.width) + 'px';
-  statsEl.style.bottom = Math.round(480 - chartRect.top + 5) + 'px';
+  statsEl.style.bottom = Math.round(480 - chartRect.top + 12) + 'px';
 
   document.body.classList.add('ready');
 </script>
