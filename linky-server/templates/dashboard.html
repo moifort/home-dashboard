@@ -58,25 +58,32 @@
 
   .stats {
     position: absolute;
-    top: 12px;
+    top: 10px;
     left: 20px;
     display: flex;
-    gap: 24px;
+    align-items: center;
+    gap: 32px;
     font-size: 13px;
   }
 
   .stat-item {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: 3px;
   }
 
-  .stat-value {
+  .stat-num {
     font-weight: 700;
   }
 
+  .stat-unit {
+    font-weight: 300;
+  }
+
   .stat-pct {
+    font-weight: 300;
     font-size: 11px;
+    margin-left: 2px;
   }
 
   .day-label {
@@ -101,24 +108,26 @@
   var s = data.stats || {};
   var statsEl = document.getElementById('stats');
 
-  function arrow(pct, invert) {
+  function pctStr(pct, invert) {
     if (pct === 0) return '';
-    var good = invert ? pct < 0 : pct > 0;
+    var arrow = pct > 0 ? '↑' : '↓';
     var sign = pct > 0 ? '+' : '';
-    return ' ' + (pct > 0 ? '↑' : '↓') + sign + pct + '%';
+    return arrow + sign + pct + '%';
   }
 
   if (s.avg_kwh) {
     var items = [
-      {val: s.avg_kwh + ' kwh/j', pct: arrow(s.avg_kwh_pct, true)},
-      {val: 'hc ' + s.hc_ratio + '%', pct: arrow(s.hc_ratio_pct, false)},
-      {val: s.avg_price + ' €/j', pct: arrow(s.avg_price_pct, true)}
+      {num: s.avg_kwh, unit: 'kWh/j', pct: pctStr(s.avg_kwh_pct, true)},
+      {num: 'HC ' + s.hc_ratio, unit: '%', pct: pctStr(s.hc_ratio_pct, false)},
+      {num: s.avg_price, unit: '€/j', pct: pctStr(s.avg_price_pct, true)}
     ];
     items.forEach(function(item) {
       var div = document.createElement('div');
       div.className = 'stat-item';
-      div.innerHTML = '<span class="stat-value">' + item.val + '</span>' +
-        '<span class="stat-pct">' + item.pct + '</span>';
+      var html = '<span class="stat-num">' + item.num + '</span>' +
+        '<span class="stat-unit">' + item.unit + '</span>';
+      if (item.pct) html += '<span class="stat-pct">' + item.pct + '</span>';
+      div.innerHTML = html;
       statsEl.appendChild(div);
     });
   }
