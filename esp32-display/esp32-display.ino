@@ -1,81 +1,182 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+#include "nvs_config.h"
+#include "DEV_Config.h"
 #include "EPD_10in85g.h"
-#include "GUI_Paint.h"
-#include "fonts.h"
-#include "ImageData.h"
+
+static String serialReadLine() {
+    String line = "";
+    while (true) {
+        if (Serial.available()) {
+            char c = Serial.read();
+            if (c == '\n' || c == '\r') {
+                if (line.length() > 0) {
+                    Serial.println();
+                    return line;
+                }
+            } else {
+                line += c;
+                Serial.print(c);
+            }
+        }
+        delay(10);
+    }
+}
+
+static bool checkResetCommand() {
+    Serial.println("Type 'reset' within 3s to reconfigure...");
+    unsigned long start = millis();
+    String input = "";
+    while (millis() - start < BOOT_WAIT_MS) {
+        if (Serial.available()) {
+            char c = Serial.read();
+            if (c == '\n' || c == '\r') {
+                input.trim();
+                if (input.equalsIgnoreCase("reset")) return true;
+                input = "";
+            } else {
+                input += c;
+            }
+        }
+        delay(10);
+    }
+    return false;
+}
+
+static String buildDisplayUrl(const String &serverUrl) {
+    String url = serverUrl;
+    if (url.endsWith("/")) url += "display";
+    else if (!url.endsWith("/display")) url += "/display";
+    return url;
+}
+
+static bool fetchDisplayBuffer(const String &serverUrl, uint8_t *buf) {
+    HTTPClient http;
+    String url = buildDisplayUrl(serverUrl);
+    Serial.printf("Fetching: %s\n", url.c_str());
+
+    http.begin(url);
+    http.setTimeout(30000);
+
+    int httpCode = http.GET();
+    if (httpCode != 200) {
+        Serial.printf("HTTP error: %d\n", httpCode);
+        http.end();
+        return false;
+    }
+
+    WiFiClient *stream = http.getStreamPtr();
+    uint32_t bytesRead = 0;
+
+    while (bytesRead < DISPLAY_BUFFER_SIZE && http.connected()) {
+        size_t available = stream->available();
+        if (available > 0) {
+            size_t toRead = min((size_t)(DISPLAY_BUFFER_SIZE - bytesRead), available);
+            size_t got = stream->readBytes(buf + bytesRead, toRead);
+            bytesRead += got;
+        } else {
+            delay(10);
+        }
+    }
+
+    http.end();
+    Serial.printf("Received %lu / %lu bytes\n", (unsigned long)bytesRead, (unsigned long)DISPLAY_BUFFER_SIZE);
+
+    return bytesRead == DISPLAY_BUFFER_SIZE;
+}
 
 void setup() {
     Serial.begin(115200);
-    delay(3000);
-    Serial.println("EPD_10IN85G_test Demo");
-    DEV_Module_Init();
-    Serial.println("Module init done");
+    delay(500);
+    Serial.println("\n=== Linky Dashboard ===");
 
-     Debug("e-Paper Init and Clear...\r\n");
-    EPD_10in85g_Init();
-    EPD_10in85g_Clear(EPD_10in85g_WHITE);
-    DEV_Delay_ms(500);
-
-    //Create a new image cache
-    UBYTE *Image;
-    UDOUBLE Imagesize = ((EPD_10in85g_WIDTH % 4 == 0)? (EPD_10in85g_WIDTH / 4 ): (EPD_10in85g_WIDTH / 4 + 1)) * EPD_10in85g_HEIGHT;
-    if((Image = (UBYTE *)ps_malloc(Imagesize*2)) == NULL) {
-        printf("Failed to apply for black memory...\r\n");
-        while(1);
+    if (checkResetCommand()) {
+        clearConfig();
+        Serial.println("Configuration cleared.");
     }
-    printf("Paint_NewImage\r\n");
-    Paint_NewImage(Image, EPD_10in85g_WIDTH*2, EPD_10in85g_HEIGHT, 0, WHITE);
-    Paint_SetScale(4);
 
-#if 1   // show bmp
-    EPD_10in85g_Init_Fast();
-    EPD_10in85g_Display(gImage_10in85G);
-    DEV_Delay_ms(1500);
-#endif
+    String ssid, pass, serverUrl;
+    bool hasConfig = loadConfig(ssid, pass, serverUrl);
 
-#if 1 // Drawing on the image
-    //1.Select Image
-    printf("SelectImage:BlackImage\r\n");
-    Paint_SelectImage(Image);
-    Paint_Clear(EPD_10in85g_WHITE);
+    if (!hasConfig) {
+        Serial.println("\nNo configuration found. Starting setup...\n");
 
-    // 2.Drawing on the image
-    printf("Drawing:Image\r\n");
-    Paint_DrawPoint(10, 80, EPD_10in85g_RED, DOT_PIXEL_1X1, DOT_STYLE_DFT);
-    Paint_DrawPoint(10, 90, EPD_10in85g_YELLOW, DOT_PIXEL_2X2, DOT_STYLE_DFT);
-    Paint_DrawPoint(10, 100, EPD_10in85g_BLACK, DOT_PIXEL_3X3, DOT_STYLE_DFT);
-    Paint_DrawLine(20, 70, 70, 120, EPD_10in85g_RED, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawLine(70, 70, 20, 120, EPD_10in85g_RED, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawRectangle(20, 70, 70, 120, EPD_10in85g_YELLOW, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawRectangle(80, 70, 130, 120, EPD_10in85g_YELLOW, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawCircle(45, 95, 20, EPD_10in85g_BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawCircle(105, 95, 20, EPD_10in85g_BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawLine(85, 95, 125, 95, EPD_10in85g_RED, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-    Paint_DrawLine(105, 75, 105, 115, EPD_10in85g_YELLOW, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-    Paint_DrawString_EN(10, 0, "Red, yellow, white and black", &Font24, EPD_10in85g_RED, EPD_10in85g_YELLOW);
-    Paint_DrawString_EN(10, 30, "Four color e-Paper", &Font16, EPD_10in85g_YELLOW, EPD_10in85g_BLACK);
-    Paint_DrawString_CN(150, 45, "微雪电子", &Font24CN, EPD_10in85g_RED, EPD_10in85g_WHITE);
-    Paint_DrawNum(10, 50, 123456, &Font12, EPD_10in85g_RED, EPD_10in85g_WHITE);
+        Serial.print("WiFi SSID: ");
+        ssid = serialReadLine();
 
-    printf("EPD_Display\r\n");
-    EPD_10in85g_Display(Image);
-    DEV_Delay_ms(3000);
-#endif
+        Serial.print("WiFi Password: ");
+        pass = serialReadLine();
 
-    Debug("Clear...\r\n");
+        Serial.printf("Server URL [%s]: ", DEFAULT_SERVER_URL);
+        serverUrl = serialReadLine();
+        if (serverUrl.length() == 0) serverUrl = DEFAULT_SERVER_URL;
+
+        saveConfig(ssid, pass, serverUrl);
+        Serial.println("\nConfiguration saved.");
+    }
+
+    Serial.printf("Connecting to WiFi: %s\n", ssid.c_str());
+
+    bool connected = false;
+    for (int attempt = 1; attempt <= WIFI_MAX_RETRIES; attempt++) {
+        Serial.printf("Attempt %d/%d...\n", attempt, WIFI_MAX_RETRIES);
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(ssid.c_str(), pass.c_str());
+
+        unsigned long start = millis();
+        while (WiFi.status() != WL_CONNECTED && (millis() - start) < WIFI_TIMEOUT_MS) {
+            delay(250);
+            Serial.print(".");
+        }
+        Serial.println();
+
+        if (WiFi.status() == WL_CONNECTED) {
+            connected = true;
+            break;
+        }
+        WiFi.disconnect(true);
+        delay(1000);
+    }
+
+    if (!connected) {
+        Serial.println("WiFi failed. Retrying in 5 minutes...");
+        Serial.flush();
+        esp_deep_sleep(RETRY_SLEEP_US);
+        return;
+    }
+
+    Serial.printf("Connected. IP: %s\n", WiFi.localIP().toString().c_str());
+
+    uint8_t *buf = (uint8_t *)ps_malloc(DISPLAY_BUFFER_SIZE);
+    if (!buf) {
+        Serial.println("ERROR: PSRAM allocation failed");
+        while (1) delay(1000);
+    }
+
+    if (!fetchDisplayBuffer(serverUrl, buf)) {
+        Serial.println("Fetch failed. Retrying in 5 minutes...");
+        free(buf);
+        WiFi.disconnect(true);
+        Serial.flush();
+        esp_deep_sleep(RETRY_SLEEP_US);
+        return;
+    }
+
+    DEV_Module_Init();
     EPD_10in85g_Init();
-    EPD_10in85g_Clear(EPD_10in85g_WHITE);
-
-    Debug("Goto Sleep...\r\n");
+    Serial.println("Rendering...");
+    EPD_10in85g_Display(buf);
     EPD_10in85g_Sleep();
-    free(Image);
-    DEV_Delay_ms(2000);
 
-    // close 5V
-    Debug("close 5V, Module enters 0 power consumption ...\r\n");
+    free(buf);
+    WiFi.disconnect(true);
     DEV_Module_Exit();
+
+    Serial.println("Sleeping 1 hour...");
+    Serial.flush();
+    esp_deep_sleep(DEEP_SLEEP_US);
 }
 
-
 void loop() {
-
 }
