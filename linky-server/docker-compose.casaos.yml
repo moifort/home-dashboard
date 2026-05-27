@@ -16,7 +16,7 @@ services:
     environment:
       TZ: Europe/Paris
       LINKY_TOKEN: ${LINKY_TOKEN}
-      LINKY_PRM: ${LINKY_PRM:-REDACTED_PRM}
+      LINKY_PRM: ${LINKY_PRM}
       HC_WINDOWS: ${HC_WINDOWS:-23:32-5:32,15:02-17:02}
       PRICE_HP: ${PRICE_HP:-0.2065}
       PRICE_HC: ${PRICE_HC:-0.1579}

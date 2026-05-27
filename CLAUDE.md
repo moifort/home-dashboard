@@ -1,61 +1,61 @@
-# Dashboard e-Paper — Guide de développement
+# Dashboard e-Paper — Development Guide
 
 ## Architecture
 
-- **ESP32** (XIAO ESP32-S3) : serveur WiFi sur port 80, reçoit un buffer EPD binaire via `POST /display` ou retourne son statut via `GET /status`
-- **linky-server/** : serveur Python Docker (CasaOS, port 5000) qui fetch les données Linky, rend le dashboard HTML via Playwright, sert le buffer EPD à l'ESP32 en mode pull (`GET /display`)
-- **web_dashboard/** : pipeline de rendu alternatif (HTML → Playwright screenshot → converter → ESP32)
-- **main.py** : dashboard Raspberry Pi avec rendu direct SPI (pas lié au linky-server)
+- **ESP32** (XIAO ESP32-S3): WiFi server on port 80, receives EPD binary buffer via `POST /display` or returns status via `GET /status`
+- **linky-server/**: Python Docker server (CasaOS, port 5000) that fetches Linky data, renders the HTML dashboard via Playwright, serves EPD buffer to ESP32 in pull mode (`GET /display`)
+- **web_dashboard/**: alternative rendering pipeline (HTML → Playwright screenshot → converter → ESP32)
+- **main.py**: Raspberry Pi dashboard with direct SPI rendering (unrelated to linky-server)
 
-## Écran e-Paper
+## e-Paper Display
 
-- **Modèle** : Waveshare 10.85" **(G) 4 couleurs** (noir, blanc, jaune, rouge)
-- **Driver** : `epd10in85g` — JAMAIS `epd10in85` (B/W), séquence d'init différente
-- **Résolution** : 1360×480, 2 bits/pixel, buffer = 163 200 octets
-- **ESP32 IP** : variable (scanner avec `arp -a | grep esp32`)
+- **Model**: Waveshare 10.85" **(G) 4-color** (black, white, yellow, red)
+- **Driver**: `epd10in85g` — NEVER `epd10in85` (B/W), different init sequence
+- **Resolution**: 1360×480, 2 bits/pixel, buffer = 163,200 bytes
+- **ESP32 IP**: variable (scan with `arp -a | grep esp32`)
 
-## Règles de rendu e-Paper (CRITIQUE)
+## e-Paper Rendering Rules (CRITICAL)
 
-### Police
-- **Arial uniquement**. Ne pas utiliser Inter, Cozette, Courier New, ni aucune police web/bitmap — toutes rendent moins bien après seuillage B&W
-- `font-weight` minimum **400** (regular). JAMAIS 300 (light) — les traits fins disparaissent
-- `font-weight` **700** (bold) pour les valeurs/chiffres importants
-- `font-variant-numeric: tabular-nums` pour les chiffres (largeur uniforme)
-- Labels de jours en **lowercase** (`text-transform: lowercase`) — les majuscules ont un espacement irrégulier en Arial
+### Font
+- **Arial only**. Do not use Inter, Cozette, Courier New, Aldrich, or any web/bitmap font — they all render worse after B&W thresholding
+- `font-weight` minimum **400** (regular). NEVER 300 (light) — thin strokes disappear
+- `font-weight` **700** (bold) for important values/numbers
+- `font-variant-numeric: tabular-nums` for digits (uniform width)
+- Day labels in **lowercase** (`text-transform: lowercase`) — uppercase letters have irregular spacing in Arial
 
-### Rendu
-- **JAMAIS** de `device_scale_factor` ni de downscale. Toujours rendu natif **1360×480**
-- Flags Chromium obligatoires : `--disable-lcd-text --disable-font-subpixel-positioning --font-render-hinting=none`
-- **JAMAIS de jaune pour du texte ou des barres** — illisible (pas assez de contraste)
-- Rouge (`#ff0000`) uniquement pour les progressions négatives (le converter 4color détecte `r > 180 && g < 100 && b < 100`)
-- Symboles : **▲▼** (triangles pleins), jamais ↑↓ (trop fins, invisibles)
+### Rendering
+- **NEVER** use `device_scale_factor` or any downscaling. Always render at native **1360×480**
+- Required Chromium flags: `--disable-lcd-text --disable-font-subpixel-positioning --font-render-hinting=none`
+- **NEVER use yellow for text or bars** — illegible (not enough contrast)
+- Red (`#ff0000`) only for negative progressions (4color converter detects `r > 180 && g < 100 && b < 100`)
+- Symbols: **▲▼** (filled triangles), never ↑↓ (too thin, invisible)
 
 ### Layout
-- **flex** pour tous les alignements, `align-items: center` pour l'alignement vertical
-- Distribution gauche/centre/droite : `justify-content: space-between` sur le parent, **sans** `flex: 1` sur les enfants
-- Lignes de séparation en **1px** (pas 2px)
-- **`Math.round()`** sur toutes les positions calculées en JS — les valeurs sub-pixel causent du flou
-- Pas d'espace HTML entre les spans — ça décale l'alignement
-- Pour aligner un bandeau avec le chart : `getBoundingClientRect()` en JS
-- Ne **jamais** toucher au style du graphique existant quand on ajoute des éléments
+- **flex** for all alignments, `align-items: center` for vertical alignment
+- Left/center/right distribution: `justify-content: space-between` on parent, **without** `flex: 1` on children
+- Separator lines at **1px** (not 2px)
+- **`Math.round()`** on all JS-computed positions — sub-pixel values cause blur after thresholding
+- No HTML spaces between spans — they shift alignment
+- To align a banner with the chart: use `getBoundingClientRect()` in JS
+- **Never** modify existing chart styles when adding surrounding elements
 
 ### Workflow
-- Après chaque modification du template, **analyser le PNG rendu** avant d'envoyer à l'ESP32
-- Vérifier : alignement avec la ligne de séparation, netteté du texte, espacement des chiffres
+- After every template change, **analyze the rendered PNG** before sending to ESP32
+- Check: alignment with separator line, text sharpness, digit spacing
 
 ## Git Workflow
 
-- **Ne jamais `git push` automatiquement** — pousser uniquement quand l'utilisateur dit "push" ou "pousse"
-- Quand on pousse : vérifier les commits locaux (`git log --oneline origin/main..HEAD`), squash les reverts/fix en série, nettoyer l'historique, mettre à jour le README si nécessaire
-- Proposer de pousser quand on a bien avancé ou qu'un milestone est atteint
-- Commit après chaque modification vérifiée, mais le push est un acte délibéré
+- **Never `git push` automatically** — push only when the user says "push"
+- On push: review local commits (`git log --oneline origin/main..HEAD`), squash reverts/serial fixes, clean up history, update README if needed
+- Suggest pushing when good progress is made or a milestone is reached
+- Commit after each verified change, but push is a deliberate act
 
 ## Linky / Conso API
 
-- **API** : `conso.boris.sh/api/consumption_load_curve` (intervalles 30 min, en W)
-- **PRM** : `REDACTED_PRM`
-- **Token** : JWT 3 ans, stocké dans `.env` (`LINKY_TOKEN`) — JAMAIS dans le code
-- **Limite API** : max 7 jours par requête (8 jours → 400 Bad Request)
-- **HC/HP** : deux fenêtres HC — 23h32-5h32 (nuit) + 15h02-17h02 (après-midi), configurable via `HC_WINDOWS`
-- **Tarifs** : HP=0.2065 €/kWh, HC=0.1579 €/kWh, abonnement=15.65 €/mois
-- **Architecture** : pull mode — ESP32 appelle `GET /display` pour récupérer le buffer pré-rendu
+- **API**: `conso.boris.sh/api/consumption_load_curve` (30-min intervals, in W)
+- **PRM**: stored in `.env` (`LINKY_PRM`) — NEVER in code
+- **Token**: JWT valid 3 years, stored in `.env` (`LINKY_TOKEN`) — NEVER in code
+- **API limit**: max 7 days per request (8 days → 400 Bad Request)
+- **HC/HP**: two off-peak windows — 23:32-5:32 (night) + 15:02-17:02 (afternoon), configurable via `HC_WINDOWS`
+- **Pricing**: HP=0.2065 €/kWh, HC=0.1579 €/kWh, subscription=15.65 €/month
+- **Architecture**: pull mode — ESP32 calls `GET /display` to retrieve pre-rendered buffer

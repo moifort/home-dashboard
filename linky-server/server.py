@@ -32,7 +32,7 @@ PARIS_TZ = ZoneInfo("Europe/Paris")
 DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
 
 TOKEN = os.environ.get("LINKY_TOKEN", "")
-PRM = os.environ.get("LINKY_PRM", "REDACTED_PRM")
+PRM = os.environ.get("LINKY_PRM", "")
 REFRESH_INTERVAL = int(os.environ.get("REFRESH_INTERVAL", "3600"))
 HC_WINDOWS = parse_hc_windows(os.environ.get("HC_WINDOWS", "23:32-5:32,15:02-17:02"))
 PRICE_HP = float(os.environ.get("PRICE_HP", "0.2065"))
