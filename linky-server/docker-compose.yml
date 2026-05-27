@@ -1,0 +1,16 @@
+services:
+  linky-dashboard:
+    build: .
+    container_name: linky-dashboard
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - linky-data:/data
+    env_file:
+      - .env
+    environment:
+      - TZ=Europe/Paris
+
+volumes:
+  linky-data:
