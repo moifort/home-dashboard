@@ -56,6 +56,29 @@
     color: #000;
   }
 
+  .stats {
+    position: absolute;
+    top: 12px;
+    left: 20px;
+    display: flex;
+    gap: 24px;
+    font-size: 13px;
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .stat-value {
+    font-weight: 700;
+  }
+
+  .stat-pct {
+    font-size: 11px;
+  }
+
   .day-label {
     font-size: 12px;
     color: #000;
@@ -70,10 +93,36 @@
   window.__DASHBOARD_DATA__ = {};
 </script>
 
+<div class="stats" id="stats"></div>
 <div class="chart" id="chart"></div>
 
 <script>
   var data = window.__DASHBOARD_DATA__;
+  var s = data.stats || {};
+  var statsEl = document.getElementById('stats');
+
+  function arrow(pct, invert) {
+    if (pct === 0) return '';
+    var good = invert ? pct < 0 : pct > 0;
+    var sign = pct > 0 ? '+' : '';
+    return ' ' + (pct > 0 ? '↑' : '↓') + sign + pct + '%';
+  }
+
+  if (s.avg_kwh) {
+    var items = [
+      {val: s.avg_kwh + ' kwh/j', pct: arrow(s.avg_kwh_pct, true)},
+      {val: 'hc ' + s.hc_ratio + '%', pct: arrow(s.hc_ratio_pct, false)},
+      {val: s.avg_price + ' €/j', pct: arrow(s.avg_price_pct, true)}
+    ];
+    items.forEach(function(item) {
+      var div = document.createElement('div');
+      div.className = 'stat-item';
+      div.innerHTML = '<span class="stat-value">' + item.val + '</span>' +
+        '<span class="stat-pct">' + item.pct + '</span>';
+      statsEl.appendChild(div);
+    });
+  }
+
   var days = data.days || [];
   var chart = document.getElementById('chart');
   var barMaxHeight = 180;
