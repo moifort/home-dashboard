@@ -2,47 +2,47 @@ name: linky-dashboard
 
 services:
   linky-dashboard:
-    build: .
+    image: ghcr.io/moifort/dashboard:main
     container_name: linky-dashboard
     restart: unless-stopped
+    pull_policy: always
+    logging:
+      driver: json-file
+      options:
+        max-size: 1m
     ports:
       - target: 5000
         published: "5000"
         protocol: tcp
     volumes:
-      - type: volume
-        source: linky-data
+      - type: bind
+        source: /DATA/AppData/linky-dashboard
         target: /data
     environment:
       TZ: Europe/Paris
-      LINKY_TOKEN: ${LINKY_TOKEN}
-      LINKY_PRM: ${LINKY_PRM}
-      HC_WINDOWS: ${HC_WINDOWS:-23:32-5:32,15:02-17:02}
-      PRICE_HP: ${PRICE_HP:-0.2065}
-      PRICE_HC: ${PRICE_HC:-0.1579}
-      PRICE_ABO_MONTHLY: ${PRICE_ABO_MONTHLY:-15.65}
-      REFRESH_INTERVAL: ${REFRESH_INTERVAL:-3600}
-
-volumes:
-  linky-data:
+      LINKY_TOKEN: changeme
+      LINKY_PRM: changeme
+      HC_WINDOWS: "23:32-5:32,15:02-17:02"
+      PRICE_HP: "0.2065"
+      PRICE_HC: "0.1579"
+      PRICE_ABO_MONTHLY: "15.65"
+      REFRESH_INTERVAL: "3600"
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5000/status || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    network_mode: bridge
+    labels:
+      icon: https://raw.githubusercontent.com/moifort/dashboard/main/docs/preview.png
 
 x-casaos:
-  architectures:
-    - amd64
-    - arm64
-  main: linky-dashboard
+  author: moifort
+  category: Utilities
+  icon: https://raw.githubusercontent.com/moifort/dashboard/main/docs/preview.png
+  index: /
+  port_map: "5000"
+  scheme: http
   store_app_id: linky-dashboard
   title:
     en_us: Linky Dashboard
-    fr_fr: Dashboard Linky
-  description:
-    en_us: E-paper electricity consumption dashboard for Linky smart meters. Displays daily HC/HP breakdown with cost tracking.
-    fr_fr: Dashboard e-paper de consommation electrique Linky. Affiche la repartition HC/HP journaliere avec suivi des couts.
-  tagline:
-    en_us: Electricity consumption on e-paper
-    fr_fr: Consommation electrique sur e-paper
-  icon: https://raw.githubusercontent.com/moifort/dashboard/main/linky-server/docs/preview.png
-  category: Utility
-  port_map: "5000"
-  scheme: http
-  developer: moifort

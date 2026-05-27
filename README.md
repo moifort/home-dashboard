@@ -62,6 +62,7 @@ REFRESH_INTERVAL=3600
 ### 3. Run with Docker Compose
 
 ```bash
+curl -O https://raw.githubusercontent.com/moifort/dashboard/main/docker-compose.yml
 docker compose up -d
 ```
 
@@ -69,11 +70,18 @@ The dashboard will be available at `http://your-server:5000`.
 
 ### 4. Run on CasaOS
 
-```bash
-docker compose -f docker-compose.casaos.yml up -d
+Import the CasaOS compose file from the CasaOS interface using this URL:
+
+```
+https://raw.githubusercontent.com/moifort/dashboard/main/docker-compose.casaos.yml
 ```
 
-Or import `docker-compose.casaos.yml` from the CasaOS interface.
+Or manually:
+
+```bash
+curl -O https://raw.githubusercontent.com/moifort/dashboard/main/docker-compose.casaos.yml
+docker compose -f docker-compose.casaos.yml up -d
+```
 
 ### 5. Flash the ESP32
 

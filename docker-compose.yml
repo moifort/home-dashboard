@@ -1,6 +1,6 @@
 services:
   linky-dashboard:
-    build: .
+    image: ghcr.io/moifort/dashboard:main
     container_name: linky-dashboard
     restart: unless-stopped
     ports:
