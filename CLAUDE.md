@@ -1,9 +1,7 @@
 # Dashboard e-Paper — Development Guide
 
 ## Architecture
-
-- **ESP32** (XIAO ESP32-S3): WiFi server on port 80, receives EPD binary buffer via `POST /display` or returns status via `GET /status`
-- **project root**: Python Docker server (CasaOS, port 5000) that fetches Linky data, renders the HTML dashboard via Playwright, serves EPD buffer to ESP32 in pull mode (`GET /display`)
+- **project root**: Python Docker server (CasaOS, port 5000) that fetches Linky data, renders the HTML dashboard via Playwright
 
 ## e-Paper Display
 
@@ -11,6 +9,48 @@
 - **Driver**: `epd10in85g` — NEVER `epd10in85` (B/W), different init sequence
 - **Resolution**: 1360×480, 2 bits/pixel, buffer = 163,200 bytes
 - **ESP32 IP**: variable (scan with `arp -a | grep esp32`)
+
+## ESP32 Firmware (esp32-display/)
+
+### Hardware
+- **Board**: Seeed XIAO ESP32S3
+- **HAT**: Waveshare 10.85inch e-Paper HAT+ — connect via its **10-pin labeled connector** (not the 40-pin RPi header)
+
+### Pin Mapping (XIAO ↔ HAT+ 10-pin connector)
+
+| HAT+ label | XIAO pin | GPIO |
+|------------|----------|------|
+| VCC        | 3V3      | —    |
+| GND        | GND      | —    |
+| DIN        | D9       | 8    |
+| CLK        | D8       | 7    |
+| CS_M       | D2       | 3    |
+| CS_S       | D10      | 9    |
+| DC         | D1       | 2    |
+| RST        | D0       | 1    |
+| BUSY       | D3       | 4    |
+| PWR        | D4       | 5    |
+
+**WARNING**: on the XIAO, GPIO numbers ≠ Dx labels (e.g. D3=GPIO4, D4=GPIO5). Always use Dx labels for wiring.
+
+### Build & Flash
+
+Requires [Arduino CLI](https://arduino.github.io/arduino-cli/) with `esp32:esp32` core installed.
+
+```bash
+# Compile (PSRAM=opi is mandatory — ps_malloc fails without it)
+arduino-cli compile --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" esp32-display/
+
+# Flash (port may vary — check with: ls /dev/cu.usb*)
+arduino-cli upload --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" --port /dev/cu.usbmodem101 esp32-display/
+
+# Serial monitor
+arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
+```
+
+### BUSY Pin
+- **HIGH** = ready, **LOW** = busy
+- ReadBusy has a 60s timeout to prevent hangs
 
 ## e-Paper Rendering Rules (CRITICAL)
 
@@ -48,6 +88,7 @@
 - Suggest pushing when good progress is made or a milestone is reached
 - Commit after each verified change, but push is a deliberate act
 
+
 ## Linky / Conso API
 
 - **API**: `conso.boris.sh/api/consumption_load_curve` (30-min intervals, in W)
@@ -56,4 +97,4 @@
 - **API limit**: max 7 days per request (8 days → 400 Bad Request)
 - **HC/HP**: two off-peak windows — 23:32-5:32 (night) + 15:02-17:02 (afternoon), configurable via `HC_WINDOWS`
 - **Pricing**: HP=0.2065 €/kWh, HC=0.1579 €/kWh, subscription=15.65 €/month
-- **Architecture**: pull mode — ESP32 calls `GET /display` to retrieve pre-rendered buffer
+
