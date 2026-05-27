@@ -193,7 +193,6 @@ def init_browser():
     )
     page_instance = browser_instance.new_page(
         viewport={"width": 1360, "height": 480},
-        device_scale_factor=2,
     )
     logger.info("Browser ready")
 
