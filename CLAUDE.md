@@ -33,7 +33,12 @@
 
 ### Build & Flash
 
-Requires [Arduino CLI](https://arduino.github.io/arduino-cli/) with `esp32:esp32` core installed.
+Requires [Arduino CLI](https://arduino.github.io/arduino-cli/) with `esp32:esp32` core:
+
+```bash
+brew install arduino-cli
+arduino-cli core install esp32:esp32
+```
 
 ```bash
 # Compile (PSRAM=opi is mandatory — ps_malloc fails without it)
