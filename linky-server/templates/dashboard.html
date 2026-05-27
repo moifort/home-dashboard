@@ -62,7 +62,7 @@
     left: 20px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 16px;
     font-size: 13px;
     padding-bottom: 4px;
     border-bottom: 1px solid #000;
@@ -74,6 +74,11 @@
     gap: 3px;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+  }
+
+  .stat-item-right {
+    margin-left: auto;
+    text-align: right;
   }
 
   .stat-val {
@@ -126,7 +131,7 @@
     items.forEach(function(item, i) {
       var div = document.createElement('div');
       div.className = 'stat-item';
-      if (i === items.length - 1) div.style.marginLeft = 'auto';
+      if (i === items.length - 1) div.className += ' stat-item-right';
       var pctClass = 'stat-pct' + (item.pct.bad ? ' stat-pct-bad' : '');
       div.innerHTML = '<span class="stat-val">' + item.val + '</span> ' +
         '<span class="' + pctClass + '">' + item.pct.text + '</span>';
