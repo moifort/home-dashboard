@@ -3,9 +3,7 @@
 ## Architecture
 
 - **ESP32** (XIAO ESP32-S3): WiFi server on port 80, receives EPD binary buffer via `POST /display` or returns status via `GET /status`
-- **linky-server/**: Python Docker server (CasaOS, port 5000) that fetches Linky data, renders the HTML dashboard via Playwright, serves EPD buffer to ESP32 in pull mode (`GET /display`)
-- **web_dashboard/**: alternative rendering pipeline (HTML → Playwright screenshot → converter → ESP32)
-- **main.py**: Raspberry Pi dashboard with direct SPI rendering (unrelated to linky-server)
+- **project root**: Python Docker server (CasaOS, port 5000) that fetches Linky data, renders the HTML dashboard via Playwright, serves EPD buffer to ESP32 in pull mode (`GET /display`)
 
 ## e-Paper Display
 
