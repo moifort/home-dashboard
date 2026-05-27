@@ -89,6 +89,10 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .stat-pct-bad {
+    color: #ff0000;
+  }
+
   .day-label {
     font-size: 12px;
     color: #000;
@@ -111,24 +115,26 @@
   var s = data.stats || {};
   var statsEl = document.getElementById('stats');
 
-  function pctStr(pct) {
-    if (pct === 0) return '—';
+  function pctInfo(pct, invertBad) {
+    if (pct === 0) return {text: '—', bad: false};
     var arrow = pct > 0 ? '▲' : '▼';
-    return arrow + Math.abs(pct) + '%';
+    var bad = invertBad ? pct > 0 : pct < 0;
+    return {text: arrow + Math.abs(pct) + '%', bad: bad};
   }
 
   if (s.avg_kwh) {
     var items = [
-      {num: s.avg_kwh, unit: 'kWh/j', pct: pctStr(s.avg_kwh_pct)},
-      {num: 'HC ' + s.hc_ratio + '%', unit: '', pct: pctStr(s.hc_ratio_pct)},
-      {num: s.avg_price, unit: '€/j', pct: pctStr(s.avg_price_pct)}
+      {num: s.avg_kwh, unit: 'kWh/j', pct: pctInfo(s.avg_kwh_pct, true)},
+      {num: 'HC ' + s.hc_ratio + '%', unit: '', pct: pctInfo(s.hc_ratio_pct, false)},
+      {num: s.avg_price, unit: '€/j', pct: pctInfo(s.avg_price_pct, true)}
     ];
     items.forEach(function(item) {
       var div = document.createElement('div');
       div.className = 'stat-item';
+      var pctClass = 'stat-pct' + (item.pct.bad ? ' stat-pct-bad' : '');
       div.innerHTML = '<span class="stat-num">' + item.num + '</span>' +
         '<span class="stat-unit">' + item.unit + '</span>' +
-        '<span class="stat-pct">' + item.pct + '</span>';
+        '<span class="' + pctClass + '">' + item.pct.text + '</span>';
       statsEl.appendChild(div);
     });
   }
