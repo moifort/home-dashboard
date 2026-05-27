@@ -120,7 +120,7 @@
   if (s.avg_kwh) {
     var items = [
       {num: s.avg_kwh, unit: 'kWh/j', pct: pctStr(s.avg_kwh_pct)},
-      {num: 'HC ' + s.hc_ratio, unit: '%', pct: pctStr(s.hc_ratio_pct)},
+      {num: 'HC ' + s.hc_ratio + '%', unit: '', pct: pctStr(s.hc_ratio_pct)},
       {num: s.avg_price, unit: '€/j', pct: pctStr(s.avg_price_pct)}
     ];
     items.forEach(function(item) {
