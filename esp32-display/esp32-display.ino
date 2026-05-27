@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <time.h>
 
 #include "nvs_config.h"
 #include "DEV_Config.h"
@@ -86,6 +87,49 @@ static bool fetchDisplayBuffer(const String &serverUrl, uint8_t *buf) {
     return bytesRead == DISPLAY_BUFFER_SIZE;
 }
 
+static bool syncNtp() {
+    configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", "pool.ntp.org");
+    Serial.print("NTP sync");
+    for (int i = 0; i < 20; i++) {
+        delay(500);
+        Serial.print(".");
+        struct tm t;
+        if (getLocalTime(&t, 0)) {
+            Serial.printf(" OK: %02d:%02d\n", t.tm_hour, t.tm_min);
+            return true;
+        }
+    }
+    Serial.println(" FAILED");
+    return false;
+}
+
+static uint64_t computeSleepUs() {
+    struct tm now;
+    if (!getLocalTime(&now, 0)) {
+        return 3600ULL * 1000000ULL;
+    }
+
+    int cur_min = now.tm_hour * 60 + now.tm_min;
+    int target1 = REFRESH_HOUR_1 * 60;
+    int target2 = REFRESH_HOUR_2 * 60;
+
+    int sleep_min;
+    if (cur_min < target1) {
+        sleep_min = target1 - cur_min;
+    } else if (cur_min < target2) {
+        sleep_min = target2 - cur_min;
+    } else {
+        sleep_min = (24 * 60 - cur_min) + target1;
+    }
+
+    if (sleep_min < 5) sleep_min = 5;
+
+    Serial.printf("Now: %02d:%02d, next refresh in %dh%02dm\n",
+                  now.tm_hour, now.tm_min, sleep_min / 60, sleep_min % 60);
+
+    return (uint64_t)sleep_min * 60ULL * 1000000ULL;
+}
+
 void setup() {
     Serial.begin(115200);
     delay(500);
@@ -148,6 +192,8 @@ void setup() {
 
     Serial.printf("Connected. IP: %s\n", WiFi.localIP().toString().c_str());
 
+    syncNtp();
+
     uint8_t *buf = (uint8_t *)ps_malloc(DISPLAY_BUFFER_SIZE);
     if (!buf) {
         Serial.println("ERROR: PSRAM allocation failed");
@@ -170,12 +216,15 @@ void setup() {
     EPD_10in85g_Sleep();
 
     free(buf);
+
+    uint64_t sleepUs = computeSleepUs();
+
     WiFi.disconnect(true);
     DEV_Module_Exit();
 
-    Serial.println("Sleeping 1 hour...");
+    Serial.printf("Deep sleep...\n");
     Serial.flush();
-    esp_deep_sleep(DEEP_SLEEP_US);
+    esp_deep_sleep(sleepUs);
 }
 
 void loop() {
