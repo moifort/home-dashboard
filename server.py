@@ -192,6 +192,10 @@ def build_dashboard_data(days: list[dict]) -> dict:
 
 def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
     daily_abo = PRICE_ABO_MONTHLY / 30.44
+    na_threshold = 1.0
+
+    def _filter_valid(days):
+        return [d for d in days if d["hc_kwh"] + d["hp_kwh"] >= na_threshold]
 
     def _avg_and_ratios(days):
         if not days:
@@ -205,9 +209,9 @@ def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
         avg_price = ((total_hp * PRICE_HP + total_hc * PRICE_HC) / n) + daily_abo
         return avg_kwh, hc_ratio, avg_price
 
-    avg_kwh, hc_ratio, avg_price = _avg_and_ratios(current)
+    avg_kwh, hc_ratio, avg_price = _avg_and_ratios(_filter_valid(current))
     has_prev = len(previous) > 0
-    avg_kwh_prev, hc_ratio_prev, avg_price_prev = _avg_and_ratios(previous)
+    avg_kwh_prev, hc_ratio_prev, avg_price_prev = _avg_and_ratios(_filter_valid(previous))
 
     def _pct(cur, prev):
         if not has_prev or prev == 0:
