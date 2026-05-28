@@ -14,6 +14,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from converter import png_to_epd_buffer
+from ecoflow_client import EcoflowMqttListener
 from linky_client import (
     LinkyApiError,
     LinkyAuthError,
@@ -43,6 +44,12 @@ DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")
 PORT = int(os.environ.get("PORT", "5000"))
 SAVE_PNG = os.environ.get("SAVE_PNG", "false").lower() == "true"
 
+ECOFLOW_EMAIL = os.environ.get("ECOFLOW_EMAIL", "")
+ECOFLOW_PASSWORD = os.environ.get("ECOFLOW_PASSWORD", "")
+ECOFLOW_DEVICE_SN = os.environ.get("ECOFLOW_DEVICE_SN", "")
+ECOFLOW_API_HOST = os.environ.get("ECOFLOW_API_HOST", "api-e.ecoflow.com")
+ECOFLOW_ENABLED = bool(ECOFLOW_EMAIL and ECOFLOW_PASSWORD and ECOFLOW_DEVICE_SN)
+
 epd_buffer: bytes = b""
 buffer_lock = threading.Lock()
 dashboard_data: dict = {}
@@ -50,6 +57,7 @@ data_lock = threading.Lock()
 last_fetch_time: str = ""
 last_render_time: str = ""
 last_error: str = ""
+last_solar_report: str = ""
 
 
 def get_version() -> str:
@@ -81,8 +89,83 @@ def init_db():
             fetched_at TEXT NOT NULL
         )"""
     )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS daily_production (
+            date TEXT PRIMARY KEY,
+            pv_wh REAL NOT NULL,
+            fetched_at TEXT NOT NULL
+        )"""
+    )
     conn.commit()
     conn.close()
+
+
+def get_cached_production(start: str, end: str) -> list[dict]:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.execute(
+        "SELECT date, pv_wh FROM daily_production WHERE date >= ? AND date < ? ORDER BY date",
+        (start, end),
+    )
+    rows = [{"date": r[0], "pv_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def upsert_production(date: str, pv_wh: float):
+    now = datetime.now(PARIS_TZ).isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT OR REPLACE INTO daily_production (date, pv_wh, fetched_at) VALUES (?, ?, ?)",
+        (date, pv_wh, now),
+    )
+    conn.commit()
+    conn.close()
+
+
+# Integration state for reported PV power → daily kWh. Only the MQTT listener
+# thread touches it, so no lock is needed.
+_solar_state = {"date": None, "wh": 0.0, "last_ts": None, "last_persist": 0.0}
+MAX_SAMPLE_GAP_H = 5 / 60  # cap a sample's time weight at 5 min to avoid overcounting silence
+PRODUCTION_PERSIST_INTERVAL = 30  # seconds between SQLite writes
+
+
+def _on_solar_power(pv_watts: float):
+    """MQTT callback: integrate reported PV power into today's kWh total."""
+    global last_solar_report
+    now = datetime.now(PARIS_TZ)
+    today = now.strftime("%Y-%m-%d")
+    st = _solar_state
+
+    if st["date"] != today:
+        if st["date"] is not None:
+            upsert_production(st["date"], st["wh"])  # flush the finished day
+        tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+        existing = get_cached_production(today, tomorrow)
+        st["date"] = today
+        st["wh"] = existing[0]["pv_kwh"] * 1000 if existing else 0.0
+        st["last_ts"] = None
+        st["last_persist"] = 0.0
+
+    if st["last_ts"] is not None:
+        dt_h = (now - st["last_ts"]).total_seconds() / 3600
+        if dt_h > 0:
+            st["wh"] += pv_watts * min(dt_h, MAX_SAMPLE_GAP_H)
+    st["last_ts"] = now
+
+    mono = time.monotonic()
+    if mono - st["last_persist"] >= PRODUCTION_PERSIST_INTERVAL:
+        upsert_production(today, st["wh"])
+        st["last_persist"] = mono
+    last_solar_report = now.isoformat()
+
+
+def start_ecoflow_listener() -> EcoflowMqttListener:
+    listener = EcoflowMqttListener(
+        ECOFLOW_EMAIL, ECOFLOW_PASSWORD, ECOFLOW_DEVICE_SN, ECOFLOW_API_HOST, _on_solar_power
+    )
+    listener.start()
+    logger.info("EcoFlow MQTT listener started for SN %s", ECOFLOW_DEVICE_SN)
+    return listener
 
 
 def get_cached_days(start: str, end: str) -> list[dict]:
@@ -200,7 +283,62 @@ def build_dashboard_data(days: list[dict]) -> dict:
         })
 
     stats = _compute_stats(current_week, prev_weeks)
-    return {"days": result, "stats": stats, "last_updated": now.isoformat()}
+    data = {"days": result, "stats": stats, "last_updated": now.isoformat()}
+
+    if ECOFLOW_ENABLED:
+        _attach_production(data)
+
+    return data
+
+
+def _attach_production(data: dict):
+    """Add the solar production history: always the last 9 completed days.
+
+    Days without accumulated data show as N/A. Today is excluded (only complete
+    days, whose total we are sure was fully accumulated).
+    """
+    now = datetime.now(PARIS_TZ)
+    today = now.date()
+    full_start = (now - timedelta(days=40)).strftime("%Y-%m-%d")
+    prod_by_date = {p["date"]: p["pv_kwh"] for p in get_cached_production(full_start, today.strftime("%Y-%m-%d"))}
+
+    production_days = []
+    recent = []
+    for i in range(9, 0, -1):
+        d = today - timedelta(days=i)
+        ds = d.strftime("%Y-%m-%d")
+        pv = prod_by_date.get(ds, 0.0)
+        production_days.append({"day": DAYS_FR[d.weekday()], "date": ds, "pv_kwh": pv})
+        recent.append({"pv_kwh": pv})
+
+    previous = [{"pv_kwh": prod_by_date[ds]}
+                for i in range(37, 9, -1)
+                if (ds := (today - timedelta(days=i)).strftime("%Y-%m-%d")) in prod_by_date]
+
+    data["production_days"] = production_days
+    data["production_stats"] = _compute_production_stats(recent, previous)
+
+
+def _compute_production_stats(current: list[dict], previous: list[dict]) -> dict:
+    na_threshold = 0.1
+
+    def _avg(days):
+        valid = [d for d in days if d["pv_kwh"] >= na_threshold]
+        if not valid:
+            return 0
+        return sum(d["pv_kwh"] for d in valid) / len(valid)
+
+    avg_kwh = _avg(current)
+    avg_kwh_prev = _avg(previous)
+    has_prev = avg_kwh_prev > 0
+
+    pct = round((avg_kwh - avg_kwh_prev) / avg_kwh_prev * 100, 1) if has_prev else 0
+    total = sum(d["pv_kwh"] for d in current)
+    return {
+        "avg_kwh": round(avg_kwh, 1),
+        "avg_kwh_pct": pct,
+        "total_kwh": round(total, 1),
+    }
 
 
 def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
@@ -297,6 +435,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def _serve_status(self):
         with data_lock:
             days_count = len(dashboard_data.get("days", []))
+            solar_days = len(dashboard_data.get("production_days", []))
         status = {
             "version": VERSION,
             "last_fetch": last_fetch_time,
@@ -308,6 +447,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "prm": PRM,
             "refresh_interval": REFRESH_INTERVAL,
             "hc_windows": os.environ.get("HC_WINDOWS", "23:32-5:32,15:02-17:02"),
+            "ecoflow_enabled": ECOFLOW_ENABLED,
+            "solar_days_cached": solar_days,
+            "last_solar_report": last_solar_report,
         }
         body = json.dumps(status, indent=2).encode()
         self.send_response(200)
@@ -376,6 +518,10 @@ def main():
         raise SystemExit(1)
 
     init_db()
+    if ECOFLOW_ENABLED:
+        start_ecoflow_listener()
+    else:
+        logger.info("EcoFlow integration disabled (set ECOFLOW_EMAIL/PASSWORD/DEVICE_SN to enable)")
     start_http_server(PORT)
     schedule_loop()
 

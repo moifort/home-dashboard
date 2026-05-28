@@ -1,0 +1,13 @@
+.git
+.gitignore
+.github
+.claude
+.env
+data/
+__pycache__/
+*.py[cod]
+.DS_Store
+templates/
+docs/
+Dashboard.3mf
+*.md
