@@ -120,3 +120,11 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 - **Thousands separator**: use a plain space — Arial.ttf renders U+202F (the iOS widget's narrow no-break space) as a tofu box on e-paper.
 - **Config**: `CRYPTO_API_URL` (empty = disabled), `CRYPTO_API_TOKEN` (the bot's `NITRO_API_TOKEN`, optional).
 
+## Cumulus (water heater) consumption (optional)
+
+- **Goal**: an inline **title-style banner** in the top-right (stacked under the crypto banner) showing the water-heater's daily consumption: `Cumulus  <today> kWh auj.  <avg> kWh/j`. `renderer._draw_cumulus_banner` reuses `_draw_right_banner`/`_draw_stats_bar`.
+- **Device**: the `cumulus` Zigbee device is a **Legrand 412171 DIN contactor**. It exposes `state`, `power` (W), `power_apparent` (VA) — **no energy (kWh) counter**. So we **integrate the reported power** into daily kWh ourselves (same technique as EcoFlow solar, `server._on_cumulus_power` → `daily_cumulus` table). No backfill — history starts at first connection.
+- **Data source**: the Zigbee2MQTT broker (mosquitto). Subscribe to `zigbee2mqtt/cumulus`, read `power` from the JSON. The contactor publishes on change; we also re-request it (`{"power":""}` on `zigbee2mqtt/cumulus/get`) every 60s so integration keeps getting samples during steady heating. Client in `cumulus_client.py`.
+- **Networking**: dashboard is in `network_mode: bridge`, so it reaches the broker via its **LAN IP** (`192.168.1.50:1883`), anonymous (no MQTT auth configured in Z2M).
+- **Config**: `CUMULUS_MQTT_HOST` (empty = disabled), `CUMULUS_MQTT_PORT` (1883), `CUMULUS_TOPIC` (`zigbee2mqtt/cumulus`), `CUMULUS_MQTT_USERNAME`/`PASSWORD` (optional).
+
