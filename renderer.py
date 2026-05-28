@@ -1,16 +1,14 @@
 """Render dashboard to 1360×480 bitmap using Pillow (no browser needed)."""
+import os
 from PIL import Image, ImageDraw, ImageFont
 
 WIDTH = 1360
 HEIGHT = 480
 
-FONT_PATH = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-FONT_BOLD_PATH = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-
-import os
-if not os.path.exists(FONT_PATH):
-    FONT_PATH = "/System/Library/Fonts/Supplemental/Arial.ttf"
-    FONT_BOLD_PATH = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+# Bundled Arial guarantees identical bitmap output on macOS and in Docker.
+_FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+FONT_PATH = os.path.join(_FONT_DIR, "Arial.ttf")
+FONT_BOLD_PATH = os.path.join(_FONT_DIR, "Arial-Bold.ttf")
 
 BLACK = 0
 RED = (255, 0, 0)
