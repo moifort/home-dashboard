@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 ARG GIT_COMMIT=unknown
-RUN echo "${GIT_COMMIT:0:7}" > .version
+RUN echo "$GIT_COMMIT" | cut -c1-7 > .version
 
 RUN mkdir -p /data
 
