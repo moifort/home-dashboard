@@ -14,6 +14,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from converter import png_to_epd_buffer
+from crypto_client import build_crypto_panel, fetch_crypto_stats
 from ecoflow_client import EcoflowMqttListener
 from linky_client import (
     LinkyApiError,
@@ -50,6 +51,10 @@ ECOFLOW_DEVICE_SN = os.environ.get("ECOFLOW_DEVICE_SN", "")
 ECOFLOW_API_HOST = os.environ.get("ECOFLOW_API_HOST", "api-e.ecoflow.com")
 ECOFLOW_ENABLED = bool(ECOFLOW_EMAIL and ECOFLOW_PASSWORD and ECOFLOW_DEVICE_SN)
 
+CRYPTO_API_URL = os.environ.get("CRYPTO_API_URL", "")
+CRYPTO_API_TOKEN = os.environ.get("CRYPTO_API_TOKEN", "")
+CRYPTO_ENABLED = bool(CRYPTO_API_URL)
+
 epd_buffer: bytes = b""
 buffer_lock = threading.Lock()
 dashboard_data: dict = {}
@@ -58,6 +63,7 @@ last_fetch_time: str = ""
 last_render_time: str = ""
 last_error: str = ""
 last_solar_report: str = ""
+last_crypto_time: str = ""
 
 
 def get_version() -> str:
@@ -288,7 +294,23 @@ def build_dashboard_data(days: list[dict]) -> dict:
     if ECOFLOW_ENABLED:
         _attach_production(data)
 
+    if CRYPTO_ENABLED:
+        _attach_crypto(data)
+
     return data
+
+
+def _attach_crypto(data: dict):
+    """Fetch crypto-bot stats and attach the rendered panel fields.
+
+    On any failure the key is left unset, so the panel is simply omitted.
+    """
+    global last_crypto_time
+    stats = fetch_crypto_stats(CRYPTO_API_URL, CRYPTO_API_TOKEN)
+    if not stats:
+        return
+    data["crypto"] = build_crypto_panel(stats)
+    last_crypto_time = datetime.now(PARIS_TZ).isoformat()
 
 
 def _attach_production(data: dict):
@@ -381,10 +403,11 @@ def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
 
 # --- Rendering (Pillow) ---
 
-def render_to_buffer() -> bytes:
+def render_to_buffer(data: dict | None = None) -> bytes:
     global last_render_time
-    with data_lock:
-        data = dashboard_data
+    if data is None:
+        with data_lock:
+            data = dashboard_data
 
     img = render_dashboard(data)
 
@@ -420,9 +443,25 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404)
 
-    def _serve_display(self):
+    def _fresh_or_cached_buffer(self) -> bytes:
+        """Buffer for /display: re-render with fresh crypto on the ESP32's pull.
+
+        Linky/solar data stay on the hourly cache; only the crypto panel is
+        refreshed here. Any failure falls back to the cached hourly buffer.
+        """
+        if CRYPTO_ENABLED:
+            try:
+                with data_lock:
+                    data = dict(dashboard_data)
+                _attach_crypto(data)
+                return render_to_buffer(data)
+            except Exception as e:
+                logger.warning("Live crypto render failed, serving cached buffer: %s", e)
         with buffer_lock:
-            buf = epd_buffer
+            return epd_buffer
+
+    def _serve_display(self):
+        buf = self._fresh_or_cached_buffer()
         if not buf:
             self.send_error(503, "No render available yet")
             return
@@ -450,6 +489,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "ecoflow_enabled": ECOFLOW_ENABLED,
             "solar_days_cached": solar_days,
             "last_solar_report": last_solar_report,
+            "crypto_enabled": CRYPTO_ENABLED,
+            "last_crypto": last_crypto_time,
         }
         body = json.dumps(status, indent=2).encode()
         self.send_response(200)
