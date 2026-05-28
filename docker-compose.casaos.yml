@@ -32,6 +32,9 @@ services:
       ECOFLOW_PASSWORD: ""
       ECOFLOW_DEVICE_SN: ""
       ECOFLOW_API_HOST: api-e.ecoflow.com
+      # Optional crypto-bot stats panel (top-right) — leave URL empty to disable.
+      CRYPTO_API_URL: ""
+      CRYPTO_API_TOKEN: ""
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/status')" || exit 1
       interval: 30s
