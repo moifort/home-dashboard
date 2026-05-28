@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-05-28
+
+- **Bundled Arial font** — the renderer now ships Arial in the repo and uses it everywhere, so Docker output is pixel-identical to local renders (previously Docker fell back to Liberation Sans, which looked less sharp at small sizes)
+
 ## 2026-05-27
 
 - **ESP32 serial configuration** — WiFi and server URL configured via serial monitor instead of captive portal
