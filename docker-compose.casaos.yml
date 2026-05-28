@@ -27,6 +27,11 @@ services:
       PRICE_HC: "0.1579"
       PRICE_ABO_MONTHLY: "15.65"
       REFRESH_INTERVAL: "3600"
+      # Optional EcoFlow PowerStream solar production — leave empty to disable.
+      ECOFLOW_EMAIL: ""
+      ECOFLOW_PASSWORD: ""
+      ECOFLOW_DEVICE_SN: ""
+      ECOFLOW_API_HOST: api-e.ecoflow.com
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/status')" || exit 1
       interval: 30s
