@@ -40,6 +40,10 @@ When an EcoFlow PowerStream is configured, the top half shows daily solar produc
 
 When a crypto-bot GraphQL endpoint is configured, an inline title-style banner is drawn in the top-right space (same look as the chart titles): a `Crypto` label, then the **% return** (black when in profit, **red when negative**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. Data is refreshed each time the ESP32 fetches the display. See the setup section below.
 
+### Cumulus consumption (optional, top-right)
+
+When a Zigbee2MQTT broker is configured, a second banner below the crypto one shows the water-heater's daily consumption: a `Cumulus` label, today's kWh and the recent daily average. The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
+
 ## Hardware
 
 | Component | Reference |
@@ -104,6 +108,18 @@ Point the dashboard at your crypto-bot's GraphQL endpoint to show its trading st
 ```env
 CRYPTO_API_URL=http://192.168.1.50:3003/graphql
 CRYPTO_API_TOKEN=your_crypto_bot_api_token   # the bot's NITRO_API_TOKEN; omit if no auth
+```
+
+#### Optional — Cumulus (water-heater) consumption
+
+Point the dashboard at your Zigbee2MQTT broker to show the water-heater's daily consumption. The `cumulus` device (a Legrand contactor) reports only instantaneous power, so the server subscribes to its MQTT topic and integrates that power into daily kWh — there is **no backfill**, the history starts at the first connection. Use the broker's **LAN IP** (bridge network). Credentials are optional if the broker allows anonymous connections.
+
+```env
+CUMULUS_MQTT_HOST=192.168.1.50
+CUMULUS_MQTT_PORT=1883
+CUMULUS_TOPIC=zigbee2mqtt/cumulus
+CUMULUS_MQTT_USERNAME=                 # omit if the broker is anonymous
+CUMULUS_MQTT_PASSWORD=
 ```
 
 ### 3. Run with Docker Compose

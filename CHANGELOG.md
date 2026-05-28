@@ -2,6 +2,7 @@
 
 ## 2026-05-28
 
+- **Cumulus (water-heater) consumption** — optional inline title-style banner (top-right, under the crypto one) showing the water-heater's daily kWh and recent daily average. The Zigbee contactor (Legrand 412171) reports only instantaneous power, so daily kWh are integrated over time from its Zigbee2MQTT power topic (no historical backfill). Enabled by setting `CUMULUS_MQTT_HOST`.
 - **Crypto-bot stats banner** — optional inline title-style banner in the top-right (same look as the chart titles): a `Crypto` label, the bot's % return (red when negative), signed profit, portfolio value and a `SANDBOX` badge. Fetched over GraphQL when the ESP32 pulls `/display`, with graceful fallback to the cached buffer. Enabled by setting `CRYPTO_API_URL` (and optionally `CRYPTO_API_TOKEN`).
 
 - **EcoFlow PowerStream solar production** — optional daily solar production chart in the top half of the screen (full-black bars), above the consumption chart. Reads the inverter's reported PV power over the EcoFlow app MQTT broker (kept alive by a periodic get-quota request) and integrates it into daily kWh totals; shows the last 9 completed days (N/A until data accumulates), daily average and trend. History starts at first connection (no backfill). Enabled by setting `ECOFLOW_EMAIL`/`ECOFLOW_PASSWORD`/`ECOFLOW_DEVICE_SN`.
