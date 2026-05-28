@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+// Minimal subset of EcoFlow PowerStream protobuf. Decodes the inverter
+// heartbeat (cmd_func=20, cmd_id=1) to read reported PV power, and builds the
+// get-quota request (same cmd) that keeps the device broadcasting. Field
+// numbers match the reference at tolwi/hassio-ecoflow-cloud.
+
+message PowerStreamHeader {
+    optional bytes pdata = 1;
+    optional int32 src = 2;
+    optional int32 dest = 3;
+    optional int32 cmd_func = 8;
+    optional int32 cmd_id = 9;
+    optional int32 data_len = 10;
+    optional int32 seq = 14;
+    optional string from_ = 23;
+    optional string device_sn = 25;
+}
+
+message PowerStreamSendHeaderMsg {
+    repeated PowerStreamHeader msg = 1;
+}
+
+message PowerStreamInverterHeartbeat {
+    optional int32 pv1_input_watts = 19;  // deci-watts (value / 10 = W)
+    optional int32 pv2_input_watts = 24;  // deci-watts
+    optional int32 inv_output_watts = 38;  // deci-watts
+    optional uint32 bat_soc = 31;
+}

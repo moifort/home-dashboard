@@ -1,4 +1,8 @@
-"""Render dashboard to 1360×480 bitmap using Pillow (no browser needed)."""
+"""Render dashboard to 1360×480 bitmap using Pillow (no browser needed).
+
+Two stacked charts share the same day columns: solar production (top half,
+full-black bars) above electricity consumption (bottom half, stacked HC/HP).
+"""
 import os
 from PIL import Image, ImageDraw, ImageFont
 
@@ -17,11 +21,12 @@ CHART_LEFT = 20
 CHART_BOTTOM = 12
 BAR_WIDTH = 28
 BAR_GAP = 16
-BAR_MAX_HEIGHT = 180
 STATS_FONT_SIZE = 13
 VALUE_FONT_SIZE = 13
 LABEL_FONT_SIZE = 12
 NA_THRESHOLD_KWH = 1.0
+PROD_NA_THRESHOLD_KWH = 0.05
+MAX_DAYS = 9  # reference column count for the stats banner width
 
 
 def render_dashboard(data: dict) -> Image.Image:
@@ -29,42 +34,74 @@ def render_dashboard(data: dict) -> Image.Image:
     draw = ImageDraw.Draw(img)
     draw.fontmode = "1"
 
-    font_regular = ImageFont.truetype(FONT_PATH, STATS_FONT_SIZE)
-    font_bold = ImageFont.truetype(FONT_BOLD_PATH, STATS_FONT_SIZE)
-    font_value = ImageFont.truetype(FONT_BOLD_PATH, VALUE_FONT_SIZE)
-    font_label = ImageFont.truetype(FONT_PATH, LABEL_FONT_SIZE)
+    fonts = {
+        "regular": ImageFont.truetype(FONT_PATH, STATS_FONT_SIZE),
+        "bold": ImageFont.truetype(FONT_BOLD_PATH, STATS_FONT_SIZE),
+        "value": ImageFont.truetype(FONT_BOLD_PATH, VALUE_FONT_SIZE),
+        "label": ImageFont.truetype(FONT_PATH, LABEL_FONT_SIZE),
+    }
 
     days = data.get("days", [])
-    stats = data.get("stats", {})
+    half = HEIGHT // 2
+
+    # Solar production chart (top half) — full-black single bars.
+    production_days = data.get("production_days", [])
+    if production_days:
+        _draw_chart(draw, fonts, production_days, data.get("production_stats", {}),
+                    region_top=0, region_height=half, mode="production")
+
+    # Consumption chart (bottom half) — stacked HC/HP bars.
+    _draw_chart(draw, fonts, days, data.get("stats", {}),
+                region_top=half, region_height=half, mode="consumption")
+
+    return img
+
+
+def _bar_total(d: dict, mode: str) -> float:
+    if mode == "production":
+        return d.get("pv_kwh", 0)
+    return d.get("hc_kwh", 0) + d.get("hp_kwh", 0)
+
+
+def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
+    if not days:
+        return
+
+    font_value = fonts["value"]
+    font_label = fonts["label"]
+    na_threshold = PROD_NA_THRESHOLD_KWH if mode == "production" else NA_THRESHOLD_KWH
 
     for d in days:
-        total = d.get("hc_kwh", 0) + d.get("hp_kwh", 0)
-        d["_na"] = total < NA_THRESHOLD_KWH
+        d["_na"] = _bar_total(d, mode) < na_threshold
 
     valid_days = [d for d in days if not d["_na"]]
-    max_kwh = max((d.get("hc_kwh", 0) + d.get("hp_kwh", 0) for d in valid_days), default=1)
-    if max_kwh == 0:
-        max_kwh = 1
+    max_kwh = max((_bar_total(d, mode) for d in valid_days), default=1) or 1
 
     col_width = BAR_WIDTH + BAR_GAP
     chart_width = len(days) * col_width - BAR_GAP
+    # Keep the stats banner a constant width so it stays readable and aligned
+    # even when a chart has few columns (e.g. solar history early on).
+    banner_width = max(chart_width, MAX_DAYS * col_width - BAR_GAP)
 
-    # baseline_y = bottom of bars, labels go below
     label_h = draw.textbbox((0, 0), "lun", font=font_label)[3]
-    baseline_y = HEIGHT - CHART_BOTTOM - label_h - 4
+    baseline_y = region_top + region_height - CHART_BOTTOM - label_h - 4
+
+    # Stats banner anchored at top of the region ("titre + bordure").
+    value_h = draw.textbbox((0, 0), "0", font=font_value)[3]
+    stats_top = region_top + 4
+    separator_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    bar_max_height = max(20, baseline_y - separator_y - value_h - 14)
 
     # --- Bars ---
     for i, d in enumerate(days):
         cx = CHART_LEFT + i * col_width
         label_text = d.get("day", "").lower()
 
-        # Day label (regular, 12px) — 4px below bar bottom
         lbox = draw.textbbox((0, 0), label_text, font=font_label)
         lw = lbox[2] - lbox[0]
         draw.text((cx + (BAR_WIDTH - lw) // 2, baseline_y + 4), label_text, fill=BLACK, font=font_label)
 
         if d["_na"]:
-            # N/A day: thin line + "N/A" label
             draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
             na_box = draw.textbbox((0, 0), "N/A", font=font_value)
             na_w = na_box[2] - na_box[0]
@@ -72,23 +109,26 @@ def render_dashboard(data: dict) -> Image.Image:
             draw.text((cx + (BAR_WIDTH - na_w) // 2, baseline_y - na_h - 6), "N/A", fill=BLACK, font=font_value)
             continue
 
-        hc = d.get("hc_kwh", 0)
-        hp = d.get("hp_kwh", 0)
-        total = hc + hp
-        total_h = round((total / max_kwh) * BAR_MAX_HEIGHT)
-        hp_h = round((hp / max_kwh) * BAR_MAX_HEIGHT)
-        hc_h = total_h - hp_h
+        total = _bar_total(d, mode)
+        total_h = round((total / max_kwh) * bar_max_height)
 
-        # Stacked bar: HP at bottom (black), HC on top (2px top border)
-        bar_bottom = baseline_y
-        if hp_h > 0:
-            draw.rectangle([cx, bar_bottom - hp_h, cx + BAR_WIDTH - 1, bar_bottom - 1], fill=BLACK)
-            bar_bottom -= hp_h
-        if hc_h > 0:
-            hc_top = bar_bottom - hc_h
-            draw.rectangle([cx, hc_top, cx + BAR_WIDTH - 1, hc_top + 1], fill=BLACK)
+        if mode == "production":
+            # Single full-black bar (no split data).
+            if total_h > 0:
+                draw.rectangle([cx, baseline_y - total_h, cx + BAR_WIDTH - 1, baseline_y - 1], fill=BLACK)
+        else:
+            # Stacked bar: HP at bottom (black), HC on top (2px top border).
+            hp = d.get("hp_kwh", 0)
+            hp_h = round((hp / max_kwh) * bar_max_height)
+            hc_h = total_h - hp_h
+            bar_bottom = baseline_y
+            if hp_h > 0:
+                draw.rectangle([cx, bar_bottom - hp_h, cx + BAR_WIDTH - 1, bar_bottom - 1], fill=BLACK)
+                bar_bottom -= hp_h
+            if hc_h > 0:
+                hc_top = bar_bottom - hc_h
+                draw.rectangle([cx, hc_top, cx + BAR_WIDTH - 1, hc_top + 1], fill=BLACK)
 
-        # Value above bar (bold, 13px) — 8px between bar top and underline
         val_text = f"{total:.1f}"
         vbox = draw.textbbox((0, 0), val_text, font=font_value)
         vw = vbox[2] - vbox[0]
@@ -96,60 +136,51 @@ def render_dashboard(data: dict) -> Image.Image:
         val_y = baseline_y - total_h - vh - 10
         draw.text((cx + (BAR_WIDTH - vw) // 2, val_y), val_text, fill=BLACK, font=font_value)
 
-    # --- Stats bar (bold, 13px, space-between) ---
-    if stats.get("avg_kwh") is not None:
-        items = _build_stat_items(stats)
-
-        # Position: above highest bar value
-        highest_total = max((d.get("hc_kwh", 0) + d.get("hp_kwh", 0) for d in days), default=0)
-        highest_h = round((highest_total / max_kwh) * BAR_MAX_HEIGHT)
-        vbox = draw.textbbox((0, 0), "0", font=font_value)
-        vh = vbox[3] - vbox[1]
-        stats_bottom = baseline_y - highest_h - vh - 4 - 42
-
-        _draw_stats_bar(draw, font_bold, font_regular, items, CHART_LEFT, stats_bottom, chart_width)
-
-    return img
+    # --- Stats banner ---
+    if stats:
+        items = _build_production_items(stats) if mode == "production" else _build_consumption_items(stats)
+        if items:
+            _draw_stats_bar(draw, fonts, items, CHART_LEFT, stats_top, banner_width, separator_y)
 
 
-def _build_stat_items(stats):
-    items = []
-
-    def pct_info(pct, invert_bad):
-        if pct == 0:
-            return "—", False
-        arrow = "▲" if pct > 0 else "▼"
-        bad = pct > 0 if invert_bad else pct < 0
-        return f"{arrow}{abs(pct)}%", bad
-
-    avg_pct_text, avg_pct_bad = pct_info(stats.get("avg_kwh_pct", 0), True)
-    items.append([(str(stats['avg_kwh']), True), ("kWh/j  ", False), (avg_pct_text, avg_pct_bad)])
-
-    hc_pct_text, hc_pct_bad = pct_info(stats.get("hc_ratio_pct", 0), False)
-    items.append([("HC ", False), (str(stats.get('hc_ratio', 0)), True), ("%  ", False), (hc_pct_text, hc_pct_bad)])
-
-    price_pct_text, price_pct_bad = pct_info(stats.get("avg_price_pct", 0), True)
-    items.append([(str(stats.get('avg_price', 0)), True), ("€/j  ", False), (price_pct_text, price_pct_bad)])
-
-    return items
+# Segment = (text, font_key, color). font_key is "bold" (values) or "regular"
+# (labels and trends). Trends are regular weight, red when the trend is bad.
+def _trend(pct, invert_bad):
+    if pct == 0:
+        return ("—", "regular", BLACK)
+    arrow = "▲" if pct > 0 else "▼"
+    bad = pct > 0 if invert_bad else pct < 0
+    return (f"{arrow}{abs(pct)}%", "regular", RED if bad else BLACK)
 
 
-def _draw_stats_bar(draw, font_bold, font_regular, items, x, y, width):
+def _build_consumption_items(stats):
+    return [
+        [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
+         _trend(stats.get("avg_kwh_pct", 0), True)],
+        [("HC ", "regular", BLACK), (str(stats.get('hc_ratio', 0)), "bold", BLACK), ("%  ", "regular", BLACK),
+         _trend(stats.get("hc_ratio_pct", 0), False)],
+        [(str(stats.get('avg_price', 0)), "bold", BLACK), ("€/j  ", "regular", BLACK),
+         _trend(stats.get("avg_price_pct", 0), True)],
+    ]
+
+
+def _build_production_items(stats):
+    # Solar: more is better, so a rising trend is good (black), falling is bad (red).
+    return [
+        [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
+         _trend(stats.get("avg_kwh_pct", 0), False)],
+        [(str(stats.get('total_kwh', 0)), "bold", BLACK), ("kWh total", "regular", BLACK)],
+    ]
+
+
+def _draw_stats_bar(draw, fonts, items, x, y, width, line_y):
     rendered = []
     total_w = 0
     for segments in items:
         item_parts = []
         item_w = 0
-        for text, flag in segments:
-            if flag is True:
-                font = font_bold
-                color = BLACK
-            elif flag is False:
-                font = font_regular
-                color = BLACK
-            else:
-                font = font_bold
-                color = RED if flag else BLACK
+        for text, font_key, color in segments:
+            font = fonts[font_key]
             box = draw.textbbox((0, 0), text, font=font)
             w = box[2] - box[0]
             item_parts.append((text, font, color, w))
@@ -169,7 +200,5 @@ def _draw_stats_bar(draw, font_bold, font_regular, items, x, y, width):
             cx += w
         cx += gap
 
-    # 2px separator line — 8px below text
-    sbox = draw.textbbox((0, 0), "X", font=font_bold)
-    line_y = y + (sbox[3] - sbox[1]) + 8
+    # 1px separator line under the banner.
     draw.line([(x, line_y), (x + width - 1, line_y)], fill=BLACK, width=1)

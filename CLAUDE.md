@@ -101,3 +101,13 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 - **HC/HP**: two off-peak windows — 23:32-5:32 (night) + 15:02-17:02 (afternoon), configurable via `HC_WINDOWS`
 - **Pricing**: HP=0.2065 €/kWh, HC=0.1579 €/kWh, subscription=15.65 €/month
 
+## EcoFlow PowerStream / Solar (optional)
+
+- **Goal**: daily solar production (kWh/day) chart in the **top 50%** of the screen, above the Linky chart. Full-black single bars (no split), same title+separator style. Shows the **last 9 completed days** (today excluded; N/A if no data). Stats: avg kWh/day + trend (rising = good = black, falling = red), plus period total.
+- **Data source**: the official Developer API (HMAC) exposes only instantaneous PV watts; the per-day energy counter (`254_32`) exists only on the **private app MQTT** but arrives on the device's own slow, non-forceable timer. So we read the **inverter heartbeat** power and integrate it ourselves into daily kWh.
+- **Power read**: protobuf heartbeat `cmd_func=20 / cmd_id=1` → `PowerStreamInverterHeartbeat`; PV watts = `(pv1_input_watts + pv2_input_watts) / 10` (deci-watts). Integrated in `server._on_solar_power` into the `daily_production` table.
+- **Keep-alive**: the device only publishes while polled. Re-publish a get-quota request (`build_get_quota_request`, cmd 20/1, src=dest=32) to `/app/{userId}/{sn}/thing/property/get` every 60s — otherwise it goes silent.
+- **Auth flow**: `POST https://{host}/auth/login` (password base64, `scene=IOT_APP`) → token + userId; `GET /iot-auth/app/certification` → MQTT url/port/account/password (broker `mqtt-e.ecoflow.com:8883`). **TLS needs `certifi.where()`** or the handshake fails (macOS python.org / Docker slim).
+- **No backfill**: history starts at first connection — EcoFlow cannot return past days.
+- **Config**: `ECOFLOW_EMAIL`, `ECOFLOW_PASSWORD`, `ECOFLOW_DEVICE_SN`, `ECOFLOW_API_HOST` (default `api-e.ecoflow.com`). Integration is disabled (Linky-only) if any is missing.
+

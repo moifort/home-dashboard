@@ -1,6 +1,6 @@
 # Linky e-Paper Dashboard
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings.
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream in the top half of the screen.
 
 ![Dashboard preview](docs/preview.png)
 
@@ -31,6 +31,10 @@ Three indicators are displayed above the chart. Each shows a **current value** a
 - **▼ in red** = degrading (less off-peak ratio)
 - **▲ in red** = degrading (more consumption or cost)
 - Days with less than 1 kWh are excluded from all calculations
+
+### Solar production (optional, top chart)
+
+When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good) and the **period total** (`kWh total`). See the setup section below.
 
 ## Hardware
 
@@ -76,6 +80,17 @@ PRICE_ABO_MONTHLY=15.65
 
 # Refresh interval in seconds (default: 1 hour)
 REFRESH_INTERVAL=3600
+```
+
+#### Optional — EcoFlow PowerStream solar production
+
+Add your EcoFlow account credentials to display daily solar production above the consumption chart. The server connects to EcoFlow's app MQTT broker, reads the inverter's reported PV power, and integrates it into daily kWh totals (the official Developer API only exposes instantaneous watts, with no historical counter). The chart shows the **last 9 completed days** — today is excluded (a partial day is not a reliable total), and days without data show as **N/A**. There is **no backfill**: the history starts at the first connection and fills in day by day.
+
+```env
+ECOFLOW_EMAIL=your_ecoflow_account_email
+ECOFLOW_PASSWORD=your_ecoflow_account_password
+ECOFLOW_DEVICE_SN=your_powerstream_serial_number
+ECOFLOW_API_HOST=api-e.ecoflow.com   # EU; use api.ecoflow.com (global) or api-a.ecoflow.com (asia)
 ```
 
 ### 3. Run with Docker Compose
