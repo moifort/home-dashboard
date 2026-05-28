@@ -1,6 +1,10 @@
 # Linky e-Paper Dashboard
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream in the top half of the screen, and a **crypto-bot stats panel** in the top-right corner.
+![Dashboard on its stand](docs/device.jpg)
+
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, and the **water-heater (cumulus) daily consumption** in the top-right.
+
+Rendered output:
 
 ![Dashboard preview](docs/preview.png)
 
