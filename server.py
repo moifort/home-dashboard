@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 from converter import png_to_epd_buffer
 from crypto_client import build_crypto_panel, fetch_crypto_stats
+from cumulus_client import CumulusMqttListener
 from ecoflow_client import EcoflowMqttListener
 from linky_client import (
     LinkyApiError,
@@ -55,6 +56,13 @@ CRYPTO_API_URL = os.environ.get("CRYPTO_API_URL", "")
 CRYPTO_API_TOKEN = os.environ.get("CRYPTO_API_TOKEN", "")
 CRYPTO_ENABLED = bool(CRYPTO_API_URL)
 
+CUMULUS_MQTT_HOST = os.environ.get("CUMULUS_MQTT_HOST", "")
+CUMULUS_MQTT_PORT = int(os.environ.get("CUMULUS_MQTT_PORT", "1883"))
+CUMULUS_TOPIC = os.environ.get("CUMULUS_TOPIC", "zigbee2mqtt/cumulus")
+CUMULUS_MQTT_USERNAME = os.environ.get("CUMULUS_MQTT_USERNAME", "")
+CUMULUS_MQTT_PASSWORD = os.environ.get("CUMULUS_MQTT_PASSWORD", "")
+CUMULUS_ENABLED = bool(CUMULUS_MQTT_HOST)
+
 epd_buffer: bytes = b""
 buffer_lock = threading.Lock()
 dashboard_data: dict = {}
@@ -64,6 +72,7 @@ last_render_time: str = ""
 last_error: str = ""
 last_solar_report: str = ""
 last_crypto_time: str = ""
+last_cumulus_report: str = ""
 
 
 def get_version() -> str:
@@ -101,6 +110,35 @@ def init_db():
             pv_wh REAL NOT NULL,
             fetched_at TEXT NOT NULL
         )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS daily_cumulus (
+            date TEXT PRIMARY KEY,
+            cons_wh REAL NOT NULL,
+            fetched_at TEXT NOT NULL
+        )"""
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_cached_cumulus(start: str, end: str) -> list[dict]:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.execute(
+        "SELECT date, cons_wh FROM daily_cumulus WHERE date >= ? AND date < ? ORDER BY date",
+        (start, end),
+    )
+    rows = [{"date": r[0], "cons_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def upsert_cumulus(date: str, cons_wh: float):
+    now = datetime.now(PARIS_TZ).isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT OR REPLACE INTO daily_cumulus (date, cons_wh, fetched_at) VALUES (?, ?, ?)",
+        (date, cons_wh, now),
     )
     conn.commit()
     conn.close()
@@ -171,6 +209,53 @@ def start_ecoflow_listener() -> EcoflowMqttListener:
     )
     listener.start()
     logger.info("EcoFlow MQTT listener started for SN %s", ECOFLOW_DEVICE_SN)
+    return listener
+
+
+# Integration state for the cumulus contactor power → daily kWh. Only the MQTT
+# listener thread touches it, so no lock is needed. The contactor has no energy
+# counter, so we integrate its reported instantaneous power ourselves.
+_cumulus_state = {"date": None, "wh": 0.0, "last_ts": None, "last_persist": 0.0}
+
+
+def _on_cumulus_power(watts: float):
+    """MQTT callback: integrate reported cumulus power into today's kWh total."""
+    global last_cumulus_report
+    now = datetime.now(PARIS_TZ)
+    today = now.strftime("%Y-%m-%d")
+    st = _cumulus_state
+
+    if st["date"] != today:
+        if st["date"] is not None:
+            upsert_cumulus(st["date"], st["wh"])  # flush the finished day
+        tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+        existing = get_cached_cumulus(today, tomorrow)
+        st["date"] = today
+        st["wh"] = existing[0]["cons_kwh"] * 1000 if existing else 0.0
+        st["last_ts"] = None
+        st["last_persist"] = 0.0
+
+    if st["last_ts"] is not None:
+        dt_h = (now - st["last_ts"]).total_seconds() / 3600
+        if dt_h > 0:
+            st["wh"] += watts * min(dt_h, MAX_SAMPLE_GAP_H)
+    st["last_ts"] = now
+
+    mono = time.monotonic()
+    if mono - st["last_persist"] >= PRODUCTION_PERSIST_INTERVAL:
+        upsert_cumulus(today, st["wh"])
+        st["last_persist"] = mono
+    last_cumulus_report = now.isoformat()
+
+
+def start_cumulus_listener() -> CumulusMqttListener:
+    listener = CumulusMqttListener(
+        CUMULUS_MQTT_HOST, CUMULUS_MQTT_PORT, CUMULUS_TOPIC,
+        CUMULUS_MQTT_USERNAME, CUMULUS_MQTT_PASSWORD, _on_cumulus_power,
+    )
+    listener.start()
+    logger.info("Cumulus MQTT listener started on %s:%d (%s)",
+                CUMULUS_MQTT_HOST, CUMULUS_MQTT_PORT, CUMULUS_TOPIC)
     return listener
 
 
@@ -297,7 +382,38 @@ def build_dashboard_data(days: list[dict]) -> dict:
     if CRYPTO_ENABLED:
         _attach_crypto(data)
 
+    if CUMULUS_ENABLED:
+        _attach_cumulus(data)
+
     return data
+
+
+CUMULUS_NA_THRESHOLD_KWH = 0.05
+
+
+def _attach_cumulus(data: dict):
+    """Attach the cumulus banner fields: today's kWh and the recent daily average.
+
+    Integrated from the contactor's reported power (no energy counter); history
+    starts at first connection (no backfill).
+    """
+    now = datetime.now(PARIS_TZ)
+    today = now.date()
+    today_str = today.strftime("%Y-%m-%d")
+    tomorrow = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+    nine_ago = (today - timedelta(days=9)).strftime("%Y-%m-%d")
+
+    today_rows = get_cached_cumulus(today_str, tomorrow)
+    today_kwh = today_rows[0]["cons_kwh"] if today_rows else 0.0
+
+    past = [r["cons_kwh"] for r in get_cached_cumulus(nine_ago, today_str)
+            if r["cons_kwh"] >= CUMULUS_NA_THRESHOLD_KWH]
+    avg = sum(past) / len(past) if past else 0.0
+
+    data["cumulus"] = {
+        "today_text": f"{today_kwh:.1f}",
+        "avg_text": f"{avg:.1f}" if past else "N/A",
+    }
 
 
 def _attach_crypto(data: dict):
@@ -491,6 +607,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "last_solar_report": last_solar_report,
             "crypto_enabled": CRYPTO_ENABLED,
             "last_crypto": last_crypto_time,
+            "cumulus_enabled": CUMULUS_ENABLED,
+            "last_cumulus": last_cumulus_report,
         }
         body = json.dumps(status, indent=2).encode()
         self.send_response(200)
@@ -563,6 +681,10 @@ def main():
         start_ecoflow_listener()
     else:
         logger.info("EcoFlow integration disabled (set ECOFLOW_EMAIL/PASSWORD/DEVICE_SN to enable)")
+    if CUMULUS_ENABLED:
+        start_cumulus_listener()
+    else:
+        logger.info("Cumulus integration disabled (set CUMULUS_MQTT_HOST to enable)")
     start_http_server(PORT)
     schedule_loop()
 

@@ -54,22 +54,30 @@ def render_dashboard(data: dict) -> Image.Image:
     _draw_chart(draw, fonts, days, data.get("stats", {}),
                 region_top=half, region_height=half, mode="consumption")
 
-    # Crypto-bot stats as a title-style banner in the empty top-right space.
+    # Title-style banners stacked in the empty top-right space.
+    region_top = 0
     crypto = data.get("crypto")
     if crypto:
-        _draw_crypto_banner(draw, fonts, crypto, region_top=0)
+        region_top = _draw_crypto_banner(draw, fonts, crypto, region_top)
+    cumulus = data.get("cumulus")
+    if cumulus:
+        _draw_cumulus_banner(draw, fonts, cumulus, region_top)
 
     return img
 
 
-def _draw_crypto_banner(draw, fonts, crypto, region_top):
-    """Crypto stats as a title-style banner (same look as the charts), aligned
-    to the right edge in the empty space beside the solar chart's title."""
+def _draw_right_banner(draw, fonts, items, region_top) -> int:
+    """Draw a title-style banner (same look as the chart titles) right-aligned
+    in the empty space beside the charts. Returns the y below its separator."""
     stats_top = region_top + 4
     separator_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
     banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     x = WIDTH - CHART_LEFT - banner_width
+    _draw_stats_bar(draw, fonts, items, x, stats_top, banner_width, separator_y)
+    return separator_y + 6
 
+
+def _draw_crypto_banner(draw, fonts, crypto, region_top) -> int:
     pct_color = BLACK if crypto.get("profit_positive", True) else RED
     items = [
         [("Crypto", "bold", BLACK)],
@@ -79,8 +87,16 @@ def _draw_crypto_banner(draw, fonts, crypto, region_top):
     ]
     if crypto.get("sandbox"):
         items.append([("SANDBOX", "bold", BLACK)])
+    return _draw_right_banner(draw, fonts, items, region_top)
 
-    _draw_stats_bar(draw, fonts, items, x, stats_top, banner_width, separator_y)
+
+def _draw_cumulus_banner(draw, fonts, cumulus, region_top) -> int:
+    items = [
+        [("Cumulus", "bold", BLACK)],
+        [(cumulus.get("today_text", "0"), "bold", BLACK), (" kWh auj.", "regular", BLACK)],
+        [(cumulus.get("avg_text", "0"), "bold", BLACK), (" kWh/j", "regular", BLACK)],
+    ]
+    return _draw_right_banner(draw, fonts, items, region_top)
 
 
 def _bar_total(d: dict, mode: str) -> float:
