@@ -35,6 +35,13 @@ services:
       # Optional crypto-bot stats panel (top-right) — leave URL empty to disable.
       CRYPTO_API_URL: ""
       CRYPTO_API_TOKEN: ""
+      # Optional cumulus (water-heater) daily consumption via Zigbee2MQTT —
+      # leave host empty to disable. Use the broker's LAN IP (bridge network).
+      CUMULUS_MQTT_HOST: ""
+      CUMULUS_MQTT_PORT: "1883"
+      CUMULUS_TOPIC: zigbee2mqtt/cumulus
+      CUMULUS_MQTT_USERNAME: ""
+      CUMULUS_MQTT_PASSWORD: ""
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/status')" || exit 1
       interval: 30s
