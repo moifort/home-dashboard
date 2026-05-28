@@ -87,9 +87,19 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 ## Git Workflow
 
 - **Never `git push` automatically** — push only when the user says "push"
-- On push: review local commits (`git log --oneline origin/main..HEAD`), squash reverts/serial fixes, clean up history, update README if needed
+- On push: review local commits (`git log --oneline origin/main..HEAD`), squash reverts/serial fixes, clean up history
 - Suggest pushing when good progress is made or a milestone is reached
 - Commit after each verified change, but push is a deliberate act
+
+### Pre-push docs & quality checklist (run EVERY push)
+
+Before pushing, verify and update as needed:
+- **CHANGELOG.md** — an entry exists for every user-facing change in the push.
+- **README.md** — features, readings, endpoints and the **Optional** env setup blocks are complete and accurate (every new integration documented).
+- **`docker-compose.yml` + `docker-compose.casaos.yml`** — every new env var is declared (empty default = disabled), ports/volumes correct, image/labels valid.
+- **`.env.example`** — every new env var present with a helpful comment.
+- **`docs/preview.png`** — regenerated when the rendered layout changed.
+- **Environment variables** — if the push adds/renames env vars, tell the user which ones to add or fill on their CasaOS deployment.
 
 
 ## Linky / Conso API
