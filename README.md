@@ -1,6 +1,6 @@
 # Linky e-Paper Dashboard
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream in the top half of the screen.
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream in the top half of the screen, and a **crypto-bot stats panel** in the top-right corner.
 
 ![Dashboard preview](docs/preview.png)
 
@@ -35,6 +35,10 @@ Three indicators are displayed above the chart. Each shows a **current value** a
 ### Solar production (optional, top chart)
 
 When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good) and the **period total** (`kWh total`). See the setup section below.
+
+### Crypto-bot banner (optional, top-right)
+
+When a crypto-bot GraphQL endpoint is configured, an inline title-style banner is drawn in the top-right space (same look as the chart titles): a `Crypto` label, then the **% return** (black when in profit, **red when negative**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. Data is refreshed each time the ESP32 fetches the display. See the setup section below.
 
 ## Hardware
 
@@ -91,6 +95,15 @@ ECOFLOW_EMAIL=your_ecoflow_account_email
 ECOFLOW_PASSWORD=your_ecoflow_account_password
 ECOFLOW_DEVICE_SN=your_powerstream_serial_number
 ECOFLOW_API_HOST=api-e.ecoflow.com   # EU; use api.ecoflow.com (global) or api-a.ecoflow.com (asia)
+```
+
+#### Optional — Crypto-bot stats panel
+
+Point the dashboard at your crypto-bot's GraphQL endpoint to show its trading stats in the top-right corner. Because the dashboard container uses a bridge network, use the bot's **LAN IP** (not `localhost`) when both run on the same host. The panel is fetched whenever the ESP32 pulls the display and is omitted if the endpoint is unreachable.
+
+```env
+CRYPTO_API_URL=http://192.168.1.50:3003/graphql
+CRYPTO_API_TOKEN=your_crypto_bot_api_token   # the bot's NITRO_API_TOKEN; omit if no auth
 ```
 
 ### 3. Run with Docker Compose

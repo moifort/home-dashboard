@@ -1,7 +1,7 @@
 # Dashboard e-Paper — Development Guide
 
 ## Architecture
-- **project root**: Python Docker server (CasaOS, port 5000) that fetches Linky data, renders the HTML dashboard via Playwright
+- **project root**: Python Docker server (CasaOS, port 5000) that fetches Linky data, renders the dashboard bitmap with **Pillow** (`renderer.py` → `ImageDraw`, no browser), converts it to the 4-color EPD buffer (`converter.py`), and serves it at `/display` for the ESP32 to pull
 
 ## e-Paper Display
 
@@ -110,4 +110,13 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 - **Auth flow**: `POST https://{host}/auth/login` (password base64, `scene=IOT_APP`) → token + userId; `GET /iot-auth/app/certification` → MQTT url/port/account/password (broker `mqtt-e.ecoflow.com:8883`). **TLS needs `certifi.where()`** or the handshake fails (macOS python.org / Docker slim).
 - **No backfill**: history starts at first connection — EcoFlow cannot return past days.
 - **Config**: `ECOFLOW_EMAIL`, `ECOFLOW_PASSWORD`, `ECOFLOW_DEVICE_SN`, `ECOFLOW_API_HOST` (default `api-e.ecoflow.com`). Integration is disabled (Linky-only) if any is missing.
+
+## Crypto Bot panel (optional)
+
+- **Goal**: an inline **title-style banner** in the empty **top-right** space (same look as the chart title banners — segments + 1px separator), on the same row as the solar chart's title. Leads with a `Crypto` label, then % return (black if profit ≥ 0, **red if < 0**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. `renderer._draw_crypto_banner` reuses `_draw_stats_bar`.
+- **Data source**: the crypto-bot's GraphQL API (`query { stats { totalProfitUsdc sommeMiseUsdc sandboxMode } }`). `% = totalProfitUsdc / sommeMiseUsdc * 100`; portfolio = `sommeMiseUsdc + totalProfitUsdc`. Client in `crypto_client.py`.
+- **Refresh on pull**: data is fetched **when the ESP32 calls `/display`** (it wakes only ~2×/day), re-rendering the buffer with fresh crypto; Linky/solar stay on the hourly cache. Any failure falls back to the cached hourly buffer (panel omitted).
+- **Networking**: the dashboard runs in `network_mode: bridge`, so it reaches the co-located bot via its **LAN IP** (`http://192.168.1.50:3003/graphql`), not `localhost`.
+- **Thousands separator**: use a plain space — Arial.ttf renders U+202F (the iOS widget's narrow no-break space) as a tofu box on e-paper.
+- **Config**: `CRYPTO_API_URL` (empty = disabled), `CRYPTO_API_TOKEN` (the bot's `NITRO_API_TOKEN`, optional).
 
