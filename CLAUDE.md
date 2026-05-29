@@ -83,6 +83,7 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 ### Workflow
 - After every template change, **analyze the rendered PNG** before sending to ESP32
 - Check: alignment with separator line, text sharpness, digit spacing
+- **After any UI change, regenerate `docs/preview.png` and open it in the macOS Preview app** (`open -a Preview docs/preview.png`) so the user can review the result
 
 ## Git Workflow
 
