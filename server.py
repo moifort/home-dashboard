@@ -410,9 +410,17 @@ def _attach_cumulus(data: dict):
             if r["cons_kwh"] >= CUMULUS_NA_THRESHOLD_KWH]
     avg = sum(past) / len(past) if past else 0.0
 
+    # Trend: last 9 days vs the 28 days before them (mirrors the solar stats).
+    prev_start = (today - timedelta(days=37)).strftime("%Y-%m-%d")
+    prev = [r["cons_kwh"] for r in get_cached_cumulus(prev_start, nine_ago)
+            if r["cons_kwh"] >= CUMULUS_NA_THRESHOLD_KWH]
+    avg_prev = sum(prev) / len(prev) if prev else 0.0
+    trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
+
     data["cumulus"] = {
         "today_text": f"{today_kwh:.1f}",
         "avg_text": f"{avg:.1f}" if past else "N/A",
+        "trend_pct": trend_pct,
     }
 
 
@@ -476,6 +484,7 @@ def _compute_production_stats(current: list[dict], previous: list[dict]) -> dict
         "avg_kwh": round(avg_kwh, 1),
         "avg_kwh_pct": pct,
         "total_kwh": round(total, 1),
+        "savings_eur": round(total * PRICE_HP, 1),
     }
 
 
