@@ -2,6 +2,7 @@
 
 ## 2026-05-29
 
+- **Chart title labels** — the solar and consumption titles now lead with a `Solaire`/`EDF` label (matching the `Crypto`/`Cumulus` banners), with tighter spacing between each value and its trend.
 - **Solar money saved** — the EcoFlow title now shows the euros saved over the period (production total valued at the peak/HP grid price), next to the `kWh total`.
 - **Cumulus consumption trend** — the water-heater banner now shows a trend on its daily average (last 9 days vs the previous 4 weeks; ▲ in red = consuming more).
 - **Tighter margins** — horizontal margins reduced to 8px (from 20px) so the charts and banners use more of the screen width.
