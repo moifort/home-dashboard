@@ -17,8 +17,10 @@ FONT_BOLD_PATH = os.path.join(_FONT_DIR, "Arial-Bold.ttf")
 BLACK = 0
 RED = (255, 0, 0)
 
-CHART_LEFT = 8
-CHART_BOTTOM = 12
+CHART_LEFT = 0
+CHART_TOP = 0  # screen top margin
+CHART_BOTTOM = 0  # screen bottom margin
+DIVIDER_GAP = 8  # spacing kept on each side of the mid-screen divider (not a screen margin)
 BAR_WIDTH = 28
 BAR_GAP = 16
 STATS_FONT_SIZE = 13
@@ -69,7 +71,7 @@ def render_dashboard(data: dict) -> Image.Image:
 def _draw_right_banner(draw, fonts, items, region_top) -> int:
     """Draw a title-style banner (same look as the chart titles) right-aligned
     in the empty space beside the charts. Returns the y below its separator."""
-    stats_top = region_top + 4
+    stats_top = region_top + CHART_TOP
     separator_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
     banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     x = WIDTH - CHART_LEFT - banner_width
@@ -126,12 +128,16 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
     # even when a chart has few columns (e.g. solar history early on).
     banner_width = max(chart_width, MAX_DAYS * col_width - BAR_GAP)
 
+    # The top chart hugs the screen top and leaves a gap above the divider; the
+    # bottom chart sits below the divider and hugs the screen bottom.
+    is_top = region_top == 0
     label_h = draw.textbbox((0, 0), "lun", font=font_label)[3]
-    baseline_y = region_top + region_height - CHART_BOTTOM - label_h - 4
+    bottom_pad = DIVIDER_GAP if is_top else CHART_BOTTOM
+    baseline_y = region_top + region_height - bottom_pad - label_h - 4
 
     # Stats banner anchored at top of the region ("titre + bordure").
     value_h = draw.textbbox((0, 0), "0", font=font_value)[3]
-    stats_top = region_top + 4
+    stats_top = region_top + (CHART_TOP if is_top else DIVIDER_GAP)
     separator_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
     bar_max_height = max(20, baseline_y - separator_y - value_h - 14)
 
