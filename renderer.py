@@ -212,8 +212,8 @@ def _build_production_items(stats):
     return [
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
-        [(str(stats.get('savings_eur', 0)), "bold", BLACK), (" €", "regular", BLACK)],
-        [(str(stats.get('total_kwh', 0)), "bold", BLACK), ("kWh total", "regular", BLACK)],
+        [(str(stats.get('savings_eur', 0)), "bold", BLACK), (" €   ", "regular", BLACK),
+         (str(stats.get('total_kwh', 0)), "bold", BLACK), ("kWh total", "regular", BLACK)],
     ]
 
 
