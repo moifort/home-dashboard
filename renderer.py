@@ -93,8 +93,8 @@ def _draw_crypto_banner(draw, fonts, crypto, region_top) -> int:
 def _draw_cumulus_banner(draw, fonts, cumulus, region_top) -> int:
     items = [
         [("Cumulus", "bold", BLACK)],
-        [(cumulus.get("today_text", "0"), "bold", BLACK), (" kWh auj.", "regular", BLACK)],
-        [(cumulus.get("avg_text", "0"), "bold", BLACK), (" kWh/j  ", "regular", BLACK),
+        [(cumulus.get("today_text", "0"), "bold", BLACK), ("kWh auj.", "regular", BLACK)],
+        [(cumulus.get("avg_text", "0"), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
          _trend(cumulus.get("trend_pct", 0), True)],
     ]
     return _draw_right_banner(draw, fonts, items, region_top)
@@ -212,7 +212,7 @@ def _build_production_items(stats):
     return [
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
-        [(str(stats.get('savings_eur', 0)), "bold", BLACK), (" €   ", "regular", BLACK),
+        [(str(stats.get('savings_eur', 0)), "bold", BLACK), ("€   ", "regular", BLACK),
          (str(stats.get('total_kwh', 0)), "bold", BLACK), ("kWh total", "regular", BLACK)],
     ]
 
