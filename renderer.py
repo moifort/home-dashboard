@@ -17,7 +17,7 @@ FONT_BOLD_PATH = os.path.join(_FONT_DIR, "Arial-Bold.ttf")
 BLACK = 0
 RED = (255, 0, 0)
 
-CHART_LEFT = 20
+CHART_LEFT = 0
 CHART_BOTTOM = 12
 BAR_WIDTH = 28
 BAR_GAP = 16

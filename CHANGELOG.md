@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-05-29
+
+- **Edge-to-edge layout** — removed the 20px horizontal margins so the charts and right-hand banners now span the full screen width.
+
 ## 2026-05-28
 
 - **Cumulus (water-heater) consumption** — optional inline title-style banner (top-right, under the crypto one) showing the water-heater's daily kWh and recent daily average. The Zigbee contactor (Legrand 412171) reports only instantaneous power, so daily kWh are integrated over time from its Zigbee2MQTT power topic (no historical backfill). Enabled by setting `CUMULUS_MQTT_HOST`.
