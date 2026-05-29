@@ -94,7 +94,7 @@ def _draw_cumulus_banner(draw, fonts, cumulus, region_top) -> int:
     items = [
         [("Cumulus", "bold", BLACK)],
         [(cumulus.get("today_text", "0"), "bold", BLACK), ("kWh auj.", "regular", BLACK)],
-        [(cumulus.get("avg_text", "0"), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
+        [(cumulus.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(cumulus.get("trend_pct", 0), True)],
     ]
     return _draw_right_banner(draw, fonts, items, region_top)
@@ -199,11 +199,11 @@ def _trend(pct, invert_bad):
 def _build_consumption_items(stats):
     return [
         [("EDF", "bold", BLACK)],
-        [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
+        [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), True)],
-        [("HC ", "regular", BLACK), (str(stats.get('hc_ratio', 0)), "bold", BLACK), ("%  ", "regular", BLACK),
+        [("HC ", "regular", BLACK), (str(stats.get('hc_ratio', 0)), "bold", BLACK), ("% ", "regular", BLACK),
          _trend(stats.get("hc_ratio_pct", 0), False)],
-        [(str(stats.get('avg_price', 0)), "bold", BLACK), ("€/j  ", "regular", BLACK),
+        [(str(stats.get('avg_price', 0)), "bold", BLACK), ("€/j ", "regular", BLACK),
          _trend(stats.get("avg_price_pct", 0), True)],
     ]
 
@@ -212,7 +212,7 @@ def _build_production_items(stats):
     # Solar: more is better, so a rising trend is good (black), falling is bad (red).
     return [
         [("Solaire", "bold", BLACK)],
-        [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
+        [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
         [(str(stats.get('savings_eur', 0)), "bold", BLACK), ("€   ", "regular", BLACK),
          (str(stats.get('total_kwh', 0)), "bold", BLACK), ("kWh total", "regular", BLACK)],
