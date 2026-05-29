@@ -2,7 +2,9 @@
 
 ## 2026-05-29
 
-- **Edge-to-edge layout** — removed the 20px horizontal margins so the charts and right-hand banners now span the full screen width.
+- **Solar money saved** — the EcoFlow title now shows the euros saved over the period (production total valued at the peak/HP grid price), next to the `kWh total`.
+- **Cumulus consumption trend** — the water-heater banner now shows a trend on its daily average (last 9 days vs the previous 4 weeks; ▲ in red = consuming more).
+- **Tighter margins** — horizontal margins reduced to 8px (from 20px) so the charts and banners use more of the screen width.
 
 ## 2026-05-28
 

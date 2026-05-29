@@ -42,7 +42,7 @@ Three indicators are displayed above the chart. Each shows a **current value** a
 
 ### Solar production (optional, top chart)
 
-When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good) and the **period total** (`kWh total`). See the setup section below.
+When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **money saved** over the period (`€`, period total valued at the peak/HP grid price) and the **period total** (`kWh total`). See the setup section below.
 
 ### Crypto-bot banner (optional, top-right)
 
@@ -50,7 +50,7 @@ When a crypto-bot GraphQL endpoint is configured, an inline title-style banner i
 
 ### Cumulus consumption (optional, top-right)
 
-When a Zigbee2MQTT broker is configured, a second banner below the crypto one shows the water-heater's daily consumption: a `Cumulus` label, today's kWh and the recent daily average. The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
+When a Zigbee2MQTT broker is configured, a second banner below the crypto one shows the water-heater's daily consumption: a `Cumulus` label, today's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
 
 ## Hardware
 
