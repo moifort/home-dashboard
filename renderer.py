@@ -198,6 +198,7 @@ def _trend(pct, invert_bad):
 
 def _build_consumption_items(stats):
     return [
+        [("EDF", "bold", BLACK)],
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), True)],
         [("HC ", "regular", BLACK), (str(stats.get('hc_ratio', 0)), "bold", BLACK), ("%  ", "regular", BLACK),
@@ -210,6 +211,7 @@ def _build_consumption_items(stats):
 def _build_production_items(stats):
     # Solar: more is better, so a rising trend is good (black), falling is bad (red).
     return [
+        [("Solaire", "bold", BLACK)],
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j  ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
         [(str(stats.get('savings_eur', 0)), "bold", BLACK), ("€   ", "regular", BLACK),
