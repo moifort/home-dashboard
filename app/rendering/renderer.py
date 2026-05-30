@@ -6,14 +6,14 @@ full-black bars) above electricity consumption (bottom half, stacked HC/HP).
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-from app.config import FONTS_DIR
-
 WIDTH = 1360
 HEIGHT = 480
 
-# Bundled Arial guarantees identical bitmap output on macOS and in Docker.
-FONT_PATH = os.path.join(FONTS_DIR, "Arial.ttf")
-FONT_BOLD_PATH = os.path.join(FONTS_DIR, "Arial-Bold.ttf")
+# Bundled Arial (co-located with the renderer) guarantees identical bitmap
+# output on macOS and in Docker.
+_FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+FONT_PATH = os.path.join(_FONTS_DIR, "Arial.ttf")
+FONT_BOLD_PATH = os.path.join(_FONTS_DIR, "Arial-Bold.ttf")
 
 BLACK = 0
 RED = (255, 0, 0)

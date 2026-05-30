@@ -10,7 +10,6 @@ from zoneinfo import ZoneInfo
 
 # Repo root: app/config.py -> app/ -> repo root.
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FONTS_DIR = REPO_ROOT / "fonts"
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
 DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
