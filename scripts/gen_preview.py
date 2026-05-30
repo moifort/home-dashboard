@@ -12,8 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-# Point at the local DB (server defaults to the in-container /app path).
-os.environ.setdefault("DB_PATH", str(ROOT / "data" / "linky.db"))
+# Point at the local DB (server defaults to the in-container /data path).
+os.environ.setdefault("DB_PATH", str(ROOT / ".data" / "linky.db"))
 
 # Pull the real grid from the bot for the preview unless already configured.
 os.environ.setdefault("CRYPTO_API_URL", "http://192.168.1.50:3003/graphql")

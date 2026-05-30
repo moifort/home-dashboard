@@ -3,7 +3,7 @@
 .github
 .claude
 .env
-data/
+.data/
 __pycache__/
 *.py[cod]
 .DS_Store
