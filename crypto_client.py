@@ -46,21 +46,10 @@ def fetch_crypto_stats(url: str, token: str = "", timeout: float = 5) -> dict | 
     Returns the `stats` object, or None on any network/HTTP/GraphQL error
     (the panel is simply omitted when data is unavailable).
     """
-    headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    try:
-        resp = requests.post(url, json={"query": STATS_QUERY}, headers=headers, timeout=timeout)
-        resp.raise_for_status()
-        body = resp.json()
-    except (requests.RequestException, ValueError) as e:
-        logger.warning("Crypto stats fetch failed: %s", e)
+    data = _post(url, STATS_QUERY, token, timeout)
+    if not data:
         return None
-
-    if body.get("errors"):
-        logger.warning("Crypto GraphQL errors: %s", body["errors"])
-        return None
-    stats = (body.get("data") or {}).get("stats")
+    stats = data.get("stats")
     if not stats:
         logger.warning("Crypto stats missing in response")
         return None
