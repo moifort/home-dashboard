@@ -5,7 +5,7 @@ interface — enabled(), init_schema(), start(), attach(data), status() — so t
 orchestrator and server can iterate them generically. To drop an integration,
 delete its package and remove it from OPTIONAL below.
 """
-from app.integrations import crypto, cumulus, ecoflow
+from app.integrations import crypto, cumulus, ecoflow, unifi
 
 # Order defines the render-attach order and is otherwise irrelevant.
-OPTIONAL = (ecoflow, crypto, cumulus)
+OPTIONAL = (ecoflow, crypto, cumulus, unifi)
