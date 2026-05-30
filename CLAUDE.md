@@ -133,7 +133,7 @@ Before pushing, verify and update as needed:
 
 ## Cumulus (water heater) consumption (optional)
 
-- **Goal**: an inline **title-style banner** in the top-right (stacked under the crypto banner) showing the water-heater's daily consumption: `Cumulus  <today> kWh auj.  <avg> kWh/j`. `renderer._draw_cumulus_banner` reuses `_draw_right_banner`/`_draw_stats_bar`.
+- **Goal**: a **title-style banner** spanning the chart width, left-aligned at the very **bottom of the screen, below the EDF chart** (the consumption chart is shrunk by `CUMULUS_BANNER_H` to make room; its 1px separator sits *above* the text as a divider from the day labels), showing the water-heater's consumption: `Cumulus  <yesterday> kWh hier  <avg> kWh/j`. The value is **yesterday's** completed daily total (not today's partial one). `renderer._draw_cumulus_banner` reuses `_draw_stats_bar`.
 - **Device**: the `cumulus` Zigbee device is a **Legrand 412171 DIN contactor**. It exposes `state`, `power` (W), `power_apparent` (VA) — **no energy (kWh) counter**. So we **integrate the reported power** into daily kWh ourselves (same technique as EcoFlow solar, `server._on_cumulus_power` → `daily_cumulus` table). No backfill — history starts at first connection.
 - **Data source**: the Zigbee2MQTT broker (mosquitto). Subscribe to `zigbee2mqtt/cumulus`, read `power` from the JSON. The contactor publishes on change; we also re-request it (`{"power":""}` on `zigbee2mqtt/cumulus/get`) every 60s so integration keeps getting samples during steady heating. Client in `cumulus_client.py`.
 - **Networking**: dashboard is in `network_mode: bridge`, so it reaches the broker via its **LAN IP** (`192.168.1.50:1883`), anonymous (no MQTT auth configured in Z2M).

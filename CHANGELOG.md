@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-05-30
+
+- **Cumulus banner** — now shows **yesterday's** completed daily consumption (`kWh hier`) instead of today's partial total, and moves to a full-width row at the very **bottom of the screen, below the EDF chart** (which shrinks slightly to make room).
+- **Chart split** — the solar chart is slightly shorter so the EDF chart gets a bit more height.
+
 ## 2026-05-29
 
 - **Chart title labels** — the solar and consumption titles now lead with a `Solaire`/`EDF` label (matching the `Crypto`/`Cumulus` banners), with tighter spacing between each value and its trend.

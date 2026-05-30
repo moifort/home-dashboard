@@ -4,7 +4,7 @@
   <img src="docs/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, and the **water-heater (cumulus) daily consumption** in the top-right.
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, and the **water-heater (cumulus) daily consumption** in a banner below the consumption chart.
 
 Rendered output:
 
@@ -48,9 +48,9 @@ When an EcoFlow PowerStream is configured, the top half shows daily solar produc
 
 When a crypto-bot GraphQL endpoint is configured, an inline title-style banner is drawn in the top-right space (same look as the chart titles): a `Crypto` label, then the **% return** (black when in profit, **red when negative**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. Data is refreshed each time the ESP32 fetches the display. See the setup section below.
 
-### Cumulus consumption (optional, top-right)
+### Cumulus consumption (optional)
 
-When a Zigbee2MQTT broker is configured, a second banner below the crypto one shows the water-heater's daily consumption: a `Cumulus` label, today's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
+When a Zigbee2MQTT broker is configured, a full-width banner below the consumption chart shows the water-heater's daily consumption: a `Cumulus` label, yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
 
 ## Hardware
 
