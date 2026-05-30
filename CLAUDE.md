@@ -1,7 +1,29 @@
 # Dashboard e-Paper — Development Guide
 
 ## Architecture
-- **project root**: Python Docker server (CasaOS, port 5000) that fetches Linky data, renders the dashboard bitmap with **Pillow** (`renderer.py` → `ImageDraw`, no browser), converts it to the 4-color EPD buffer (`converter.py`), and serves it at `/display` for the ESP32 to pull
+- **`app/` package**: Python Docker server (CasaOS, port 5000, run with `python -m app`) that fetches Linky data, renders the dashboard bitmap with **Pillow** (`app/rendering/renderer.py` → `ImageDraw`, no browser), converts it to the 4-color EPD buffer (`app/rendering/converter.py`), and serves it at `/display` for the ESP32 to pull
+
+### Project structure (vertical slices)
+```
+app/
+  __main__.py          # python -m app
+  config.py            # global settings (paths, version, TZ, DB_PATH, PORT…)
+  db.py                # SQLite primitive: connect() + daily-table accessors
+  server.py            # HTTP server, refresh loop, /status assembled from slices
+  dashboard_data.py    # orchestrator: Linky core + each enabled slice.attach()
+  rendering/           # renderer.py + converter.py
+  integrations/        # one self-contained folder per integration
+    __init__.py        # OPTIONAL registry — drop a slice = delete folder + 1 line
+    linky/   {api/, client.py, __init__.py}        # core
+    ecoflow/ {client.py, mqtt/, proto/, __init__.py}
+    cumulus/ {mqtt/, __init__.py}
+    crypto/  {graphql/, __init__.py}
+```
+Each integration's `__init__.py` exposes the uniform slice API — `enabled()`,
+`init_schema()`, `start()`, `attach(data)`, `status()` — and owns its env config,
+DB table, power integrator and render panel. Tech-specific transport lives in a
+subfolder (`mqtt/`, `proto/`, `graphql/`, `api/`). Removing an integration is
+`rm -rf app/integrations/<name>/` + removing its entry from `OPTIONAL`.
 
 ## e-Paper Display
 
@@ -116,7 +138,7 @@ Before pushing, verify and update as needed:
 
 - **Goal**: daily solar production (kWh/day) chart in the **top 50%** of the screen, above the Linky chart. Full-black single bars (no split), same title+separator style. Shows the **last 9 completed days** (today excluded; N/A if no data). Stats: avg kWh/day + trend (rising = good = black, falling = red), plus period total.
 - **Data source**: the official Developer API (HMAC) exposes only instantaneous PV watts; the per-day energy counter (`254_32`) exists only on the **private app MQTT** but arrives on the device's own slow, non-forceable timer. So we read the **inverter heartbeat** power and integrate it ourselves into daily kWh.
-- **Power read**: protobuf heartbeat `cmd_func=20 / cmd_id=1` → `PowerStreamInverterHeartbeat`; PV watts = `(pv1_input_watts + pv2_input_watts) / 10` (deci-watts). Integrated in `server._on_solar_power` into the `daily_production` table.
+- **Power read**: protobuf heartbeat `cmd_func=20 / cmd_id=1` → `PowerStreamInverterHeartbeat`; PV watts = `(pv1_input_watts + pv2_input_watts) / 10` (deci-watts). Integrated in `app/integrations/ecoflow` (`_on_solar_power`) into the `daily_production` table.
 - **Keep-alive**: the device only publishes while polled. Re-publish a get-quota request (`build_get_quota_request`, cmd 20/1, src=dest=32) to `/app/{userId}/{sn}/thing/property/get` every 60s — otherwise it goes silent.
 - **Auth flow**: `POST https://{host}/auth/login` (password base64, `scene=IOT_APP`) → token + userId; `GET /iot-auth/app/certification` → MQTT url/port/account/password (broker `mqtt-e.ecoflow.com:8883`). **TLS needs `certifi.where()`** or the handshake fails (macOS python.org / Docker slim).
 - **No backfill**: history starts at first connection — EcoFlow cannot return past days.
@@ -124,8 +146,8 @@ Before pushing, verify and update as needed:
 
 ## Crypto Bot panel (optional)
 
-- **Goal**: an inline **title-style banner** in the empty **top-right** space (same look as the chart title banners — segments + 1px separator), on the same row as the solar chart's title. Leads with a `Crypto` label, then % return (black if profit ≥ 0, **red if < 0**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. `renderer._draw_crypto_banner` reuses `_draw_stats_bar`.
-- **Data source**: the crypto-bot's GraphQL API (`query { stats { totalProfitUsdc sommeMiseUsdc sandboxMode } }`). `% = totalProfitUsdc / sommeMiseUsdc * 100`; portfolio = `sommeMiseUsdc + totalProfitUsdc`. Client in `crypto_client.py`.
+- **Goal**: an inline **title-style banner** in the empty **top-right** space (same look as the chart title banners — segments + 1px separator), on the same row as the solar chart's title. Leads with a `Crypto` label, then % return (black if profit ≥ 0, **red if < 0**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. `renderer._draw_crypto_banner` (in `app/rendering/renderer.py`) reuses `_draw_stats_bar`.
+- **Data source**: the crypto-bot's GraphQL API (`query { stats { totalProfitUsdc sommeMiseUsdc sandboxMode } }`). `% = totalProfitUsdc / sommeMiseUsdc * 100`; portfolio = `sommeMiseUsdc + totalProfitUsdc`. Slice in `app/integrations/crypto/` (`graphql/` transport + queries).
 - **Refresh on pull**: data is fetched **when the ESP32 calls `/display`** (it wakes only ~2×/day), re-rendering the buffer with fresh crypto; Linky/solar stay on the hourly cache. Any failure falls back to the cached hourly buffer (panel omitted).
 - **Networking**: the dashboard runs in `network_mode: bridge`, so it reaches the co-located bot via its **LAN IP** (`http://192.168.1.50:3003/graphql`), not `localhost`.
 - **Thousands separator**: use a plain space — Arial.ttf renders U+202F (the iOS widget's narrow no-break space) as a tofu box on e-paper.
@@ -133,9 +155,9 @@ Before pushing, verify and update as needed:
 
 ## Cumulus (water heater) consumption (optional)
 
-- **Goal**: a **title-style banner** spanning the chart width, left-aligned at the very **bottom of the screen, below the EDF chart** (the consumption chart is shrunk by `CUMULUS_BANNER_H` to make room; its 1px separator sits *above* the text as a divider from the day labels), showing the water-heater's consumption: `Cumulus  <yesterday> kWh hier  <avg> kWh/j`. The value is **yesterday's** completed daily total (not today's partial one). `renderer._draw_cumulus_banner` reuses `_draw_stats_bar`.
-- **Device**: the `cumulus` Zigbee device is a **Legrand 412171 DIN contactor**. It exposes `state`, `power` (W), `power_apparent` (VA) — **no energy (kWh) counter**. So we **integrate the reported power** into daily kWh ourselves (same technique as EcoFlow solar, `server._on_cumulus_power` → `daily_cumulus` table). No backfill — history starts at first connection.
-- **Data source**: the Zigbee2MQTT broker (mosquitto). Subscribe to `zigbee2mqtt/cumulus`, read `power` from the JSON. The contactor publishes on change; we also re-request it (`{"power":""}` on `zigbee2mqtt/cumulus/get`) every 60s so integration keeps getting samples during steady heating. Client in `cumulus_client.py`.
+- **Goal**: a **title-style banner** spanning the chart width, left-aligned at the very **bottom of the screen, below the EDF chart** (the consumption chart is shrunk by `CUMULUS_BANNER_H` to make room; its 1px separator sits *above* the text as a divider from the day labels), showing the water-heater's consumption: `Cumulus  <yesterday> kWh hier  <avg> kWh/j`. The value is **yesterday's** completed daily total (not today's partial one). `renderer._draw_cumulus_banner` (in `app/rendering/renderer.py`) reuses `_draw_stats_bar`.
+- **Device**: the `cumulus` Zigbee device is a **Legrand 412171 DIN contactor**. It exposes `state`, `power` (W), `power_apparent` (VA) — **no energy (kWh) counter**. So we **integrate the reported power** into daily kWh ourselves (same technique as EcoFlow solar, `app/integrations/cumulus` `_on_cumulus_power` → `daily_cumulus` table). No backfill — history starts at first connection.
+- **Data source**: the Zigbee2MQTT broker (mosquitto). Subscribe to `zigbee2mqtt/cumulus`, read `power` from the JSON. The contactor publishes on change; we also re-request it (`{"power":""}` on `zigbee2mqtt/cumulus/get`) every 60s so integration keeps getting samples during steady heating. Slice in `app/integrations/cumulus/` (`mqtt/` transport).
 - **Networking**: dashboard is in `network_mode: bridge`, so it reaches the broker via its **LAN IP** (`192.168.1.50:1883`), anonymous (no MQTT auth configured in Z2M).
 - **Config**: `CUMULUS_MQTT_HOST` (empty = disabled), `CUMULUS_MQTT_PORT` (1883), `CUMULUS_TOPIC` (`zigbee2mqtt/cumulus`), `CUMULUS_MQTT_USERNAME`/`PASSWORD` (optional).
 

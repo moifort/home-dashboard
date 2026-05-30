@@ -2,6 +2,13 @@
 
 ## 2026-05-30
 
+- **Internal refactor (no behavior change)** — the loose root modules became an `app/`
+  package organized as vertical slices: each integration (`linky`, `ecoflow`, `cumulus`,
+  `crypto`) is a self-contained folder owning its config, storage, transport (in tech
+  subfolders `mqtt/`/`proto/`/`graphql/`/`api/`), integrator and render panel, wired
+  through an `OPTIONAL` registry. Dead code removed (`templates/`, `send_to_esp32`). The
+  server now runs with `python -m app`. `Dashboard.3mf` moved to `hardware/`.
+
 - **Crypto profit grouping** — the Crypto banner now groups the bot's results behind a `Profits` label: the signed `%` return and the `±$` amount on one line (red when negative), keeping the portfolio value as a separate segment.
 - **Crypto alpha** — the Crypto banner now shows an `α` segment: the bot's excess return over buy-and-hold (all-time bot return minus `holdReturnPercent`), black when ahead, red when behind.
 - **Crypto grid snapshot chart** — under the Crypto banner (top-right): the grid price levels with left labels and dashed lines, the 7-day price line, and a "now" marker dot with the live current price. Rendered black & white. Reuses the existing `CRYPTO_API_URL`/`CRYPTO_API_TOKEN` (fetched live on the ESP32's `/display` pull).
