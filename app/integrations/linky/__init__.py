@@ -39,6 +39,11 @@ def init_schema():
             fetched_at TEXT NOT NULL
         )"""
     )
+    # Migration: the talon (daily P5 power, W) was added later — add the column
+    # to existing databases. Backfilled by fetch_and_cache on the next refresh.
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(daily_consumption)")]
+    if "talon_w" not in cols:
+        conn.execute("ALTER TABLE daily_consumption ADD COLUMN talon_w REAL")
     conn.commit()
     conn.close()
 
@@ -60,7 +65,10 @@ def fetch_and_cache() -> list[dict]:
         chunk_start = chunk_end - timedelta(days=7)
         s = chunk_start.strftime("%Y-%m-%d")
         e = chunk_end.strftime("%Y-%m-%d")
-        if db.get_cached_days(s, e) and week_offset > 0:
+        cached = db.get_cached_days(s, e)
+        # Skip cached chunks, but force a one-time backfill of older weeks whose
+        # rows predate the talon column (talon_w still NULL).
+        if cached and week_offset > 0 and all(d.get("talon_w") is not None for d in cached):
             continue
         logger.info("Fetching load curve: %s to %s", s, e)
         try:

@@ -68,10 +68,10 @@ def upsert_production(date: str, pv_wh: float):
 def get_cached_days(start: str, end: str) -> list[dict]:
     conn = connect()
     cur = conn.execute(
-        "SELECT date, hc_kwh, hp_kwh FROM daily_consumption WHERE date >= ? AND date < ? ORDER BY date",
+        "SELECT date, hc_kwh, hp_kwh, talon_w FROM daily_consumption WHERE date >= ? AND date < ? ORDER BY date",
         (start, end),
     )
-    rows = [{"date": r[0], "hc_kwh": r[1], "hp_kwh": r[2]} for r in cur.fetchall()]
+    rows = [{"date": r[0], "hc_kwh": r[1], "hp_kwh": r[2], "talon_w": r[3]} for r in cur.fetchall()]
     conn.close()
     return rows
 
@@ -81,8 +81,8 @@ def upsert_days(days: list[dict]):
     conn = connect()
     for d in days:
         conn.execute(
-            "INSERT OR REPLACE INTO daily_consumption (date, hc_kwh, hp_kwh, fetched_at) VALUES (?, ?, ?, ?)",
-            (d["date"], d["hc_kwh"], d["hp_kwh"], now),
+            "INSERT OR REPLACE INTO daily_consumption (date, hc_kwh, hp_kwh, talon_w, fetched_at) VALUES (?, ?, ?, ?, ?)",
+            (d["date"], d["hc_kwh"], d["hp_kwh"], d.get("talon_w"), now),
         )
     conn.commit()
     conn.close()

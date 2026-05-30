@@ -32,13 +32,34 @@ def parse_hc_windows(windows_str: str) -> list[tuple[int, int, int, int]]:
     return windows
 
 
+# Talon (baseline) = a low percentile of the day's 30-min power samples, in W.
+# The strict minimum would catch the single step where everything (fridge
+# included) happened to be off at once; P5 gives the true permanent floor.
+TALON_PCT = 5
+
+
+def _percentile(values: list[float], pct: float) -> float:
+    """Linear-interpolation percentile (nearest-rank fallback for tiny series)."""
+    if not values:
+        return 0.0
+    s = sorted(values)
+    if len(s) == 1:
+        return s[0]
+    rank = (pct / 100) * (len(s) - 1)
+    lo = int(rank)
+    frac = rank - lo
+    hi = min(lo + 1, len(s) - 1)
+    return s[lo] + (s[hi] - s[lo]) * frac
+
+
 def compute_daily_hc_hp(
     api_response: list | dict,
     hc_windows: list[tuple[int, int, int, int]] | None = None,
 ) -> list[dict]:
-    """Aggregate load curve data into daily HC/HP totals.
+    """Aggregate load curve data into daily HC/HP totals and the daily talon.
 
-    Each 30-min interval: energy_Wh = power_W * 0.5
+    Each 30-min interval: energy_Wh = power_W * 0.5. The talon is the P5 of the
+    day's power samples (W) — the house's permanent baseline load.
     """
     if hc_windows is None:
         hc_windows = [(23, 32, 5, 32), (15, 2, 17, 2)]
@@ -47,7 +68,9 @@ def compute_daily_hc_hp(
     if not readings:
         return []
 
-    daily: dict[str, dict[str, float]] = defaultdict(lambda: {"hc_wh": 0.0, "hp_wh": 0.0})
+    daily: dict[str, dict] = defaultdict(
+        lambda: {"hc_wh": 0.0, "hp_wh": 0.0, "watts": []}
+    )
 
     for reading in readings:
         ts = reading["timestamp"]
@@ -60,6 +83,7 @@ def compute_daily_hc_hp(
             daily[date_key]["hc_wh"] += wh
         else:
             daily[date_key]["hp_wh"] += wh
+        daily[date_key]["watts"].append(watts)
 
     return sorted(
         [
@@ -67,6 +91,7 @@ def compute_daily_hc_hp(
                 "date": date,
                 "hc_kwh": round(vals["hc_wh"] / 1000, 2),
                 "hp_kwh": round(vals["hp_wh"] / 1000, 2),
+                "talon_w": round(_percentile(vals["watts"], TALON_PCT)),
             }
             for date, vals in daily.items()
         ],
