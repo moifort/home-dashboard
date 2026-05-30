@@ -11,3 +11,5 @@ __pycache__/
 # Runtime data
 .version
 data/
+
+.claude/

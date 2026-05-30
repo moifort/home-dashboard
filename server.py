@@ -14,7 +14,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from converter import png_to_epd_buffer
-from crypto_client import build_crypto_panel, fetch_crypto_stats
+from crypto_client import build_crypto_panel, fetch_crypto_grid, fetch_crypto_stats
 from cumulus_client import CumulusMqttListener
 from ecoflow_client import EcoflowMqttListener
 from linky_client import (
@@ -434,6 +434,11 @@ def _attach_crypto(data: dict):
     if not stats:
         return
     data["crypto"] = build_crypto_panel(stats)
+    # Grid snapshot chart (independent: a failure just omits the chart, the
+    # banner still shows).
+    grid = fetch_crypto_grid(CRYPTO_API_URL, CRYPTO_API_TOKEN)
+    if grid:
+        data["crypto_grid"] = grid
     last_crypto_time = datetime.now(PARIS_TZ).isoformat()
 
 

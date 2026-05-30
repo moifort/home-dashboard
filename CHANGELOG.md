@@ -2,6 +2,8 @@
 
 ## 2026-05-30
 
+- **Crypto grid snapshot chart** — under the Crypto banner (top-right): the grid price levels with left labels and dashed lines, the 7-day price line, and a "now" marker dot with the live current price. Rendered black & white. Reuses the existing `CRYPTO_API_URL`/`CRYPTO_API_TOKEN` (fetched live on the ESP32's `/display` pull).
+- **`scripts/gen_preview.py`** — regenerates `docs/preview.png` from the local DB history + live crypto, for UI review.
 - **Cumulus banner** — now shows **yesterday's** completed daily consumption (`kWh hier`) instead of today's partial total, and moves to a full-width row at the very **bottom of the screen, below the EDF chart** (which shrinks slightly to make room).
 - **Chart split** — the solar chart is slightly shorter so the EDF chart gets a bit more height.
 
