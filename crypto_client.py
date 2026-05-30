@@ -7,7 +7,10 @@ logger = logging.getLogger(__name__)
 
 USER_AGENT = "linky-dashboard/1.0 (github.com/thibaut-mottet/dashboard)"
 
-STATS_QUERY = "query { stats { totalProfitUsdc sommeMiseUsdc sandboxMode } }"
+STATS_QUERY = (
+    "query { stats { totalProfitUsdc sommeMiseUsdc sandboxMode"
+    " periodStats { alltime { holdReturnPercent } } } }"
+)
 
 # Grid snapshot: bounds + level count + current price (Stats), plus the 7-day
 # price line (PriceHistory). Mirrors the iOS GridSnapshotCard inputs.
@@ -82,11 +85,18 @@ def build_crypto_panel(stats: dict) -> dict:
     sign = "+" if profit >= 0 else "-"
     portfolio = somme_mise + profit
 
+    # Alpha = the bot's return minus the buy-and-hold return over the same
+    # (all-time) period: how much the strategy beat just holding BTC.
+    hold = ((stats.get("periodStats") or {}).get("alltime") or {}).get("holdReturnPercent")
+    alpha = (pct - hold) if hold is not None else None
+
     return {
         "pct_text": f"{abs(pct):.0f}",
         "profit_positive": profit >= 0,
         "profit_text": f"{sign}${_grouped(abs(profit))}",
         "portfolio_text": f"${_grouped(portfolio)}",
+        "alpha_text": f"{alpha:+.0f}" if alpha is not None else "",
+        "alpha_positive": alpha is None or alpha >= 0,
         "sandbox": bool(stats.get("sandboxMode", False)),
     }
 
