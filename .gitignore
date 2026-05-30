@@ -10,6 +10,6 @@ __pycache__/
 
 # Runtime data
 .version
-data/
+.data/
 
 .claude/

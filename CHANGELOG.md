@@ -7,7 +7,8 @@
   `crypto`) is a self-contained folder owning its config, storage, transport (in tech
   subfolders `mqtt/`/`proto/`/`graphql/`/`api/`), integrator and render panel, wired
   through an `OPTIONAL` registry. Dead code removed (`templates/`, `send_to_esp32`). The
-  server now runs with `python -m app`. `Dashboard.3mf` moved to `hardware/`.
+  server now runs with `python -m app`. Fonts co-located under `app/rendering/fonts/`,
+  `Dashboard.3mf` moved to `hardware/`, and the local runtime dir is now `.data/`.
 
 - **Crypto profit grouping** — the Crypto banner now groups the bot's results behind a `Profits` label: the signed `%` return and the `±$` amount on one line (red when negative), keeping the portfolio value as a separate segment.
 - **Crypto alpha** — the Crypto banner now shows an `α` segment: the bot's excess return over buy-and-hold (all-time bot return minus `holdReturnPercent`), black when ahead, red when behind.
