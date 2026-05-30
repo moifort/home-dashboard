@@ -392,7 +392,7 @@ CUMULUS_NA_THRESHOLD_KWH = 0.05
 
 
 def _attach_cumulus(data: dict):
-    """Attach the cumulus banner fields: today's kWh and the recent daily average.
+    """Attach the cumulus banner fields: yesterday's kWh and the recent daily average.
 
     Integrated from the contactor's reported power (no energy counter); history
     starts at first connection (no backfill).
@@ -400,11 +400,11 @@ def _attach_cumulus(data: dict):
     now = datetime.now(PARIS_TZ)
     today = now.date()
     today_str = today.strftime("%Y-%m-%d")
-    tomorrow = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
     nine_ago = (today - timedelta(days=9)).strftime("%Y-%m-%d")
 
-    today_rows = get_cached_cumulus(today_str, tomorrow)
-    today_kwh = today_rows[0]["cons_kwh"] if today_rows else 0.0
+    yesterday_rows = get_cached_cumulus(yesterday_str, today_str)
+    yesterday_kwh = yesterday_rows[0]["cons_kwh"] if yesterday_rows else 0.0
 
     past = [r["cons_kwh"] for r in get_cached_cumulus(nine_ago, today_str)
             if r["cons_kwh"] >= CUMULUS_NA_THRESHOLD_KWH]
@@ -418,7 +418,7 @@ def _attach_cumulus(data: dict):
     trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
 
     data["cumulus"] = {
-        "today_text": f"{today_kwh:.1f}",
+        "yesterday_text": f"{yesterday_kwh:.1f}",
         "avg_text": f"{avg:.1f}" if past else "N/A",
         "trend_pct": trend_pct,
     }

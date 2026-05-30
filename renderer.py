@@ -29,6 +29,8 @@ LABEL_FONT_SIZE = 12
 NA_THRESHOLD_KWH = 1.0
 PROD_NA_THRESHOLD_KWH = 0.05
 MAX_DAYS = 9  # reference column count for the stats banner width
+CUMULUS_BANNER_H = 30  # bottom strip reserved under the EDF chart for the cumulus banner
+SOLAR_HEIGHT = HEIGHT // 2 - 24  # top (solar) chart height; EDF gets the rest (a bit taller)
 
 
 def render_dashboard(data: dict) -> Image.Image:
@@ -44,26 +46,33 @@ def render_dashboard(data: dict) -> Image.Image:
     }
 
     days = data.get("days", [])
-    half = HEIGHT // 2
 
-    # Solar production chart (top half) — full-black single bars.
+    # Reserve a strip at the very bottom (under the EDF chart) for the cumulus
+    # banner, shrinking the consumption chart by that much so they don't overlap.
+    cumulus = data.get("cumulus")
+    cumulus_h = CUMULUS_BANNER_H if cumulus else 0
+
+    # The split between the two charts sits a bit above mid-screen so the EDF
+    # chart is slightly taller than the solar one.
+    split = SOLAR_HEIGHT
+
+    # Solar production chart (top) — full-black single bars.
     production_days = data.get("production_days", [])
     if production_days:
         _draw_chart(draw, fonts, production_days, data.get("production_stats", {}),
-                    region_top=0, region_height=half, mode="production")
+                    region_top=0, region_height=split, mode="production")
 
-    # Consumption chart (bottom half) — stacked HC/HP bars.
+    # Consumption chart (bottom, minus the cumulus strip) — stacked HC/HP bars.
     _draw_chart(draw, fonts, days, data.get("stats", {}),
-                region_top=half, region_height=half, mode="consumption")
+                region_top=split, region_height=HEIGHT - split - cumulus_h, mode="consumption")
 
-    # Title-style banners stacked in the empty top-right space.
-    region_top = 0
+    # Crypto title-style banner in the empty top-right space (aligned with the
+    # solar title); cumulus banner sits below the EDF chart, bottom-left.
     crypto = data.get("crypto")
     if crypto:
-        region_top = _draw_crypto_banner(draw, fonts, crypto, region_top)
-    cumulus = data.get("cumulus")
+        _draw_crypto_banner(draw, fonts, crypto, 0)
     if cumulus:
-        _draw_cumulus_banner(draw, fonts, cumulus, region_top)
+        _draw_cumulus_banner(draw, fonts, cumulus)
 
     return img
 
@@ -92,14 +101,20 @@ def _draw_crypto_banner(draw, fonts, crypto, region_top) -> int:
     return _draw_right_banner(draw, fonts, items, region_top)
 
 
-def _draw_cumulus_banner(draw, fonts, cumulus, region_top) -> int:
+def _draw_cumulus_banner(draw, fonts, cumulus) -> None:
+    """Draw the cumulus banner left-aligned at the very bottom, spanning the chart
+    width, below the EDF chart. Its 1px separator sits above the text, acting as a
+    divider from the chart's day labels."""
     items = [
         [("Cumulus", "bold", BLACK)],
-        [(cumulus.get("today_text", "0"), "bold", BLACK), ("kWh auj.", "regular", BLACK)],
+        [(cumulus.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
         [(cumulus.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(cumulus.get("trend_pct", 0), True)],
     ]
-    return _draw_right_banner(draw, fonts, items, region_top)
+    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
+    line_y = HEIGHT - CUMULUS_BANNER_H + 8
+    text_y = line_y + 6
+    _draw_stats_bar(draw, fonts, items, CHART_LEFT, text_y, banner_width, line_y)
 
 
 def _bar_total(d: dict, mode: str) -> float:
