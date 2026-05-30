@@ -42,6 +42,14 @@ services:
       CUMULUS_TOPIC: zigbee2mqtt/cumulus
       CUMULUS_MQTT_USERNAME: ""
       CUMULUS_MQTT_PASSWORD: ""
+      # Optional UniFi network panel (bottom-right) — set the password to enable.
+      # Use the gateway's LAN IP (bridge network can't use localhost).
+      UNIFI_HOST: https://192.168.1.1
+      UNIFI_USERNAME: ""
+      UNIFI_PASSWORD: ""
+      UNIFI_SITE: default
+      UNIFI_SSID_IOT: your_iot_wifi_ssid
+      UNIFI_SSID_MAIN: your_main_wifi_ssid
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/status')" || exit 1
       interval: 30s
