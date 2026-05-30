@@ -17,7 +17,7 @@ import certifi
 import paho.mqtt.client as mqtt
 import requests
 
-from proto import powerstream_pb2
+from .proto import powerstream_pb2
 
 logger = logging.getLogger(__name__)
 
