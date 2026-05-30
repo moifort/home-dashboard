@@ -17,6 +17,7 @@ FONT_BOLD_PATH = os.path.join(_FONTS_DIR, "Arial-Bold.ttf")
 
 BLACK = 0
 RED = (255, 0, 0)
+YELLOW = (255, 255, 0)  # 4-color warning marker; always outlined in black on white
 
 MARGIN = 2  # screen margin kept on every edge of the e-paper window
 CHART_LEFT = MARGIN  # left origin; right-anchored banners use WIDTH - CHART_LEFT
@@ -31,6 +32,7 @@ LABEL_FONT_SIZE = 12
 NA_THRESHOLD_KWH = 1.0
 PROD_NA_THRESHOLD_KWH = 0.05
 MAX_DAYS = 9  # reference column count for the stats banner width
+WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto grid
 # Bottom strip under the EDF chart: a 3-column table (name | yesterday | avg+trend),
 # all columns left-aligned, stacking the Cumulus and Talon rows under a single top
 # separator line. Its height grows with the number of rows.
@@ -169,9 +171,15 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
     else:
         level_prices = [lower]
 
-    # Left gutter: the price label, sized to the widest one.
+    # Left gutter: the price label, sized to the widest one. A warning marker
+    # (yellow ▲) sits right after the label; it only shortens its own level's
+    # line (below), so the other grid lines keep their full width.
+    skips = grid.get("skips") or []
+    half = WARN_MARKER_W // 2
+    mark_pad = 3
     label_x = region_left + 2
     max_label_w = max(draw.textlength(_grid_label(p), font=label_font) for p in level_prices)
+    marker_cx = round(label_x + max_label_w + mark_pad + half)
     plot_left = round(label_x + max_label_w + 8)
     plot_right = region_right - 2
 
@@ -188,10 +196,17 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
     def price_y(p):
         return round(plot_bottom - (p - lower) / span_y * plot_h)
 
+    # Levels carrying a warning marker: only that line starts after the marker,
+    # so a skip never shifts the whole grid (the others keep their full width).
+    marker_end = marker_cx + half + 5
+    marked_ys = {min(plot_bottom, max(plot_top, price_y(s["price"])))
+                 for s in skips if s.get("price") is not None}
+
     # --- Grid levels: fine dotted line + label (no marker dot) ---
     for p in level_prices:
         y = price_y(p)
-        _dashed_h_line(draw, plot_left, plot_right, y, on=1, off=8)
+        line_start = marker_end if y in marked_ys else plot_left
+        _dashed_h_line(draw, line_start, plot_right, y, on=1, off=8)
         draw.text((label_x, y - label_h // 2 - 1), _grid_label(p), fill=BLACK, font=label_font)
 
     # --- Price line + 'now' marker ---
@@ -226,6 +241,23 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
                 cx = max(plot_left, min(round(nx - cw / 2), region_right - cw))
                 cy = max(plot_top, ny - ch - 6)
                 draw.text((cx, cy), ctext, fill=BLACK, font=value_font)
+
+    # --- Warning markers: a full-yellow ▲ right after each skipped level's
+    # Y-axis price label (insufficient-funds, half-spacing or max-orders —
+    # mirrors the iOS grid badges). Flat fill, no outline.
+    seen_y = set()
+    for skip in skips:
+        price = skip.get("price")
+        if price is None:
+            continue
+        y = min(plot_bottom, max(plot_top, price_y(price)))
+        if y in seen_y:  # one marker per level even if both sides were skipped
+            continue
+        seen_y.add(y)
+        draw.polygon(
+            [(marker_cx, y - half), (marker_cx - half, y + half), (marker_cx + half, y + half)],
+            fill=YELLOW,
+        )
 
 
 def _build_bottom_rows(data) -> list:

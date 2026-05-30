@@ -5,11 +5,13 @@ STATS_QUERY = (
     " periodStats { alltime { holdReturnPercent } } } }"
 )
 
-# Grid snapshot: bounds + level count + current price (Stats), plus the 7-day
-# price line (PriceHistory). Mirrors the iOS GridSnapshotCard inputs.
+# Grid snapshot: bounds + level count + current price (Stats), the 7-day price
+# line (PriceHistory), and the last placement cycle's skipped levels — the
+# warning markers shown on the grid. Mirrors the iOS GridSnapshotCard inputs.
 GRID_QUERY = (
     "query {"
     " stats { currentPrice gridConfig { lowerPrice upperPrice levels } }"
     " priceHistory { time price }"
+    " placementStatus { cycleAt skippedLevels { price side reason { kind } } }"
     " }"
 )
