@@ -3,16 +3,33 @@
 import json
 import logging
 import os
-import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-from app.config import VERSION
+from app.config import (
+    DAYS_FR,
+    DB_PATH,
+    PARIS_TZ,
+    PORT,
+    REFRESH_INTERVAL,
+    RENDER_MODE,
+    SAVE_PNG,
+    VERSION,
+)
+from app.db import (
+    get_cached_cumulus,
+    get_cached_days,
+    get_cached_production,
+    init_db,
+    needs_refresh,
+    upsert_cumulus,
+    upsert_days,
+    upsert_production,
+)
 from app.integrations.crypto import build_crypto_panel, fetch_crypto_grid, fetch_crypto_stats
 from app.integrations.cumulus import CumulusMqttListener
 from app.integrations.ecoflow import EcoflowMqttListener
@@ -29,20 +46,12 @@ from app.rendering.renderer import render_dashboard
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-PARIS_TZ = ZoneInfo("Europe/Paris")
-DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-
 TOKEN = os.environ.get("LINKY_TOKEN", "")
 PRM = os.environ.get("LINKY_PRM", "")
-REFRESH_INTERVAL = int(os.environ.get("REFRESH_INTERVAL", "3600"))
 HC_WINDOWS = parse_hc_windows(os.environ.get("HC_WINDOWS", "23:32-5:32,15:02-17:02"))
 PRICE_HP = float(os.environ.get("PRICE_HP", "0.2065"))
 PRICE_HC = float(os.environ.get("PRICE_HC", "0.1579"))
 PRICE_ABO_MONTHLY = float(os.environ.get("PRICE_ABO_MONTHLY", "15.65"))
-RENDER_MODE = os.environ.get("RENDER_MODE", "4color")
-DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")
-PORT = int(os.environ.get("PORT", "5000"))
-SAVE_PNG = os.environ.get("SAVE_PNG", "false").lower() == "true"
 
 ECOFLOW_EMAIL = os.environ.get("ECOFLOW_EMAIL", "")
 ECOFLOW_PASSWORD = os.environ.get("ECOFLOW_PASSWORD", "")
@@ -71,81 +80,6 @@ last_error: str = ""
 last_solar_report: str = ""
 last_crypto_time: str = ""
 last_cumulus_report: str = ""
-
-
-# --- SQLite Cache ---
-
-def init_db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_consumption (
-            date TEXT PRIMARY KEY,
-            hc_kwh REAL NOT NULL,
-            hp_kwh REAL NOT NULL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_production (
-            date TEXT PRIMARY KEY,
-            pv_wh REAL NOT NULL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_cumulus (
-            date TEXT PRIMARY KEY,
-            cons_wh REAL NOT NULL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_cached_cumulus(start: str, end: str) -> list[dict]:
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.execute(
-        "SELECT date, cons_wh FROM daily_cumulus WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
-    )
-    rows = [{"date": r[0], "cons_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-
-def upsert_cumulus(date: str, cons_wh: float):
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute(
-        "INSERT OR REPLACE INTO daily_cumulus (date, cons_wh, fetched_at) VALUES (?, ?, ?)",
-        (date, cons_wh, now),
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_cached_production(start: str, end: str) -> list[dict]:
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.execute(
-        "SELECT date, pv_wh FROM daily_production WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
-    )
-    rows = [{"date": r[0], "pv_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-
-def upsert_production(date: str, pv_wh: float):
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute(
-        "INSERT OR REPLACE INTO daily_production (date, pv_wh, fetched_at) VALUES (?, ?, ?)",
-        (date, pv_wh, now),
-    )
-    conn.commit()
-    conn.close()
 
 
 # Integration state for reported PV power → daily kWh. Only the MQTT listener
@@ -239,60 +173,6 @@ def start_cumulus_listener() -> CumulusMqttListener:
     logger.info("Cumulus MQTT listener started on %s:%d (%s)",
                 CUMULUS_MQTT_HOST, CUMULUS_MQTT_PORT, CUMULUS_TOPIC)
     return listener
-
-
-def get_cached_days(start: str, end: str) -> list[dict]:
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.execute(
-        "SELECT date, hc_kwh, hp_kwh FROM daily_consumption WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
-    )
-    rows = [{"date": r[0], "hc_kwh": r[1], "hp_kwh": r[2]} for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-
-def upsert_days(days: list[dict]):
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = sqlite3.connect(DB_PATH)
-    for d in days:
-        conn.execute(
-            "INSERT OR REPLACE INTO daily_consumption (date, hc_kwh, hp_kwh, fetched_at) VALUES (?, ?, ?, ?)",
-            (d["date"], d["hc_kwh"], d["hp_kwh"], now),
-        )
-    conn.commit()
-    conn.close()
-
-
-def needs_refresh(start: str, end: str) -> bool:
-    cached = get_cached_days(start, end)
-    cached_dates = {d["date"] for d in cached}
-    now = datetime.now(PARIS_TZ)
-
-    current = datetime.strptime(start, "%Y-%m-%d")
-    end_dt = datetime.strptime(end, "%Y-%m-%d")
-    while current < end_dt:
-        ds = current.strftime("%Y-%m-%d")
-        if ds not in cached_dates:
-            return True
-        current += timedelta(days=1)
-
-    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-    if yesterday in cached_dates:
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.execute(
-            "SELECT fetched_at FROM daily_consumption WHERE date = ?", (yesterday,)
-        )
-        row = cur.fetchone()
-        conn.close()
-        if row:
-            fetched = datetime.fromisoformat(row[0])
-            if fetched.astimezone(PARIS_TZ).date() < now.date():
-                return True
-            if fetched.astimezone(PARIS_TZ).hour < 10:
-                return True
-
-    return False
 
 
 # --- Data Fetching ---
