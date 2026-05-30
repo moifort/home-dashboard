@@ -18,9 +18,10 @@ FONT_BOLD_PATH = os.path.join(_FONTS_DIR, "Arial-Bold.ttf")
 BLACK = 0
 RED = (255, 0, 0)
 
-CHART_LEFT = 0
-CHART_TOP = 0  # screen top margin
-CHART_BOTTOM = 0  # screen bottom margin
+MARGIN = 2  # screen margin kept on every edge of the e-paper window
+CHART_LEFT = MARGIN  # left origin; right-anchored banners use WIDTH - CHART_LEFT
+CHART_TOP = MARGIN  # screen top margin
+CHART_BOTTOM = MARGIN  # screen bottom margin
 DIVIDER_GAP = 8  # spacing kept on each side of the mid-screen divider (not a screen margin)
 BAR_WIDTH = 28
 BAR_GAP = 16
@@ -30,8 +31,20 @@ LABEL_FONT_SIZE = 12
 NA_THRESHOLD_KWH = 1.0
 PROD_NA_THRESHOLD_KWH = 0.05
 MAX_DAYS = 9  # reference column count for the stats banner width
-CUMULUS_BANNER_H = 30  # bottom strip reserved under the EDF chart for the cumulus banner
+# Bottom strip under the EDF chart: a 3-column table (name | yesterday | avg+trend),
+# all columns left-aligned, stacking the Cumulus and Talon rows under a single top
+# separator line. Its height grows with the number of rows.
+BOTTOM_ROW_H = 17  # vertical pitch between table rows
+BOTTOM_TOP_GAP = 8  # gap between the chart's day labels and the top separator
+BOTTOM_TEXT_GAP = 6  # first row below the separator
 SOLAR_HEIGHT = HEIGHT // 2 - 24  # top (solar) chart height; EDF gets the rest (a bit taller)
+
+
+def _bottom_table_height(n_rows: int) -> int:
+    """Height of the bottom strip reserved for an n-row table (0 if empty)."""
+    if n_rows == 0:
+        return 0
+    return BOTTOM_TOP_GAP + BOTTOM_TEXT_GAP + n_rows * BOTTOM_ROW_H + MARGIN
 
 
 def render_dashboard(data: dict) -> Image.Image:
@@ -48,10 +61,11 @@ def render_dashboard(data: dict) -> Image.Image:
 
     days = data.get("days", [])
 
-    # Reserve a strip at the very bottom (under the EDF chart) for the cumulus
-    # banner, shrinking the consumption chart by that much so they don't overlap.
-    cumulus = data.get("cumulus")
-    cumulus_h = CUMULUS_BANNER_H if cumulus else 0
+    # Bottom table rows (name | yesterday | avg+trend): Cumulus on top (if the
+    # integration is enabled) then Talon below (core Linky, always shown). The
+    # consumption chart shrinks by the strip height so they don't overlap.
+    bottom_rows = _build_bottom_rows(data)
+    bottom_h = _bottom_table_height(len(bottom_rows))
 
     # The split between the two charts sits a bit above mid-screen so the EDF
     # chart is slightly taller than the solar one.
@@ -63,12 +77,12 @@ def render_dashboard(data: dict) -> Image.Image:
         _draw_chart(draw, fonts, production_days, data.get("production_stats", {}),
                     region_top=0, region_height=split, mode="production")
 
-    # Consumption chart (bottom, minus the cumulus strip) — stacked HC/HP bars.
+    # Consumption chart (bottom, minus the table strip) — stacked HC/HP bars.
     _draw_chart(draw, fonts, days, data.get("stats", {}),
-                region_top=split, region_height=HEIGHT - split - cumulus_h, mode="consumption")
+                region_top=split, region_height=HEIGHT - split - bottom_h, mode="consumption")
 
     # Crypto title-style banner in the empty top-right space (aligned with the
-    # solar title); cumulus banner sits below the EDF chart, bottom-left.
+    # solar title); the bottom table sits below the EDF chart, full chart width.
     crypto = data.get("crypto")
     crypto_bottom = 0
     if crypto:
@@ -82,8 +96,8 @@ def render_dashboard(data: dict) -> Image.Image:
                           region_top=(crypto_bottom or 12) - 2,
                           region_bottom=split - DIVIDER_GAP)
 
-    if cumulus:
-        _draw_cumulus_banner(draw, fonts, cumulus)
+    if bottom_rows:
+        _draw_bottom_table(draw, fonts, bottom_rows, bottom_h)
 
     return img
 
@@ -214,20 +228,62 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
                 draw.text((cx, cy), ctext, fill=BLACK, font=value_font)
 
 
-def _draw_cumulus_banner(draw, fonts, cumulus) -> None:
-    """Draw the cumulus banner left-aligned at the very bottom, spanning the chart
-    width, below the EDF chart. Its 1px separator sits above the text, acting as a
-    divider from the chart's day labels."""
-    items = [
-        [("Cumulus", "bold", BLACK)],
-        [(cumulus.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
-        [(cumulus.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
-         _trend(cumulus.get("trend_pct", 0), True)],
-    ]
-    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
-    line_y = HEIGHT - CUMULUS_BANNER_H + 8
-    text_y = line_y + 6
-    _draw_stats_bar(draw, fonts, items, CHART_LEFT, text_y, banner_width, line_y)
+def _build_bottom_rows(data) -> list:
+    """Assemble the bottom table rows: Cumulus (if enabled) then Talon (core
+    Linky, always shown). Each row is (name, yesterday, avg+trend) — a rising
+    value reads as bad (red) for both consumption-style metrics."""
+    rows = []
+    cumulus = data.get("cumulus")
+    if cumulus:
+        rows.append((
+            [("Cumulus", "bold", BLACK)],
+            [(cumulus.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
+            [(cumulus.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
+             _trend(cumulus.get("trend_pct", 0), True)],
+        ))
+    talon = data.get("talon")
+    if talon:
+        rows.append((
+            [("Talon", "bold", BLACK)],
+            [(talon.get("yesterday_text", "0"), "bold", BLACK), ("W hier", "regular", BLACK)],
+            [(talon.get("avg_text", "0"), "bold", BLACK), ("W ", "regular", BLACK),
+             _trend(talon.get("trend_pct", 0), True)],
+        ))
+    return rows
+
+
+def _draw_bottom_table(draw, fonts, rows, bottom_h) -> None:
+    """Draw the bottom table below the EDF chart: a 3-column grid with one row per
+    metric. The name and yesterday columns are left-aligned at fixed thirds; the
+    average+trend column is right-aligned to the table's right edge. A single 1px
+    separator line sits above the rows, dividing them from the chart's day labels
+    (no surrounding box)."""
+    width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
+    x = CHART_LEFT
+    line_y = HEIGHT - bottom_h + BOTTOM_TOP_GAP
+    y0 = line_y + BOTTOM_TEXT_GAP
+    col_w = width // 3
+
+    def seg_w(segments):
+        return sum(draw.textbbox((0, 0), t, font=fonts[fk])[2]
+                   - draw.textbbox((0, 0), t, font=fonts[fk])[0] for t, fk, _ in segments)
+
+    def put(segments, sx, sy):
+        cx = sx
+        for text, font_key, color in segments:
+            font = fonts[font_key]
+            draw.text((cx, sy), text, fill=color, font=font)
+            box = draw.textbbox((0, 0), text, font=font)
+            cx += box[2] - box[0]
+
+    for i, row in enumerate(rows):
+        ry = y0 + i * BOTTOM_ROW_H
+        left, mid, right = row
+        put(left, x, ry)
+        put(mid, x + col_w, ry)
+        put(right, x + width - seg_w(right), ry)  # right-aligned to the table edge
+
+    draw.line([(x, line_y), (x + width - 1, line_y)], fill=BLACK, width=1)
 
 
 def _bar_total(d: dict, mode: str) -> float:
