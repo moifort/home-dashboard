@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import sqlite3
-import subprocess
 import threading
 import time
 from datetime import datetime, timedelta
@@ -13,23 +12,22 @@ from io import BytesIO
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from converter import png_to_epd_buffer
-from crypto_client import build_crypto_panel, fetch_crypto_grid, fetch_crypto_stats
-from cumulus_client import CumulusMqttListener
-from ecoflow_client import EcoflowMqttListener
-from linky_client import (
+from app.config import VERSION
+from app.integrations.crypto import build_crypto_panel, fetch_crypto_grid, fetch_crypto_stats
+from app.integrations.cumulus import CumulusMqttListener
+from app.integrations.ecoflow import EcoflowMqttListener
+from app.integrations.linky import (
     LinkyApiError,
     LinkyAuthError,
     compute_daily_hc_hp,
     fetch_load_curve,
     parse_hc_windows,
 )
-from renderer import render_dashboard
+from app.rendering.converter import png_to_epd_buffer
+from app.rendering.renderer import render_dashboard
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
-
-ROOT = Path(__file__).parent
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
 DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
@@ -73,22 +71,6 @@ last_error: str = ""
 last_solar_report: str = ""
 last_crypto_time: str = ""
 last_cumulus_report: str = ""
-
-
-def get_version() -> str:
-    version_file = ROOT / ".version"
-    if version_file.exists():
-        return version_file.read_text().strip()
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=ROOT, stderr=subprocess.DEVNULL,
-        ).decode().strip()
-    except Exception:
-        return "unknown"
-
-
-VERSION = get_version()
 
 
 # --- SQLite Cache ---

@@ -15,4 +15,4 @@ RUN mkdir -p /data
 VOLUME /data
 EXPOSE 5000
 
-CMD ["python", "server.py"]
+CMD ["python", "-m", "app"]
