@@ -103,6 +103,14 @@ def _draw_crypto_banner(draw, fonts, crypto, region_top) -> int:
     items = [
         [("Crypto", "bold", BLACK)],
         [(crypto.get("pct_text", "0"), "bold", pct_color), ("%", "regular", pct_color)],
+    ]
+    # Alpha (excess return vs buy-and-hold): black when ahead, red when behind.
+    alpha_text = crypto.get("alpha_text", "")
+    if alpha_text:
+        alpha_color = BLACK if crypto.get("alpha_positive", True) else RED
+        items.append([("Alpha ", "regular", alpha_color), (alpha_text, "bold", alpha_color),
+                      ("%", "regular", alpha_color)])
+    items += [
         [(crypto.get("profit_text", ""), "bold", BLACK)],
         [(crypto.get("portfolio_text", ""), "bold", BLACK)],
     ]
