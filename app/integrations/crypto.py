@@ -1,11 +1,22 @@
-"""GraphQL client for the crypto-bot trading stats (mirrors the iOS "small" widget)."""
+"""Crypto-bot trading slice: GraphQL stats + grid snapshot and its render panel.
+
+Optional, live-fetched on each /display pull (no DB table, no listener). Mirrors
+the iOS "small" widget.
+"""
 import logging
+import os
+from datetime import datetime
 
 import requests
+
+from app.config import PARIS_TZ
 
 logger = logging.getLogger(__name__)
 
 USER_AGENT = "linky-dashboard/1.0 (github.com/thibaut-mottet/dashboard)"
+
+API_URL = os.environ.get("CRYPTO_API_URL", "")
+API_TOKEN = os.environ.get("CRYPTO_API_TOKEN", "")
 
 STATS_QUERY = (
     "query { stats { totalProfitUsdc sommeMiseUsdc sandboxMode"
@@ -127,3 +138,44 @@ def fetch_crypto_grid(url: str, token: str = "", timeout: float = 5) -> dict | N
         "current_price_text": f"${_grouped(current)}" if current is not None else "",
         "points": points,
     }
+
+
+# --- Slice orchestration: enable, panel, status (no DB, no listener) ---
+
+ENABLED = bool(API_URL)
+_last_crypto_time = ""
+
+
+def enabled() -> bool:
+    return ENABLED
+
+
+def init_schema():
+    """No persistent storage: crypto is fetched live on each pull."""
+
+
+def start():
+    """No background listener for crypto."""
+    return None
+
+
+def attach(data: dict):
+    """Fetch crypto-bot stats and attach the rendered panel fields.
+
+    On any failure the key is left unset, so the panel is simply omitted.
+    """
+    global _last_crypto_time
+    stats = fetch_crypto_stats(API_URL, API_TOKEN)
+    if not stats:
+        return
+    data["crypto"] = build_crypto_panel(stats)
+    # Grid snapshot chart (independent: a failure just omits the chart, the
+    # banner still shows).
+    grid = fetch_crypto_grid(API_URL, API_TOKEN)
+    if grid:
+        data["crypto_grid"] = grid
+    _last_crypto_time = datetime.now(PARIS_TZ).isoformat()
+
+
+def status() -> dict:
+    return {"crypto_enabled": ENABLED, "last_crypto": _last_crypto_time}

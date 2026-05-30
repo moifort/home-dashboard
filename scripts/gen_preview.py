@@ -19,7 +19,11 @@ os.environ.setdefault("DB_PATH", str(ROOT / "data" / "linky.db"))
 os.environ.setdefault("CRYPTO_API_URL", "http://192.168.1.50:3003/graphql")
 os.environ.setdefault("CRYPTO_API_TOKEN", "***REMOVED***")
 
-from app import server  # noqa: E402  (env must be set first)
+from datetime import datetime  # noqa: E402
+
+from app import dashboard_data, db  # noqa: E402  (env must be set first)
+from app.config import PARIS_TZ  # noqa: E402
+from app.integrations import cumulus, ecoflow  # noqa: E402
 from app.rendering.renderer import render_dashboard  # noqa: E402
 
 # Show panels backed by cached DB history even though their live integrations
@@ -33,15 +37,15 @@ _tables = {
         "SELECT name FROM sqlite_master WHERE type='table'"
     )
 }
-server.ECOFLOW_ENABLED = "daily_production" in _tables
-server.CUMULUS_ENABLED = "daily_cumulus" in _tables
+ecoflow.ENABLED = "daily_production" in _tables
+cumulus.ENABLED = "daily_cumulus" in _tables
 
-now = server.datetime.now(server.PARIS_TZ)
+now = datetime.now(PARIS_TZ)
 start = (now - timedelta(days=45)).strftime("%Y-%m-%d")
 end = now.strftime("%Y-%m-%d")
 
-days = server.get_cached_days(start, end)
-data = server.build_dashboard_data(days)
+days = db.get_cached_days(start, end)
+data = dashboard_data.build_dashboard_data(days)
 
 # The dev DB may predate the cumulus table; inject a representative banner so
 # the preview still shows the bottom Cumulus row the device renders.
