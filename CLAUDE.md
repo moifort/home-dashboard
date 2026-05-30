@@ -134,6 +134,12 @@ Before pushing, verify and update as needed:
 - **HC/HP**: two off-peak windows — 23:32-5:32 (night) + 15:02-17:02 (afternoon), configurable via `HC_WINDOWS`
 - **Pricing**: HP=0.2065 €/kWh, HC=0.1579 €/kWh, subscription=15.65 €/month
 
+## Talon énergétique (baseline power, core)
+
+- **Goal**: the house's permanent baseline power (fridge, box, standby), shown as the **bottom `Talon` row** of the bottom table — always visible (core Linky), in **W**: `Talon  <yesterday> W hier  <avg> W <trend>`.
+- **Compute**: per day, `talon_w` = **P5** of that day's 30-min load-curve samples (`_percentile` in `app/integrations/linky/client.py`, `TALON_PCT=5`) — a low percentile, **not the strict min** (which catches the single all-off step). Computed inside `compute_daily_hc_hp` alongside HC/HP, persisted in the new `daily_consumption.talon_w` column (idempotent `ALTER TABLE` in `init_schema`).
+- **Backfill**: unlike EcoFlow/Cumulus, the load-curve API returns history, so `fetch_and_cache` forces a **one-time refetch** of cached weeks whose rows still lack `talon_w`. `build_core._compute_talon` derives yesterday/avg/trend (avg = mean of daily P5 over the 9-day window; ▲ in red = rising baseline = bad).
+
 ## EcoFlow PowerStream / Solar (optional)
 
 - **Goal**: daily solar production (kWh/day) chart in the **top 50%** of the screen, above the Linky chart. Full-black single bars (no split), same title+separator style. Shows the **last 9 completed days** (today excluded; N/A if no data). Stats: avg kWh/day + trend (rising = good = black, falling = red), plus period total.
@@ -155,7 +161,8 @@ Before pushing, verify and update as needed:
 
 ## Cumulus (water heater) consumption (optional)
 
-- **Goal**: a **title-style banner** spanning the chart width, left-aligned at the very **bottom of the screen, below the EDF chart** (the consumption chart is shrunk by `CUMULUS_BANNER_H` to make room; its 1px separator sits *above* the text as a divider from the day labels), showing the water-heater's consumption: `Cumulus  <yesterday> kWh hier  <avg> kWh/j`. The value is **yesterday's** completed daily total (not today's partial one). `renderer._draw_cumulus_banner` (in `app/rendering/renderer.py`) reuses `_draw_stats_bar`.
+- **Goal**: the water-heater's daily consumption as the top **`Cumulus` row** of the bottom table (stacked above the always-present `Talon` row), spanning the chart width below the EDF chart: `Cumulus  <yesterday> kWh hier  <avg> kWh/j <trend>`. The value is **yesterday's** completed daily total (not today's partial one).
+- **Rendering**: the bottom table is `renderer._draw_bottom_table` (in `app/rendering/renderer.py`); `_build_bottom_rows` assembles its rows (Cumulus if enabled, then Talon). It is a 3-column grid — name + yesterday left-aligned at fixed thirds, average+trend right-aligned to the table edge — under a single 1px top separator line (no box; not the *space-between* `_draw_stats_bar` of the title banners). Its height (`_bottom_table_height`) grows with the row count and the consumption chart shrinks by it. The whole dashboard is inset by the global `MARGIN=2`px (via `CHART_LEFT`/`CHART_TOP`/`CHART_BOTTOM`; right-anchored banners use `WIDTH - CHART_LEFT`).
 - **Device**: the `cumulus` Zigbee device is a **Legrand 412171 DIN contactor**. It exposes `state`, `power` (W), `power_apparent` (VA) — **no energy (kWh) counter**. So we **integrate the reported power** into daily kWh ourselves (same technique as EcoFlow solar, `app/integrations/cumulus` `_on_cumulus_power` → `daily_cumulus` table). No backfill — history starts at first connection.
 - **Data source**: the Zigbee2MQTT broker (mosquitto). Subscribe to `zigbee2mqtt/cumulus`, read `power` from the JSON. The contactor publishes on change; we also re-request it (`{"power":""}` on `zigbee2mqtt/cumulus/get`) every 60s so integration keeps getting samples during steady heating. Slice in `app/integrations/cumulus/` (`mqtt/` transport).
 - **Networking**: dashboard is in `network_mode: bridge`, so it reaches the broker via its **LAN IP** (`192.168.1.50:1883`), anonymous (no MQTT auth configured in Z2M).

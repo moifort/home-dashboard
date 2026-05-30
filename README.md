@@ -48,9 +48,13 @@ When an EcoFlow PowerStream is configured, the top half shows daily solar produc
 
 When a crypto-bot GraphQL endpoint is configured, an inline title-style banner is drawn in the top-right space (same look as the chart titles): a `Crypto` label, then the **% return** (black when in profit, **red when negative**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. Data is refreshed each time the ESP32 fetches the display. See the setup section below.
 
+### Talon énergétique (baseline power)
+
+A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **5th percentile (P5)** of the 30-min Linky load curve (in **W**), which captures the true floor without being skewed by the single step where everything happens to be off at once. Each row has three columns — name and **yesterday's** value left-aligned, and the recent **daily average** with its trend (▲ in red = a rising baseline, i.e. more standby waste) right-aligned. The talon is always shown; when the Cumulus integration is enabled its row is stacked above the Talon row in the same table.
+
 ### Cumulus consumption (optional)
 
-When a Zigbee2MQTT broker is configured, a full-width banner below the consumption chart shows the water-heater's daily consumption: a `Cumulus` label, yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
+When a Zigbee2MQTT broker is configured, a `Cumulus` row is added at the top of the bottom table (above the Talon row), showing the water-heater's daily consumption: yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
 
 ## Hardware
 
