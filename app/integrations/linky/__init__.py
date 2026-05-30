@@ -110,7 +110,32 @@ def build_core(days: list[dict]) -> dict:
             "hp_kwh": d["hp_kwh"],
         })
 
-    return {"days": result, "stats": _compute_stats(current_week, prev_weeks)}
+    return {
+        "days": result,
+        "stats": _compute_stats(current_week, prev_weeks),
+        "talon": _compute_talon(current_week, prev_weeks),
+    }
+
+
+def _compute_talon(current: list[dict], previous: list[dict]) -> dict:
+    """Baseline-power panel: yesterday's talon, the recent daily average and its
+    trend. A rising talon means more standby waste, so it reads as bad (red)."""
+    def _vals(days):
+        return [d["talon_w"] for d in days if d.get("talon_w") is not None]
+
+    cur = _vals(current)
+    yesterday = cur[-1] if cur else None
+    avg = sum(cur) / len(cur) if cur else 0.0
+
+    prev = _vals(previous)
+    avg_prev = sum(prev) / len(prev) if prev else 0.0
+    trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
+
+    return {
+        "yesterday_text": f"{round(yesterday)}" if yesterday is not None else "N/A",
+        "avg_text": f"{round(avg)}" if cur else "N/A",
+        "trend_pct": trend_pct,
+    }
 
 
 def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
