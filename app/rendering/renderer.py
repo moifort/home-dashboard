@@ -101,6 +101,14 @@ def render_dashboard(data: dict) -> Image.Image:
     if bottom_rows:
         _draw_bottom_table(draw, fonts, bottom_rows, bottom_h)
 
+    # UniFi "Réseau" panel in the empty bottom-right column, directly under the
+    # crypto grid (same right column), down to the screen bottom.
+    unifi = data.get("unifi")
+    if unifi:
+        _draw_unifi_panel(draw, fonts, unifi,
+                          region_top=split + 2,
+                          region_bottom=HEIGHT - CHART_BOTTOM)
+
     return img
 
 
@@ -318,6 +326,105 @@ def _draw_bottom_table(draw, fonts, rows, bottom_h) -> None:
     draw.line([(x, line_y), (x + width - 1, line_y)], fill=BLACK, width=1)
 
 
+def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
+    """Draw the "Réseau" panel in the bottom-right column (under the crypto grid):
+    a title banner with internet/Wi-Fi health (each with a ▲▼ trend), detail rows
+    (latency, Wi-Fi signal, speed test, data usage — values with their unit in
+    regular weight, glued to the bold number), then a top-3 clients mini-table per
+    network (main Wi-Fi first, then IoT) with its client count."""
+    width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
+    x = WIDTH - CHART_LEFT - width
+    right = x + width
+
+    def seg_w(segments):
+        return sum(draw.textlength(t, font=fonts[fk]) for t, fk, _ in segments)
+
+    def put(segments, sx, sy):
+        cx = sx
+        for text, fk, color in segments:
+            draw.text((round(cx), sy), text, fill=color, font=fonts[fk])
+            cx += draw.textlength(text, font=fonts[fk])
+
+    def row(left, right_segs, sy):  # label left, value right-aligned to the edge
+        put(left, x, sy)
+        put(right_segs, right - seg_w(right_segs), sy)
+
+    line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
+    row_h = line_h + 3
+
+    # --- Title banner: "Réseau" + the two health figures (name + %, with a ▲▼
+    # trend), distributed across the width with a 1px separator below it.
+    def health(name, pct, color, trend_pct, invert_bad):
+        segs = []
+        if name:
+            segs.append((name + " ", "regular", color))
+        segs.append((str(pct), "bold", color))
+        segs.append(("%", "regular", color))
+        if trend_pct:
+            segs += [(" ", "regular", BLACK), _trend(trend_pct, invert_bad)]
+        return segs
+
+    isp_color = RED if unifi.get("isp_bad") else BLACK
+    wifi_color = RED if unifi.get("wifi_bad") else BLACK
+    sep_y = region_top + line_h + 5
+    title_items = [
+        [("Réseau", "bold", BLACK)],
+        health(unifi.get("isp_name", ""), unifi.get("isp_pct", 0), isp_color,
+               unifi.get("isp_trend"), invert_bad=False),
+        health("WiFi", unifi.get("wifi_pct", 0), wifi_color,
+               unifi.get("wifi_trend"), invert_bad=False),
+    ]
+    _draw_stats_bar(draw, fonts, title_items, x, region_top, width, sep_y)
+
+    # --- Detail rows: label (regular) left, value (bold number + regular unit,
+    # no space) right, with an optional ▲▼ trend.
+    def value_row(label, value_segs, sy, trend_pct=None, invert_bad=False, neutral=False):
+        rs = list(value_segs)
+        if trend_pct:
+            t = _trend(trend_pct, invert_bad)
+            if neutral:  # keep the arrow but force black (no good/bad colour)
+                t = (t[0], t[1], BLACK)
+            rs += [(" ", "regular", BLACK), t]
+        row([(label, "regular", BLACK)], rs, sy)
+
+    y = sep_y + 6
+    value_row("Latence", [(unifi.get("latency_val", ""), "bold", BLACK), ("ms", "regular", BLACK)],
+              y, unifi.get("latency_trend"), invert_bad=True)
+    y += row_h
+    value_row("Signal Wi-Fi", [(unifi.get("wifi_exp_text", ""), "bold", BLACK)], y)
+    y += row_h
+    value_row("Vitesse",
+              [(unifi.get("speed_dl", ""), "bold", BLACK), ("/", "regular", BLACK),
+               (unifi.get("speed_ul", ""), "bold", BLACK), ("Mbps", "regular", BLACK)],
+              y, unifi.get("speed_trend"), invert_bad=False)
+    y += row_h
+    value_row("Données hier/mois",
+              [(unifi.get("usage_hier", ""), "bold", BLACK), ("/", "regular", BLACK),
+               (unifi.get("usage_mois", ""), "bold", BLACK), ("Go", "regular", BLACK)],
+              y, unifi.get("usage_trend"), neutral=True)
+    y += row_h + 4
+
+    # --- Top-3 clients per network (main Wi-Fi first, then IoT): a header
+    # (name + count) over a separator, then up to three "name … traffic" rows.
+    for key in ("main", "iot"):
+        net = unifi.get(key) or {}
+        rows = net.get("top") or []
+        if y + line_h > region_bottom:
+            break
+        count = net.get("count", 0)
+        row([(net.get("label", ""), "bold", BLACK)],
+            [(str(count), "bold", BLACK), (" clients", "regular", BLACK)], y)
+        hdr_y = y + line_h + 3
+        draw.line([(x, hdr_y), (right - 1, hdr_y)], fill=BLACK, width=1)
+        y = hdr_y + 5
+        for name, traffic in rows[:3]:
+            if y + line_h > region_bottom:
+                break
+            row([(name, "regular", BLACK)], [(traffic, "bold", BLACK), ("Go", "regular", BLACK)], y)
+            y += row_h
+        y += 4
+
+
 def _bar_total(d: dict, mode: str) -> float:
     if mode == "production":
         return d.get("pv_kwh", 0)
@@ -431,20 +538,25 @@ def _build_consumption_items(stats):
 
 
 def _build_production_items(stats):
+    # Share of the base load (talon) the solar covers. Always shown — falls back
+    # to N/A when the talon has no value yet (no talon_w on the recent days).
+    pct = stats.get("talon_cover_pct")
+    if pct is not None:
+        talon = [("Talon ", "regular", BLACK), (str(pct), "bold", BLACK), ("%", "regular", BLACK)]
+    else:
+        talon = [("Talon ", "regular", BLACK), ("N/A", "bold", BLACK)]
+
     # Solar: more is better, so a rising trend is good (black), falling is bad (red).
-    items = [
+    # Talon sits to the left of Total.
+    return [
         [("Solaire", "bold", BLACK)],
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
+        talon,
         [("Total ", "regular", BLACK), (str(stats.get('total_kwh', 0)), "bold", BLACK),
          ("kWh   ", "regular", BLACK), (str(stats.get('savings_eur', 0)), "bold", BLACK),
          ("€", "regular", BLACK)],
     ]
-    # Share of the base load (talon) the solar covers, when the talon is known.
-    pct = stats.get("talon_cover_pct")
-    if pct is not None:
-        items.append([("Talon ", "regular", BLACK), (str(pct), "bold", BLACK), ("%", "regular", BLACK)])
-    return items
 
 
 def _draw_stats_bar(draw, fonts, items, x, y, width, line_y):
