@@ -1,5 +1,6 @@
 """GraphQL transport for the crypto-bot API: POST helper + stats/grid fetchers."""
 import logging
+from datetime import datetime, timezone
 
 import requests
 
@@ -8,6 +9,43 @@ from .queries import GRID_QUERY, STATS_QUERY
 logger = logging.getLogger(__name__)
 
 USER_AGENT = "linky-dashboard/1.0 (github.com/thibaut-mottet/dashboard)"
+
+# A placement cycle older than this is considered stale and its skipped levels
+# are dropped, so we never surface warnings about a state that may have changed
+# (mirrors the iOS PlacementStatusData.isStale 5-minute guard).
+PLACEMENT_MAX_AGE_S = 5 * 60
+
+
+def _parse_skips(placement: dict | None) -> list[dict]:
+    """Extract the skipped-level warning markers from a placementStatus block.
+
+    Returns a list of {"price", "side", "kind"} for each skipped level, or an
+    empty list when there is no placement, it is stale, or it is malformed.
+    """
+    if not placement:
+        return []
+
+    cycle_at = placement.get("cycleAt")
+    if cycle_at:
+        try:
+            ts = datetime.fromisoformat(str(cycle_at).replace("Z", "+00:00"))
+            age = (datetime.now(timezone.utc) - ts).total_seconds()
+            if age > PLACEMENT_MAX_AGE_S:
+                return []
+        except ValueError:
+            logger.warning("Crypto placement cycleAt unparseable: %s", cycle_at)
+
+    skips = []
+    for lvl in placement.get("skippedLevels") or []:
+        price = lvl.get("price")
+        if price is None:
+            continue
+        skips.append({
+            "price": float(price),
+            "side": lvl.get("side", ""),
+            "kind": ((lvl.get("reason") or {}).get("kind", "")),
+        })
+    return skips
 
 
 def _grouped(value: float) -> str:
@@ -85,4 +123,5 @@ def fetch_crypto_grid(url: str, token: str = "", timeout: float = 5) -> dict | N
         "current_price": float(current) if current is not None else None,
         "current_price_text": f"${_grouped(current)}" if current is not None else "",
         "points": points,
+        "skips": _parse_skips(data.get("placementStatus")),
     }

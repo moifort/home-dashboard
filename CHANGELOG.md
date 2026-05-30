@@ -2,6 +2,7 @@
 
 ## 2026-05-30
 
+- **Crypto grid warning markers** — the grid snapshot now flags the bot's last placement cycle: a full-yellow ▲ is drawn right after the Y-axis price label of every skipped level (insufficient funds, half-spacing or max-orders), mirroring the iOS grid badges. Only the marked level's dashed line is shortened to make room — the other lines keep their full width — and markers from a cycle older than 5 minutes are dropped.
 - **Solar talon coverage** — the solar title now ends with a `Talon … %` item: the share of the house's baseline-power (talon) energy the solar production covers, computed from the 9-day averages (average daily PV kWh over the talon's daily energy, `avg_w × 24h`). Shown only when the talon is known. The title's total/savings group was relabelled to lead with `Total … kWh` (then the `€`).
 - **Talon énergétique** — the dashboard now computes the house's baseline power (the P5 of each day's 30-min Linky load curve, in W — the permanent floor: fridge, box, standby), persisted in `daily_consumption.talon_w` and backfilled from the load-curve history.
 - **Bottom table (Cumulus + Talon)** — the bottom strip became a 3-column table (name · yesterday · average + trend) under a single top separator line: the name and yesterday columns are left-aligned, the average+trend column is right-aligned. The Talon row is always shown (core Linky data), with the Cumulus row stacked above it when that integration is enabled.

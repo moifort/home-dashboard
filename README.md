@@ -46,7 +46,7 @@ When an EcoFlow PowerStream is configured, the top half shows daily solar produc
 
 ### Crypto-bot banner (optional, top-right)
 
-When a crypto-bot GraphQL endpoint is configured, an inline title-style banner is drawn in the top-right space (same look as the chart titles): a `Crypto` label, then the **% return** (black when in profit, **red when negative**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. Data is refreshed each time the ESP32 fetches the display. See the setup section below.
+When a crypto-bot GraphQL endpoint is configured, an inline title-style banner is drawn in the top-right space (same look as the chart titles): a `Crypto` label, then the **% return** (black when in profit, **red when negative**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. Below it a **grid snapshot chart** shows the bot's price levels (left labels + dashed lines), the 7-day price line and a "now" marker with the live price. Any level the bot **skipped** on its last placement cycle (insufficient funds, half-spacing or max-orders) is flagged with a **yellow ▲** right after its price label — mirroring the iOS grid badges; stale cycles (older than 5 min) are ignored. Data is refreshed each time the ESP32 fetches the display. See the setup section below.
 
 ### Talon énergétique (baseline power)
 
