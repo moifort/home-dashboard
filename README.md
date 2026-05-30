@@ -147,8 +147,8 @@ UNIFI_HOST=https://192.168.1.1
 UNIFI_USERNAME=your_gateway_local_account
 UNIFI_PASSWORD=your_gateway_password
 UNIFI_SITE=default
-UNIFI_SSID_IOT=your_iot_wifi_ssid                # your IoT Wi-Fi SSID
-UNIFI_SSID_MAIN=your_main_wifi_ssid                # your main Wi-Fi SSID
+UNIFI_SSID_IOT=your_iot_wifi_ssid      # your IoT Wi-Fi SSID
+UNIFI_SSID_MAIN=your_main_wifi_ssid    # your main Wi-Fi SSID
 ```
 
 ### 3. Run with Docker Compose
