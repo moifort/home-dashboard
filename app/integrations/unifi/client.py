@@ -9,7 +9,10 @@ fetch_unifi() returns the raw API payloads (dashboard + active clients + an
 optional daily WAN-usage report); all field extraction/formatting lives in the
 slice's build_unifi_panel(). Returns None on any error so the panel is omitted.
 """
+import base64
+import json
 import logging
+import time
 
 import requests
 import urllib3
@@ -36,6 +39,19 @@ def _client() -> requests.Session:
     return _session
 
 
+def _csrf_from_cookie() -> str | None:
+    """Extract the csrfToken claim from the TOKEN JWT cookie (UniFi OS)."""
+    token = _client().cookies.get("TOKEN")
+    if not token or token.count(".") < 2:
+        return None
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)  # restore base64 padding
+        return json.loads(base64.urlsafe_b64decode(payload)).get("csrfToken")
+    except (ValueError, KeyError):
+        return None
+
+
 def _login(host: str, user: str, password: str, timeout: float) -> bool:
     """Authenticate; the TOKEN cookie is stored on the shared session."""
     try:
@@ -48,6 +64,12 @@ def _login(host: str, user: str, password: str, timeout: float) -> bool:
     except requests.RequestException as e:
         logger.warning("UniFi login failed: %s", e)
         return False
+    # UniFi OS requires the CSRF token (carried in the TOKEN JWT, or returned as a
+    # response header) on POST requests; GETs are exempt. Set it on the session so
+    # the daily-usage report POST is accepted instead of 403'd.
+    csrf = resp.headers.get("X-Csrf-Token") or _csrf_from_cookie()
+    if csrf:
+        _client().headers["X-Csrf-Token"] = csrf
     return "TOKEN" in _client().cookies
 
 
@@ -71,7 +93,9 @@ def _fetch_daily_usage(host: str, site: str, timeout: float) -> dict | None:
     panel — the slice falls back to the month-only figure.
     """
     try:
-        body = {"attrs": ["time", "wan-tx_bytes", "wan-rx_bytes"]}
+        end = int(time.time() * 1000)
+        start = end - 35 * 24 * 60 * 60 * 1000  # ~5 weeks of daily WAN totals
+        body = {"attrs": ["time", "wan-tx_bytes", "wan-rx_bytes"], "start": start, "end": end}
         return _post(host, f"/proxy/network/api/s/{site}/stat/report/daily.gw", body, timeout)
     except (requests.RequestException, ValueError) as e:
         logger.info("UniFi daily usage report unavailable: %s", e)
