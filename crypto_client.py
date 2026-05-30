@@ -91,7 +91,7 @@ def build_crypto_panel(stats: dict) -> dict:
     alpha = (pct - hold) if hold is not None else None
 
     return {
-        "pct_text": f"{abs(pct):.0f}",
+        "pct_text": f"{pct:+.0f}",
         "profit_positive": profit >= 0,
         "profit_text": f"{sign}${_grouped(abs(profit))}",
         "portfolio_text": f"${_grouped(portfolio)}",
