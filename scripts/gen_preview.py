@@ -23,8 +23,12 @@ from datetime import datetime  # noqa: E402
 
 from app import dashboard_data, db  # noqa: E402  (env must be set first)
 from app.config import PARIS_TZ  # noqa: E402
-from app.integrations import cumulus, ecoflow  # noqa: E402
+from app.integrations import cumulus, ecoflow, linky  # noqa: E402
 from app.rendering.renderer import render_dashboard  # noqa: E402
+
+# Apply pending schema migrations (e.g. the talon_w column) as the server does
+# at startup, so reading from an older dev DB doesn't fail.
+linky.init_schema()
 
 # Show panels backed by cached DB history even though their live integrations
 # need credentials we don't have here. Only enable those whose table exists in
@@ -51,6 +55,11 @@ data = dashboard_data.build_dashboard_data(days)
 # the preview still shows the bottom Cumulus row the device renders.
 if "cumulus" not in data:
     data["cumulus"] = {"yesterday_text": "2.4", "avg_text": "3.1", "trend_pct": 4.5}
+
+# The talon needs the new talon_w column populated (one fetch cycle). On a dev DB
+# that predates it, inject representative values so the bottom Talon row shows.
+if data.get("talon", {}).get("yesterday_text") in (None, "N/A"):
+    data["talon"] = {"yesterday_text": "318", "avg_text": "305", "trend_pct": -4.0}
 
 print("days:", len(data.get("days", [])),
       "| solar:", len(data.get("production_days", [])),
