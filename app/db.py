@@ -12,37 +12,13 @@ from app.config import DB_PATH, PARIS_TZ
 
 
 def connect() -> sqlite3.Connection:
-    """Open a connection to the configured database file."""
-    return sqlite3.connect(DB_PATH)
+    """Open a connection to the configured database file.
 
-
-def init_db():
+    Each slice creates its own table via its init_schema(); this module only
+    owns the connection primitive and the daily-table accessors.
+    """
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = connect()
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_consumption (
-            date TEXT PRIMARY KEY,
-            hc_kwh REAL NOT NULL,
-            hp_kwh REAL NOT NULL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_production (
-            date TEXT PRIMARY KEY,
-            pv_wh REAL NOT NULL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_cumulus (
-            date TEXT PRIMARY KEY,
-            cons_wh REAL NOT NULL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    conn.commit()
-    conn.close()
+    return sqlite3.connect(DB_PATH)
 
 
 def get_cached_cumulus(start: str, end: str) -> list[dict]:

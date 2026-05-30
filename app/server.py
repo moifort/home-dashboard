@@ -1,396 +1,28 @@
 #!/usr/bin/env python3
-"""Linky dashboard server for CasaOS — fetches electricity data and serves EPD buffer."""
+"""Dashboard server for CasaOS — orchestrates the slices and serves the EPD buffer."""
 import json
 import logging
-import os
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
 
-from app.config import (
-    DAYS_FR,
-    DB_PATH,
-    PARIS_TZ,
-    PORT,
-    REFRESH_INTERVAL,
-    RENDER_MODE,
-    SAVE_PNG,
-    VERSION,
-)
-from app.db import (
-    get_cached_cumulus,
-    get_cached_days,
-    get_cached_production,
-    init_db,
-    needs_refresh,
-    upsert_cumulus,
-    upsert_days,
-    upsert_production,
-)
-from app.integrations.crypto import build_crypto_panel, fetch_crypto_grid, fetch_crypto_stats
-from app.integrations.cumulus import CumulusMqttListener
-from app.integrations.ecoflow import EcoflowMqttListener
-from app.integrations.linky import (
-    LinkyApiError,
-    LinkyAuthError,
-    compute_daily_hc_hp,
-    fetch_load_curve,
-    parse_hc_windows,
-)
+from app import dashboard_data as dashboard
+from app.config import DB_PATH, PARIS_TZ, PORT, REFRESH_INTERVAL, RENDER_MODE, SAVE_PNG, VERSION
+from app.integrations import OPTIONAL, crypto, linky
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-TOKEN = os.environ.get("LINKY_TOKEN", "")
-PRM = os.environ.get("LINKY_PRM", "")
-HC_WINDOWS = parse_hc_windows(os.environ.get("HC_WINDOWS", "23:32-5:32,15:02-17:02"))
-PRICE_HP = float(os.environ.get("PRICE_HP", "0.2065"))
-PRICE_HC = float(os.environ.get("PRICE_HC", "0.1579"))
-PRICE_ABO_MONTHLY = float(os.environ.get("PRICE_ABO_MONTHLY", "15.65"))
-
-ECOFLOW_EMAIL = os.environ.get("ECOFLOW_EMAIL", "")
-ECOFLOW_PASSWORD = os.environ.get("ECOFLOW_PASSWORD", "")
-ECOFLOW_DEVICE_SN = os.environ.get("ECOFLOW_DEVICE_SN", "")
-ECOFLOW_API_HOST = os.environ.get("ECOFLOW_API_HOST", "api-e.ecoflow.com")
-ECOFLOW_ENABLED = bool(ECOFLOW_EMAIL and ECOFLOW_PASSWORD and ECOFLOW_DEVICE_SN)
-
-CRYPTO_API_URL = os.environ.get("CRYPTO_API_URL", "")
-CRYPTO_API_TOKEN = os.environ.get("CRYPTO_API_TOKEN", "")
-CRYPTO_ENABLED = bool(CRYPTO_API_URL)
-
-CUMULUS_MQTT_HOST = os.environ.get("CUMULUS_MQTT_HOST", "")
-CUMULUS_MQTT_PORT = int(os.environ.get("CUMULUS_MQTT_PORT", "1883"))
-CUMULUS_TOPIC = os.environ.get("CUMULUS_TOPIC", "zigbee2mqtt/cumulus")
-CUMULUS_MQTT_USERNAME = os.environ.get("CUMULUS_MQTT_USERNAME", "")
-CUMULUS_MQTT_PASSWORD = os.environ.get("CUMULUS_MQTT_PASSWORD", "")
-CUMULUS_ENABLED = bool(CUMULUS_MQTT_HOST)
-
 epd_buffer: bytes = b""
 buffer_lock = threading.Lock()
 dashboard_data: dict = {}
 data_lock = threading.Lock()
-last_fetch_time: str = ""
 last_render_time: str = ""
-last_error: str = ""
-last_solar_report: str = ""
-last_crypto_time: str = ""
-last_cumulus_report: str = ""
-
-
-# Integration state for reported PV power → daily kWh. Only the MQTT listener
-# thread touches it, so no lock is needed.
-_solar_state = {"date": None, "wh": 0.0, "last_ts": None, "last_persist": 0.0}
-MAX_SAMPLE_GAP_H = 5 / 60  # cap a sample's time weight at 5 min to avoid overcounting silence
-PRODUCTION_PERSIST_INTERVAL = 30  # seconds between SQLite writes
-
-
-def _on_solar_power(pv_watts: float):
-    """MQTT callback: integrate reported PV power into today's kWh total."""
-    global last_solar_report
-    now = datetime.now(PARIS_TZ)
-    today = now.strftime("%Y-%m-%d")
-    st = _solar_state
-
-    if st["date"] != today:
-        if st["date"] is not None:
-            upsert_production(st["date"], st["wh"])  # flush the finished day
-        tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-        existing = get_cached_production(today, tomorrow)
-        st["date"] = today
-        st["wh"] = existing[0]["pv_kwh"] * 1000 if existing else 0.0
-        st["last_ts"] = None
-        st["last_persist"] = 0.0
-
-    if st["last_ts"] is not None:
-        dt_h = (now - st["last_ts"]).total_seconds() / 3600
-        if dt_h > 0:
-            st["wh"] += pv_watts * min(dt_h, MAX_SAMPLE_GAP_H)
-    st["last_ts"] = now
-
-    mono = time.monotonic()
-    if mono - st["last_persist"] >= PRODUCTION_PERSIST_INTERVAL:
-        upsert_production(today, st["wh"])
-        st["last_persist"] = mono
-    last_solar_report = now.isoformat()
-
-
-def start_ecoflow_listener() -> EcoflowMqttListener:
-    listener = EcoflowMqttListener(
-        ECOFLOW_EMAIL, ECOFLOW_PASSWORD, ECOFLOW_DEVICE_SN, ECOFLOW_API_HOST, _on_solar_power
-    )
-    listener.start()
-    logger.info("EcoFlow MQTT listener started for SN %s", ECOFLOW_DEVICE_SN)
-    return listener
-
-
-# Integration state for the cumulus contactor power → daily kWh. Only the MQTT
-# listener thread touches it, so no lock is needed. The contactor has no energy
-# counter, so we integrate its reported instantaneous power ourselves.
-_cumulus_state = {"date": None, "wh": 0.0, "last_ts": None, "last_persist": 0.0}
-
-
-def _on_cumulus_power(watts: float):
-    """MQTT callback: integrate reported cumulus power into today's kWh total."""
-    global last_cumulus_report
-    now = datetime.now(PARIS_TZ)
-    today = now.strftime("%Y-%m-%d")
-    st = _cumulus_state
-
-    if st["date"] != today:
-        if st["date"] is not None:
-            upsert_cumulus(st["date"], st["wh"])  # flush the finished day
-        tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-        existing = get_cached_cumulus(today, tomorrow)
-        st["date"] = today
-        st["wh"] = existing[0]["cons_kwh"] * 1000 if existing else 0.0
-        st["last_ts"] = None
-        st["last_persist"] = 0.0
-
-    if st["last_ts"] is not None:
-        dt_h = (now - st["last_ts"]).total_seconds() / 3600
-        if dt_h > 0:
-            st["wh"] += watts * min(dt_h, MAX_SAMPLE_GAP_H)
-    st["last_ts"] = now
-
-    mono = time.monotonic()
-    if mono - st["last_persist"] >= PRODUCTION_PERSIST_INTERVAL:
-        upsert_cumulus(today, st["wh"])
-        st["last_persist"] = mono
-    last_cumulus_report = now.isoformat()
-
-
-def start_cumulus_listener() -> CumulusMqttListener:
-    listener = CumulusMqttListener(
-        CUMULUS_MQTT_HOST, CUMULUS_MQTT_PORT, CUMULUS_TOPIC,
-        CUMULUS_MQTT_USERNAME, CUMULUS_MQTT_PASSWORD, _on_cumulus_power,
-    )
-    listener.start()
-    logger.info("Cumulus MQTT listener started on %s:%d (%s)",
-                CUMULUS_MQTT_HOST, CUMULUS_MQTT_PORT, CUMULUS_TOPIC)
-    return listener
-
-
-# --- Data Fetching ---
-
-def fetch_and_cache() -> list[dict]:
-    global last_fetch_time, last_error
-    now = datetime.now(PARIS_TZ)
-    end_date = now.strftime("%Y-%m-%d")
-    full_start = (now - timedelta(days=35)).strftime("%Y-%m-%d")
-    week_start = (now - timedelta(days=7)).strftime("%Y-%m-%d")
-
-    if not needs_refresh(week_start, end_date):
-        logger.info("Cache is fresh, skipping API call")
-        return get_cached_days(full_start, end_date)
-
-    for week_offset in range(5):
-        chunk_end = now - timedelta(days=week_offset * 7)
-        chunk_start = chunk_end - timedelta(days=7)
-        s = chunk_start.strftime("%Y-%m-%d")
-        e = chunk_end.strftime("%Y-%m-%d")
-        if get_cached_days(s, e) and week_offset > 0:
-            continue
-        logger.info("Fetching load curve: %s to %s", s, e)
-        try:
-            raw = fetch_load_curve(TOKEN, PRM, s, e)
-            days = compute_daily_hc_hp(raw, HC_WINDOWS)
-            if days:
-                upsert_days(days)
-        except LinkyAuthError as exc:
-            logger.critical("Auth error: %s", exc)
-            last_error = str(exc)
-            break
-        except LinkyApiError as exc:
-            logger.warning("API error for %s-%s: %s", s, e, exc)
-            last_error = str(exc)
-            continue
-
-    last_fetch_time = now.isoformat()
-    if not last_error:
-        last_error = ""
-    return get_cached_days(full_start, end_date)
-
-
-def build_dashboard_data(days: list[dict]) -> dict:
-    now = datetime.now(PARIS_TZ)
-    today = now.strftime("%Y-%m-%d")
-    complete_days = [d for d in days if d["date"] < today]
-
-    current_week = complete_days[-9:]
-    prev_weeks = complete_days[-37:-9]
-
-    result = []
-    for d in current_week:
-        dt = datetime.strptime(d["date"], "%Y-%m-%d")
-        day_name = DAYS_FR[dt.weekday()]
-        result.append({
-            "day": day_name,
-            "date": d["date"],
-            "hc_kwh": d["hc_kwh"],
-            "hp_kwh": d["hp_kwh"],
-        })
-
-    stats = _compute_stats(current_week, prev_weeks)
-    data = {"days": result, "stats": stats, "last_updated": now.isoformat()}
-
-    if ECOFLOW_ENABLED:
-        _attach_production(data)
-
-    if CRYPTO_ENABLED:
-        _attach_crypto(data)
-
-    if CUMULUS_ENABLED:
-        _attach_cumulus(data)
-
-    return data
-
-
-CUMULUS_NA_THRESHOLD_KWH = 0.05
-
-
-def _attach_cumulus(data: dict):
-    """Attach the cumulus banner fields: yesterday's kWh and the recent daily average.
-
-    Integrated from the contactor's reported power (no energy counter); history
-    starts at first connection (no backfill).
-    """
-    now = datetime.now(PARIS_TZ)
-    today = now.date()
-    today_str = today.strftime("%Y-%m-%d")
-    yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-    nine_ago = (today - timedelta(days=9)).strftime("%Y-%m-%d")
-
-    yesterday_rows = get_cached_cumulus(yesterday_str, today_str)
-    yesterday_kwh = yesterday_rows[0]["cons_kwh"] if yesterday_rows else 0.0
-
-    past = [r["cons_kwh"] for r in get_cached_cumulus(nine_ago, today_str)
-            if r["cons_kwh"] >= CUMULUS_NA_THRESHOLD_KWH]
-    avg = sum(past) / len(past) if past else 0.0
-
-    # Trend: last 9 days vs the 28 days before them (mirrors the solar stats).
-    prev_start = (today - timedelta(days=37)).strftime("%Y-%m-%d")
-    prev = [r["cons_kwh"] for r in get_cached_cumulus(prev_start, nine_ago)
-            if r["cons_kwh"] >= CUMULUS_NA_THRESHOLD_KWH]
-    avg_prev = sum(prev) / len(prev) if prev else 0.0
-    trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
-
-    data["cumulus"] = {
-        "yesterday_text": f"{yesterday_kwh:.1f}",
-        "avg_text": f"{avg:.1f}" if past else "N/A",
-        "trend_pct": trend_pct,
-    }
-
-
-def _attach_crypto(data: dict):
-    """Fetch crypto-bot stats and attach the rendered panel fields.
-
-    On any failure the key is left unset, so the panel is simply omitted.
-    """
-    global last_crypto_time
-    stats = fetch_crypto_stats(CRYPTO_API_URL, CRYPTO_API_TOKEN)
-    if not stats:
-        return
-    data["crypto"] = build_crypto_panel(stats)
-    # Grid snapshot chart (independent: a failure just omits the chart, the
-    # banner still shows).
-    grid = fetch_crypto_grid(CRYPTO_API_URL, CRYPTO_API_TOKEN)
-    if grid:
-        data["crypto_grid"] = grid
-    last_crypto_time = datetime.now(PARIS_TZ).isoformat()
-
-
-def _attach_production(data: dict):
-    """Add the solar production history: always the last 9 completed days.
-
-    Days without accumulated data show as N/A. Today is excluded (only complete
-    days, whose total we are sure was fully accumulated).
-    """
-    now = datetime.now(PARIS_TZ)
-    today = now.date()
-    full_start = (now - timedelta(days=40)).strftime("%Y-%m-%d")
-    prod_by_date = {p["date"]: p["pv_kwh"] for p in get_cached_production(full_start, today.strftime("%Y-%m-%d"))}
-
-    production_days = []
-    recent = []
-    for i in range(9, 0, -1):
-        d = today - timedelta(days=i)
-        ds = d.strftime("%Y-%m-%d")
-        pv = prod_by_date.get(ds, 0.0)
-        production_days.append({"day": DAYS_FR[d.weekday()], "date": ds, "pv_kwh": pv})
-        recent.append({"pv_kwh": pv})
-
-    previous = [{"pv_kwh": prod_by_date[ds]}
-                for i in range(37, 9, -1)
-                if (ds := (today - timedelta(days=i)).strftime("%Y-%m-%d")) in prod_by_date]
-
-    data["production_days"] = production_days
-    data["production_stats"] = _compute_production_stats(recent, previous)
-
-
-def _compute_production_stats(current: list[dict], previous: list[dict]) -> dict:
-    na_threshold = 0.1
-
-    def _avg(days):
-        valid = [d for d in days if d["pv_kwh"] >= na_threshold]
-        if not valid:
-            return 0
-        return sum(d["pv_kwh"] for d in valid) / len(valid)
-
-    avg_kwh = _avg(current)
-    avg_kwh_prev = _avg(previous)
-    has_prev = avg_kwh_prev > 0
-
-    pct = round((avg_kwh - avg_kwh_prev) / avg_kwh_prev * 100, 1) if has_prev else 0
-    total = sum(d["pv_kwh"] for d in current)
-    return {
-        "avg_kwh": round(avg_kwh, 1),
-        "avg_kwh_pct": pct,
-        "total_kwh": round(total, 1),
-        "savings_eur": round(total * PRICE_HP, 1),
-    }
-
-
-def _compute_stats(current: list[dict], previous: list[dict]) -> dict:
-    daily_abo = PRICE_ABO_MONTHLY / 30.44
-    na_threshold = 1.0
-
-    def _filter_valid(days):
-        return [d for d in days if d["hc_kwh"] + d["hp_kwh"] >= na_threshold]
-
-    def _avg_and_ratios(days):
-        if not days:
-            return 0, 0, 0
-        total_hc = sum(d["hc_kwh"] for d in days)
-        total_hp = sum(d["hp_kwh"] for d in days)
-        total = total_hc + total_hp
-        n = len(days)
-        avg_kwh = total / n
-        hc_ratio = (total_hc / total * 100) if total > 0 else 0
-        avg_price = ((total_hp * PRICE_HP + total_hc * PRICE_HC) / n) + daily_abo
-        return avg_kwh, hc_ratio, avg_price
-
-    avg_kwh, hc_ratio, avg_price = _avg_and_ratios(_filter_valid(current))
-    has_prev = len(previous) > 0
-    avg_kwh_prev, hc_ratio_prev, avg_price_prev = _avg_and_ratios(_filter_valid(previous))
-
-    def _pct(cur, prev):
-        if not has_prev or prev == 0:
-            return 0
-        return round((cur - prev) / prev * 100, 1)
-
-    return {
-        "avg_kwh": round(avg_kwh, 1),
-        "avg_kwh_pct": _pct(avg_kwh, avg_kwh_prev),
-        "hc_ratio": round(hc_ratio, 1),
-        "hc_ratio_pct": round(hc_ratio - hc_ratio_prev, 1) if has_prev else 0,
-        "avg_price": round(avg_price, 2),
-        "avg_price_pct": _pct(avg_price, avg_price_prev),
-    }
 
 
 # --- Rendering (Pillow) ---
@@ -441,11 +73,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
         Linky/solar data stay on the hourly cache; only the crypto panel is
         refreshed here. Any failure falls back to the cached hourly buffer.
         """
-        if CRYPTO_ENABLED:
+        if crypto.enabled():
             try:
                 with data_lock:
                     data = dict(dashboard_data)
-                _attach_crypto(data)
+                crypto.attach(data)
                 return render_to_buffer(data)
             except Exception as e:
                 logger.warning("Live crypto render failed, serving cached buffer: %s", e)
@@ -469,23 +101,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
             solar_days = len(dashboard_data.get("production_days", []))
         status = {
             "version": VERSION,
-            "last_fetch": last_fetch_time,
             "last_render": last_render_time,
-            "last_error": last_error,
             "days_cached": days_count,
             "buffer_ready": len(epd_buffer) > 0,
             "buffer_size": len(epd_buffer),
-            "prm": PRM,
             "refresh_interval": REFRESH_INTERVAL,
-            "hc_windows": os.environ.get("HC_WINDOWS", "23:32-5:32,15:02-17:02"),
-            "ecoflow_enabled": ECOFLOW_ENABLED,
             "solar_days_cached": solar_days,
-            "last_solar_report": last_solar_report,
-            "crypto_enabled": CRYPTO_ENABLED,
-            "last_crypto": last_crypto_time,
-            "cumulus_enabled": CUMULUS_ENABLED,
-            "last_cumulus": last_cumulus_report,
         }
+        status.update(linky.status())
+        for integration in OPTIONAL:
+            status.update(integration.status())
         body = json.dumps(status, indent=2).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -524,8 +149,8 @@ def start_http_server(port: int):
 def refresh_cycle():
     global epd_buffer, dashboard_data
     try:
-        days = fetch_and_cache()
-        data = build_dashboard_data(days)
+        days = linky.fetch_and_cache()
+        data = dashboard.build_dashboard_data(days)
         with data_lock:
             dashboard_data = data
         buf = render_to_buffer()
@@ -546,21 +171,17 @@ def schedule_loop():
 # --- Main ---
 
 def main():
-    logger.info("Linky Dashboard v%s", VERSION)
+    logger.info("Dashboard v%s", VERSION)
 
-    if not TOKEN:
+    if not linky.TOKEN:
         logger.critical("LINKY_TOKEN environment variable is required")
         raise SystemExit(1)
 
-    init_db()
-    if ECOFLOW_ENABLED:
-        start_ecoflow_listener()
-    else:
-        logger.info("EcoFlow integration disabled (set ECOFLOW_EMAIL/PASSWORD/DEVICE_SN to enable)")
-    if CUMULUS_ENABLED:
-        start_cumulus_listener()
-    else:
-        logger.info("Cumulus integration disabled (set CUMULUS_MQTT_HOST to enable)")
+    linky.init_schema()
+    for integration in OPTIONAL:
+        integration.init_schema()
+        integration.start()
+
     start_http_server(PORT)
     schedule_loop()
 
