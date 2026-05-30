@@ -2,6 +2,7 @@
 
 ## 2026-05-30
 
+- **Crypto profit grouping** — the Crypto banner now groups the bot's results behind a `Profits` label: the signed `%` return and the `±$` amount on one line (red when negative), keeping the portfolio value as a separate segment.
 - **Crypto alpha** — the Crypto banner now shows an `α` segment: the bot's excess return over buy-and-hold (all-time bot return minus `holdReturnPercent`), black when ahead, red when behind.
 - **Crypto grid snapshot chart** — under the Crypto banner (top-right): the grid price levels with left labels and dashed lines, the 7-day price line, and a "now" marker dot with the live current price. Rendered black & white. Reuses the existing `CRYPTO_API_URL`/`CRYPTO_API_TOKEN` (fetched live on the ESP32's `/display` pull).
 - **`scripts/gen_preview.py`** — regenerates `docs/preview.png` from the local DB history + live crypto, for UI review.
