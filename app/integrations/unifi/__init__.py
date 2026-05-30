@@ -33,7 +33,6 @@ _last_unifi_time = ""
 # Snapshot columns that carry a ▲▼ trend, paired with the panel key they fill.
 _TREND_COLUMNS = (
     ("usage_bytes", "usage_trend"),
-    ("speed_dl", "speed_trend"),
     ("latency_ms", "latency_trend"),
     ("isp_pct", "isp_trend"),
     ("wifi_pct", "wifi_trend"),
@@ -95,9 +94,9 @@ def _snapshot(snap: dict):
     conn = db.connect()
     conn.execute(
         """INSERT OR REPLACE INTO daily_unifi
-           (date, usage_bytes, speed_dl, latency_ms, isp_pct, wifi_pct, fetched_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (today, snap.get("usage_bytes"), snap.get("speed_dl"), snap.get("latency_ms"),
+           (date, usage_bytes, latency_ms, isp_pct, wifi_pct, fetched_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (today, snap.get("usage_bytes"), snap.get("latency_ms"),
          snap.get("isp_pct"), snap.get("wifi_pct"), now),
     )
     conn.commit()
@@ -155,13 +154,18 @@ def _short(name: str, limit: int = 15) -> str:
     return name if len(name) <= limit else name[: limit - 1] + "…"
 
 
+def _client_bytes(c: dict) -> int:
+    """Session traffic for a client (rx+tx); active-clients has no usage_bytes."""
+    return int((c.get("rx_bytes", 0) or 0) + (c.get("tx_bytes", 0) or 0))
+
+
 def _network(clients: list, ssid: str, label: str) -> dict:
     """Client count + top-3 by total traffic for one SSID (wireless only)."""
     members = [c for c in clients if not c.get("is_wired") and c.get("essid") == ssid]
-    members.sort(key=lambda c: c.get("usage_bytes", 0) or 0, reverse=True)
+    members.sort(key=_client_bytes, reverse=True)
     top = [
         (_short(c.get("display_name") or c.get("hostname") or c.get("mac", "?")),
-         _gb(c.get("usage_bytes", 0)))
+         _gb(_client_bytes(c)))
         for c in members[:3]
     ]
     return {"label": label, "count": len(members), "top": top}
@@ -179,44 +183,48 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
     if not isinstance(dash, dict) or not isinstance(clients, list):
         return None
 
-    # --- Internet (ISP) quality: WAN uptime over the window + link state.
-    isp_name = (_dig(dash, "wan", "wan_details", 0, "isp", "name", default="") or "").split(" ")[0]
-    link_up = _dig(dash, "wan", "wan_details", 0, "status", "up", default=True)
-    uptime = _dig(dash, "wan_history", "wan_history_details", 0, "uptime")
-    isp_pct = round(uptime) if uptime is not None else (100 if link_up else 0)
+    # --- Internet (ISP): provider name + health from the routability widget and
+    # the per-sample health history (each sample flags WAN downtime over the
+    # dashboard's ~24h window).
+    isp_name = (_dig(dash, "wan_routability_info", 0, "isp_name", default="") or "").split(" ")[0]
+    history = _dig(dash, "internet", "health_history", default=[]) or []
+    link_up = not (history[-1].get("wan_downtime") if history else False)
+    if history:
+        good = sum(1 for h in history if not h.get("wan_downtime"))
+        isp_pct = round(good / len(history) * 100)
+    else:
+        isp_pct = 100 if link_up else 0
     isp_bad = (not link_up) or isp_pct < HEALTH_BAD_PCT
 
-    # --- Internet latency: worst service ping, else the speed-test latency.
-    lats = [s.get("latency") for s in
-            (_dig(dash, "wan", "wan_details", 0, "stats", "service_latencies", default=[]) or [])
-            if s.get("latency") is not None]
-    speed = next((d for d in (_dig(dash, "speed_test", "data", default=[]) or [])
-                  if d.get("interface_name")), {})
-    latency_ms = max(lats) if lats else (speed.get("latency_ms", 0) or 0)
+    # --- Internet latency: average WAN latency over the dashboard window.
+    wan_hist = _dig(dash, "wan_activity", "activity_by_network_group", "WAN", "history",
+                    default=[]) or []
+    lats = [h.get("avg_latency_ms") for h in wan_hist if h.get("avg_latency_ms") is not None]
+    latency_ms = round(sum(lats) / len(lats)) if lats else 0
 
-    # --- Speed test (last successful run): download / upload Mbps.
-    speed_dl = round(speed.get("download_mbps", 0) or 0)
-    speed_ul = round(speed.get("upload_mbps", 0) or 0)
-
-    # --- Wi-Fi quality: weakest connectivity ratio over all radios.
-    attempts = next((rc.get("attempts", {}) for rc in
-                     (_dig(dash, "wifi_connectivity", "radio_connectivity", default=[]) or [])
-                     if rc.get("radio_filter") == "all"), {})
-    ratios = [attempts.get(k) for k in
-              ("success_ratio", "association_ratio", "authentication_ratio", "dhcp_ratio", "dns_ratio")
-              if attempts.get(k) is not None]
-    wifi_pct = round(min(ratios)) if ratios else 100
+    # --- Wi-Fi quality: per-standard satisfaction averaged, weighted by the
+    # number of stations (a lightly-used standard shouldn't drag the figure down).
+    wt = [s for s in (_dig(dash, "wifi_technology", "summary", default=[]) or [])
+          if s.get("satisfaction") is not None]
+    sta_total = sum(s.get("num_sta", 0) or 0 for s in wt)
+    if sta_total:
+        wifi_pct = round(sum(s["satisfaction"] * (s.get("num_sta", 0) or 0) for s in wt) / sta_total)
+    elif wt:
+        wifi_pct = round(sum(s["satisfaction"] for s in wt) / len(wt))
+    else:
+        wifi_pct = 100
     wifi_bad = wifi_pct < HEALTH_BAD_PCT
     # Detailed Wi-Fi quality: the average per-client experience score (0-100).
     exp = [c.get("wifi_experience_score") for c in clients
            if not c.get("is_wired") and c.get("wifi_experience_score")]
     wifi_exp_text = f"{round(sum(exp) / len(exp))}/100" if exp else "—"
 
-    # --- Data usage: yesterday (daily report, best-effort) / current month.
-    month_bytes = _dig(dash, "wan", "wan_details", 0, "stats", "monthly_bytes", default=0)
-    yesterday_bytes = _yesterday_wan_bytes(raw.get("daily"))
-    if yesterday_bytes is None:  # report unavailable -> rolling 24h window from the dashboard
-        summary = _dig(dash, "wan_activity", "total_activity", "summary", default={})
+    # --- Data usage: yesterday + current-month total, both from the daily report
+    # (the aggregated dashboard only covers a 24h window, no monthly counter).
+    yesterday_bytes, month_bytes = _usage_from_daily(raw.get("daily"))
+    if yesterday_bytes is None:  # report unavailable -> 24h WAN total from the dashboard
+        summary = _dig(dash, "wan_activity", "activity_by_network_group", "WAN", "summary",
+                       default={})
         yesterday_bytes = (summary.get("rx_bytes", 0) or 0) + (summary.get("tx_bytes", 0) or 0)
 
     return {
@@ -225,33 +233,42 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
         "wifi_pct": wifi_pct, "wifi_bad": wifi_bad, "wifi_trend": None,
         "wifi_exp_text": wifi_exp_text,
         # Detail rows: numeric strings only — the renderer appends the unit.
-        "latency_val": str(round(latency_ms)), "latency_trend": None,
-        "speed_dl": str(speed_dl), "speed_ul": str(speed_ul), "speed_trend": None,
+        "latency_val": str(latency_ms), "latency_trend": None,
         "usage_hier": _gb(yesterday_bytes), "usage_mois": _gb(month_bytes), "usage_trend": None,
         "iot": _network(clients, ssids["iot"], "IoT"),
         "main": _network(clients, ssids["main"], "Perso"),
         # Raw values snapshotted by attach() to compute the 7-day trends.
         "_snap": {
-            "usage_bytes": yesterday_bytes, "speed_dl": speed_dl,
+            "usage_bytes": yesterday_bytes,
             "latency_ms": latency_ms, "isp_pct": isp_pct, "wifi_pct": wifi_pct,
         },
     }
 
 
-def _yesterday_wan_bytes(daily) -> int | None:
-    """Sum of WAN tx+rx for yesterday from the daily.gw report, or None."""
+def _usage_from_daily(daily) -> tuple[int | None, int]:
+    """(yesterday, current-month total) WAN tx+rx bytes from the daily.gw report.
+
+    yesterday is None when the report is unavailable (caller falls back); the
+    month total is the running sum of every day in the current month (today
+    included, partial)."""
     rows = (daily or {}).get("data") if isinstance(daily, dict) else None
     if not rows:
-        return None
-    yesterday = (datetime.now(PARIS_TZ).date() - timedelta(days=1))
+        return None, 0
+    today = datetime.now(PARIS_TZ).date()
+    yesterday = today - timedelta(days=1)
+    y_bytes: int | None = None
+    month_total = 0
     for row in rows:
         ts = row.get("time")
         if ts is None:
             continue
         day = datetime.fromtimestamp(ts / 1000, PARIS_TZ).date()
+        day_bytes = int((row.get("wan-tx_bytes", 0) or 0) + (row.get("wan-rx_bytes", 0) or 0))
         if day == yesterday:
-            return int((row.get("wan-tx_bytes", 0) or 0) + (row.get("wan-rx_bytes", 0) or 0))
-    return None
+            y_bytes = day_bytes
+        if (day.year, day.month) == (today.year, today.month):
+            month_total += day_bytes
+    return y_bytes, month_total
 
 
 def status() -> dict:
