@@ -59,7 +59,7 @@ if "cumulus" not in data:
 # The talon needs the new talon_w column populated (one fetch cycle). On a dev DB
 # that predates it, inject representative values so the bottom Talon row shows.
 if data.get("talon", {}).get("yesterday_text") in (None, "N/A"):
-    data["talon"] = {"yesterday_text": "318", "avg_text": "305", "trend_pct": -4.0}
+    data["talon"] = {"yesterday_text": "318", "avg_text": "305", "avg_w": 305, "trend_pct": -4.0}
 
 print("days:", len(data.get("days", [])),
       "| solar:", len(data.get("production_days", [])),

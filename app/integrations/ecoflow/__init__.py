@@ -123,7 +123,15 @@ def attach(data: dict):
                 if (ds := (today - timedelta(days=i)).strftime("%Y-%m-%d")) in prod_by_date]
 
     data["production_days"] = production_days
-    data["production_stats"] = _compute_production_stats(recent, previous)
+    stats = _compute_production_stats(recent, previous)
+    # Share of the base load (talon) the solar covers: average daily PV energy
+    # over the talon's average daily energy (W → kWh/day). Core Linky runs before
+    # the optional slices, so data["talon"] is already populated.
+    talon_w = (data.get("talon") or {}).get("avg_w")
+    if talon_w and talon_w > 0:
+        talon_kwh = talon_w * 24 / 1000
+        stats["talon_cover_pct"] = round(stats["avg_kwh"] / talon_kwh * 100)
+    data["production_stats"] = stats
 
 
 def _compute_production_stats(current: list[dict], previous: list[dict]) -> dict:

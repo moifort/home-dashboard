@@ -42,7 +42,7 @@ Three indicators are displayed above the chart. Each shows a **current value** a
 
 ### Solar production (optional, top chart)
 
-When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **money saved** over the period (`€`, period total valued at the peak/HP grid price) and the **period total** (`kWh total`). See the setup section below.
+When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). See the setup section below.
 
 ### Crypto-bot banner (optional, top-right)
 

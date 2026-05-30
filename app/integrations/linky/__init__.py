@@ -134,6 +134,7 @@ def _compute_talon(current: list[dict], previous: list[dict]) -> dict:
     return {
         "yesterday_text": f"{round(yesterday)}" if yesterday is not None else "N/A",
         "avg_text": f"{round(avg)}" if cur else "N/A",
+        "avg_w": round(avg) if cur else None,
         "trend_pct": trend_pct,
     }
 

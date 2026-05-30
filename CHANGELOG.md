@@ -2,6 +2,7 @@
 
 ## 2026-05-30
 
+- **Solar talon coverage** — the solar title now ends with a `Talon … %` item: the share of the house's baseline-power (talon) energy the solar production covers, computed from the 9-day averages (average daily PV kWh over the talon's daily energy, `avg_w × 24h`). Shown only when the talon is known. The title's total/savings group was relabelled to lead with `Total … kWh` (then the `€`).
 - **Talon énergétique** — the dashboard now computes the house's baseline power (the P5 of each day's 30-min Linky load curve, in W — the permanent floor: fridge, box, standby), persisted in `daily_consumption.talon_w` and backfilled from the load-curve history.
 - **Bottom table (Cumulus + Talon)** — the bottom strip became a 3-column table (name · yesterday · average + trend) under a single top separator line: the name and yesterday columns are left-aligned, the average+trend column is right-aligned. The Talon row is always shown (core Linky data), with the Cumulus row stacked above it when that integration is enabled.
 - **2px screen margin** — the whole dashboard is now inset 2px from every e-paper edge instead of bleeding edge-to-edge.
