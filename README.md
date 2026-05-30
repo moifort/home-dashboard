@@ -4,7 +4,7 @@
   <img src="docs/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, and the **water-heater (cumulus) daily consumption** in a banner below the consumption chart.
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right.
 
 Rendered output:
 
@@ -42,7 +42,7 @@ Three indicators are displayed above the chart. Each shows a **current value** a
 
 ### Solar production (optional, top chart)
 
-When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). See the setup section below.
+When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). The talon coverage sits to the left of the `Total` group and falls back to `Talon N/A` until the talon is known. See the setup section below.
 
 ### Crypto-bot banner (optional, top-right)
 
@@ -55,6 +55,10 @@ A **table** below the consumption chart (under a thin separator line) shows the 
 ### Cumulus consumption (optional)
 
 When a Zigbee2MQTT broker is configured, a `Cumulus` row is added at the top of the bottom table (above the Talon row), showing the water-heater's daily consumption: yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
+
+### UniFi network panel (optional, bottom-right)
+
+When a UniFi gateway (UniFi OS) is configured, a `Réseau` panel is drawn in the bottom-right, under the crypto grid. The title shows the **internet quality** (ISP name + WAN uptime %) and the **Wi-Fi quality** (weakest connectivity ratio), each with a ▲▼ trend. Below it: **latency** (worst service ping), **Wi-Fi signal** (average client experience score), **speed test** (↓/↑ Mbps) and **data usage** (yesterday / current month). Then a **top-3 clients** mini-table per network — the main Wi-Fi first, then the IoT Wi-Fi — each with its client count. Trends compare the latest day to a 7-day average from a daily snapshot (no backfill — they fill in over the first week); for the speed test a rise is good (black), for latency and a falling speed a degradation is red, and data usage stays neutral (black). See the setup section below.
 
 ## Hardware
 
@@ -132,6 +136,19 @@ CUMULUS_MQTT_PORT=1883
 CUMULUS_TOPIC=zigbee2mqtt/cumulus
 CUMULUS_MQTT_USERNAME=                 # omit if the broker is anonymous
 CUMULUS_MQTT_PASSWORD=
+```
+
+#### Optional — UniFi network panel
+
+Point the dashboard at your local UniFi gateway (UCG/UDM running UniFi OS) to show a `Réseau` panel with internet & Wi-Fi quality, per-SSID client counts and the top consumers. It logs in with your **local** gateway account (cookie auth; the self-signed certificate is trusted automatically) and reads the aggregated dashboard + active clients. Use the gateway's **LAN IP** (bridge network). Set `UNIFI_SSID_IOT`/`UNIFI_SSID_MAIN` to your own SSID names so the IoT vs personal split is correct. Trends build up over the first week (no backfill). Enabled by setting `UNIFI_PASSWORD`.
+
+```env
+UNIFI_HOST=https://192.168.1.1
+UNIFI_USERNAME=your_gateway_local_account
+UNIFI_PASSWORD=your_gateway_password
+UNIFI_SITE=default
+UNIFI_SSID_IOT=your_iot_wifi_ssid                # your IoT Wi-Fi SSID
+UNIFI_SSID_MAIN=your_main_wifi_ssid                # your main Wi-Fi SSID
 ```
 
 ### 3. Run with Docker Compose
