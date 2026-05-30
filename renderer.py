@@ -69,8 +69,18 @@ def render_dashboard(data: dict) -> Image.Image:
     # Crypto title-style banner in the empty top-right space (aligned with the
     # solar title); cumulus banner sits below the EDF chart, bottom-left.
     crypto = data.get("crypto")
+    crypto_bottom = 0
     if crypto:
-        _draw_crypto_banner(draw, fonts, crypto, 0)
+        crypto_bottom = _draw_crypto_banner(draw, fonts, crypto, 0)
+
+    # Grid snapshot chart under the Crypto title (top-right quadrant), down to
+    # the gap above the chart divider. Drawn black & white.
+    crypto_grid = data.get("crypto_grid")
+    if crypto_grid:
+        _draw_crypto_grid(draw, fonts, crypto_grid,
+                          region_top=(crypto_bottom or 12) - 2,
+                          region_bottom=split - DIVIDER_GAP)
+
     if cumulus:
         _draw_cumulus_banner(draw, fonts, cumulus)
 
@@ -99,6 +109,101 @@ def _draw_crypto_banner(draw, fonts, crypto, region_top) -> int:
     if crypto.get("sandbox"):
         items.append([("SANDBOX", "bold", BLACK)])
     return _draw_right_banner(draw, fonts, items, region_top)
+
+
+def _dashed_h_line(draw, x0, x1, y, on=2, off=3, fill=BLACK):
+    x = x0
+    while x < x1:
+        draw.line([(x, y), (min(x + on, x1), y)], fill=fill, width=1)
+        x += on + off
+
+
+def _grid_label(price: float) -> str:
+    """Price with a $ prefix and plain-space thousands separator (Arial-safe)."""
+    return f"${price:,.0f}".replace(",", chr(32))
+
+
+def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
+    """Render the trading grid snapshot under the Crypto banner (top-right):
+    horizontal dashed grid levels with left price labels, the price line over
+    the period, and a 'now' marker dot with the current price. Black & white."""
+    lower = grid.get("lower")
+    upper = grid.get("upper")
+    levels = grid.get("levels", 0)
+    if lower is None or upper is None or upper <= lower or levels < 1:
+        return
+
+    label_font = fonts["label"]
+    value_font = fonts["bold"]
+
+    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
+    region_left = WIDTH - CHART_LEFT - banner_width
+    region_right = WIDTH - CHART_LEFT
+
+    # Level prices, top (upper) to bottom (lower).
+    if levels > 1:
+        step = (upper - lower) / (levels - 1)
+        level_prices = [upper - i * step for i in range(levels)]
+    else:
+        level_prices = [lower]
+
+    # Left gutter: the price label, sized to the widest one.
+    label_x = region_left + 2
+    max_label_w = max(draw.textlength(_grid_label(p), font=label_font) for p in level_prices)
+    plot_left = round(label_x + max_label_w + 8)
+    plot_right = region_right - 2
+
+    label_h = draw.textbbox((0, 0), "0", font=label_font)[3]
+    pad = label_h // 2 + 2
+    plot_top = region_top + pad
+    plot_bottom = region_bottom - pad
+    if plot_bottom <= plot_top or plot_right <= plot_left:
+        return
+
+    span_y = upper - lower
+    plot_h = plot_bottom - plot_top
+
+    def price_y(p):
+        return round(plot_bottom - (p - lower) / span_y * plot_h)
+
+    # --- Grid levels: fine dotted line + label (no marker dot) ---
+    for p in level_prices:
+        y = price_y(p)
+        _dashed_h_line(draw, plot_left, plot_right, y, on=1, off=8)
+        draw.text((label_x, y - label_h // 2 - 1), _grid_label(p), fill=BLACK, font=label_font)
+
+    # --- Price line + 'now' marker ---
+    points = grid.get("points") or []
+    if points:
+        t0 = points[0][0]
+        t_last = points[-1][0]
+        # 6% right buffer so the 'now' marker leaves room for its label.
+        t_span = (t_last - t0) * 1.06 or 1
+        plot_w = plot_right - plot_left
+
+        def clamp_y(p):
+            return min(plot_bottom, max(plot_top, price_y(p)))
+
+        def time_x(t):
+            return round(plot_left + (t - t0) / t_span * plot_w)
+
+        line = [(time_x(t), clamp_y(p)) for t, p in points]
+        if len(line) > 1:
+            draw.line(line, fill=BLACK, width=1)
+
+        current = grid.get("current_price")
+        if current is not None:
+            nx = time_x(t_last)
+            ny = clamp_y(current)
+            draw.ellipse([nx - 3, ny - 3, nx + 3, ny + 3], fill=BLACK)
+            # Current price label, centered above the dot, kept inside the region.
+            ctext = grid.get("current_price_text", "")
+            if ctext:
+                cw = draw.textlength(ctext, font=value_font)
+                ch = draw.textbbox((0, 0), ctext, font=value_font)[3]
+                cx = max(plot_left, min(round(nx - cw / 2), region_right - cw))
+                cy = max(plot_top, ny - ch - 6)
+                draw.text((cx, cy), ctext, fill=BLACK, font=value_font)
 
 
 def _draw_cumulus_banner(draw, fonts, cumulus) -> None:
