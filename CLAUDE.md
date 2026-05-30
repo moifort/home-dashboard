@@ -125,46 +125,37 @@ Before pushing, verify and update as needed:
 - **Environment variables** — if the push adds/renames env vars, tell the user which ones to add or fill on their CasaOS deployment.
 
 
-## Linky / Conso API
+## Integration dev notes
 
-- **API**: `conso.boris.sh/api/consumption_load_curve` (30-min intervals, in W)
-- **PRM**: stored in `.env` (`LINKY_PRM`) — NEVER in code
-- **Token**: JWT valid 3 years, stored in `.env` (`LINKY_TOKEN`) — NEVER in code
-- **API limit**: max 7 days per request (8 days → 400 Bad Request)
-- **HC/HP**: two off-peak windows — 23:32-5:32 (night) + 15:02-17:02 (afternoon), configurable via `HC_WINDOWS`
-- **Pricing**: HP=0.2065 €/kWh, HC=0.1579 €/kWh, subscription=15.65 €/month
+Each integration is a vertical slice in `app/integrations/<name>/` (see structure
+above). **Feature behaviour, what each panel shows and env setup live in the
+README** — below are only the non-obvious implementation gotchas per slice.
 
-## Talon énergétique (baseline power, core)
+### Linky / Conso API (core)
+- API `conso.boris.sh/api/consumption_load_curve` (30-min samples, in W). **Max 7 days per request** (8 → 400). `LINKY_TOKEN`/`LINKY_PRM` live in `.env`, **never in code**.
+- `compute_daily_hc_hp` (`client.py`) aggregates samples into daily HC/HP kWh **and the talon** = P5 of the day's samples (`_percentile`, `TALON_PCT=5`; P5 not the strict min, which catches the single all-off step). Persisted in `daily_consumption.talon_w` (idempotent `ALTER TABLE` in `init_schema`).
+- The load curve returns history, so `fetch_and_cache` forces a **one-time refetch** of cached weeks still missing `talon_w` (the talon backfills; HC/HP, solar and cumulus do not). `build_core._compute_talon` derives yesterday / avg / trend.
 
-- **Goal**: the house's permanent baseline power (fridge, box, standby), shown as the **bottom `Talon` row** of the bottom table — always visible (core Linky), in **W**: `Talon  <yesterday> W hier  <avg> W <trend>`.
-- **Compute**: per day, `talon_w` = **P5** of that day's 30-min load-curve samples (`_percentile` in `app/integrations/linky/client.py`, `TALON_PCT=5`) — a low percentile, **not the strict min** (which catches the single all-off step). Computed inside `compute_daily_hc_hp` alongside HC/HP, persisted in the new `daily_consumption.talon_w` column (idempotent `ALTER TABLE` in `init_schema`).
-- **Backfill**: unlike EcoFlow/Cumulus, the load-curve API returns history, so `fetch_and_cache` forces a **one-time refetch** of cached weeks whose rows still lack `talon_w`. `build_core._compute_talon` derives yesterday/avg/trend (avg = mean of daily P5 over the 9-day window; ▲ in red = rising baseline = bad).
+### EcoFlow PowerStream / Solar
+- The Developer API exposes only instantaneous PV watts; the daily counter (`254_32`) is app-MQTT-only and arrives on a slow, non-forceable timer. So we read the **inverter heartbeat** (protobuf `cmd_func=20 / cmd_id=1` → `PowerStreamInverterHeartbeat`, PV watts = `(pv1 + pv2) / 10` deci-watts) and integrate it into `daily_production` (`_on_solar_power`).
+- **Keep-alive**: the device only publishes while polled — re-publish `build_get_quota_request` (cmd 20/1, src=dest=32) to `/app/{userId}/{sn}/thing/property/get` every 60s.
+- Auth: `POST /auth/login` (password base64, `scene=IOT_APP`) → token + userId; `GET /iot-auth/app/certification` → MQTT creds (`mqtt-e.ecoflow.com:8883`). **TLS needs `certifi.where()`** or the handshake fails (macOS python.org / Docker slim).
 
-## EcoFlow PowerStream / Solar (optional)
+### Crypto Bot panel
+- GraphQL `query { stats { totalProfitUsdc sommeMiseUsdc sandboxMode } }`; `% = totalProfitUsdc / sommeMiseUsdc * 100`, portfolio = their sum. Slice `crypto/` (`graphql/`).
+- Fetched **on the ESP32 `/display` pull** (re-renders with fresh crypto; Linky/solar stay on the hourly cache); any failure falls back to the cached buffer.
+- Thousands separator: plain space — Arial renders U+202F as a tofu box on e-paper.
 
-- **Goal**: daily solar production (kWh/day) chart in the **top 50%** of the screen, above the Linky chart. Full-black single bars (no split), same title+separator style. Shows the **last 9 completed days** (today excluded; N/A if no data). Stats: avg kWh/day + trend (rising = good = black, falling = red), plus period total.
-- **Data source**: the official Developer API (HMAC) exposes only instantaneous PV watts; the per-day energy counter (`254_32`) exists only on the **private app MQTT** but arrives on the device's own slow, non-forceable timer. So we read the **inverter heartbeat** power and integrate it ourselves into daily kWh.
-- **Power read**: protobuf heartbeat `cmd_func=20 / cmd_id=1` → `PowerStreamInverterHeartbeat`; PV watts = `(pv1_input_watts + pv2_input_watts) / 10` (deci-watts). Integrated in `app/integrations/ecoflow` (`_on_solar_power`) into the `daily_production` table.
-- **Keep-alive**: the device only publishes while polled. Re-publish a get-quota request (`build_get_quota_request`, cmd 20/1, src=dest=32) to `/app/{userId}/{sn}/thing/property/get` every 60s — otherwise it goes silent.
-- **Auth flow**: `POST https://{host}/auth/login` (password base64, `scene=IOT_APP`) → token + userId; `GET /iot-auth/app/certification` → MQTT url/port/account/password (broker `mqtt-e.ecoflow.com:8883`). **TLS needs `certifi.where()`** or the handshake fails (macOS python.org / Docker slim).
-- **No backfill**: history starts at first connection — EcoFlow cannot return past days.
-- **Config**: `ECOFLOW_EMAIL`, `ECOFLOW_PASSWORD`, `ECOFLOW_DEVICE_SN`, `ECOFLOW_API_HOST` (default `api-e.ecoflow.com`). Integration is disabled (Linky-only) if any is missing.
+### Cumulus (water heater)
+- The Legrand 412171 contactor exposes `power` (W) but **no kWh counter** → we integrate the reported power into `daily_cumulus` ourselves (`_on_cumulus_power`, same technique as solar). No backfill.
+- Z2M broker (mosquitto): subscribe `zigbee2mqtt/cumulus`, read `power`; re-request `{"power":""}` on `.../get` every 60s so integration keeps getting samples during steady heating.
 
-## Crypto Bot panel (optional)
+### Bottom table rendering (Cumulus + Talon)
+- `renderer._draw_bottom_table`; `_build_bottom_rows` builds the rows (Cumulus if enabled, then Talon, always). 3-column grid: name + yesterday left-aligned at fixed thirds, avg + trend right-aligned; single 1px top separator (no box; not the *space-between* `_draw_stats_bar` of the title banners). `_bottom_table_height` grows with the row count, and the consumption chart shrinks by it.
 
-- **Goal**: an inline **title-style banner** in the empty **top-right** space (same look as the chart title banners — segments + 1px separator), on the same row as the solar chart's title. Leads with a `Crypto` label, then % return (black if profit ≥ 0, **red if < 0**), `±$profit`, `$portfolio`, and a `SANDBOX` badge. `renderer._draw_crypto_banner` (in `app/rendering/renderer.py`) reuses `_draw_stats_bar`.
-- **Data source**: the crypto-bot's GraphQL API (`query { stats { totalProfitUsdc sommeMiseUsdc sandboxMode } }`). `% = totalProfitUsdc / sommeMiseUsdc * 100`; portfolio = `sommeMiseUsdc + totalProfitUsdc`. Slice in `app/integrations/crypto/` (`graphql/` transport + queries).
-- **Refresh on pull**: data is fetched **when the ESP32 calls `/display`** (it wakes only ~2×/day), re-rendering the buffer with fresh crypto; Linky/solar stay on the hourly cache. Any failure falls back to the cached hourly buffer (panel omitted).
-- **Networking**: the dashboard runs in `network_mode: bridge`, so it reaches the co-located bot via its **LAN IP** (`http://192.168.1.50:3003/graphql`), not `localhost`.
-- **Thousands separator**: use a plain space — Arial.ttf renders U+202F (the iOS widget's narrow no-break space) as a tofu box on e-paper.
-- **Config**: `CRYPTO_API_URL` (empty = disabled), `CRYPTO_API_TOKEN` (the bot's `NITRO_API_TOKEN`, optional).
+### Networking
+- The dashboard runs in `network_mode: bridge`, so it reaches co-located services (crypto bot, MQTT brokers) via their **LAN IP**, not `localhost`.
 
-## Cumulus (water heater) consumption (optional)
-
-- **Goal**: the water-heater's daily consumption as the top **`Cumulus` row** of the bottom table (stacked above the always-present `Talon` row), spanning the chart width below the EDF chart: `Cumulus  <yesterday> kWh hier  <avg> kWh/j <trend>`. The value is **yesterday's** completed daily total (not today's partial one).
-- **Rendering**: the bottom table is `renderer._draw_bottom_table` (in `app/rendering/renderer.py`); `_build_bottom_rows` assembles its rows (Cumulus if enabled, then Talon). It is a 3-column grid — name + yesterday left-aligned at fixed thirds, average+trend right-aligned to the table edge — under a single 1px top separator line (no box; not the *space-between* `_draw_stats_bar` of the title banners). Its height (`_bottom_table_height`) grows with the row count and the consumption chart shrinks by it. The whole dashboard is inset by the global `MARGIN=2`px (via `CHART_LEFT`/`CHART_TOP`/`CHART_BOTTOM`; right-anchored banners use `WIDTH - CHART_LEFT`).
-- **Device**: the `cumulus` Zigbee device is a **Legrand 412171 DIN contactor**. It exposes `state`, `power` (W), `power_apparent` (VA) — **no energy (kWh) counter**. So we **integrate the reported power** into daily kWh ourselves (same technique as EcoFlow solar, `app/integrations/cumulus` `_on_cumulus_power` → `daily_cumulus` table). No backfill — history starts at first connection.
-- **Data source**: the Zigbee2MQTT broker (mosquitto). Subscribe to `zigbee2mqtt/cumulus`, read `power` from the JSON. The contactor publishes on change; we also re-request it (`{"power":""}` on `zigbee2mqtt/cumulus/get`) every 60s so integration keeps getting samples during steady heating. Slice in `app/integrations/cumulus/` (`mqtt/` transport).
-- **Networking**: dashboard is in `network_mode: bridge`, so it reaches the broker via its **LAN IP** (`192.168.1.50:1883`), anonymous (no MQTT auth configured in Z2M).
-- **Config**: `CUMULUS_MQTT_HOST` (empty = disabled), `CUMULUS_MQTT_PORT` (1883), `CUMULUS_TOPIC` (`zigbee2mqtt/cumulus`), `CUMULUS_MQTT_USERNAME`/`PASSWORD` (optional).
+### Layout margin
+- The whole dashboard is inset by the global `MARGIN` (2px) via `CHART_LEFT`/`CHART_TOP`/`CHART_BOTTOM`; right-anchored banners use `WIDTH - CHART_LEFT`.
 
