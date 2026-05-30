@@ -1,6 +1,5 @@
-"""Convert screenshots to e-Paper display buffer and send to ESP32."""
+"""Convert a rendered PNG to the e-Paper display buffer (4-color or B/W)."""
 import numpy as np
-import requests
 from PIL import Image
 from io import BytesIO
 
@@ -97,10 +96,3 @@ def _convert_4color(img: Image.Image) -> bytes:
             shift = 6 - (x % 4) * 2
             buf[idx] |= color << shift
     return bytes(buf)
-
-
-def send_to_esp32(buffer: bytes, ip: str) -> bool:
-    url = f"http://{ip}/display"
-    r = requests.post(url, data=buffer, headers={"Content-Type": "application/octet-stream"})
-    print(f"ESP32 response: {r.status_code} {r.text}")
-    return r.status_code == 200
