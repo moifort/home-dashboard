@@ -329,8 +329,8 @@ def _draw_bottom_table(draw, fonts, rows, bottom_h) -> None:
 def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
     """Draw the "Réseau" panel in the bottom-right column (under the crypto grid):
     a title banner with internet/Wi-Fi health (each with a ▲▼ trend), detail rows
-    (latency, Wi-Fi signal, speed test, data usage — values with their unit in
-    regular weight, glued to the bold number), then a top-3 clients mini-table per
+    (latency, Wi-Fi signal, data usage — values with their unit in regular weight,
+    glued to the bold number), then a top-3 clients mini-table per
     network (main Wi-Fi first, then IoT) with its client count."""
     width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     x = WIDTH - CHART_LEFT - width
@@ -392,11 +392,6 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
               y, unifi.get("latency_trend"), invert_bad=True)
     y += row_h
     value_row("Signal Wi-Fi", [(unifi.get("wifi_exp_text", ""), "bold", BLACK)], y)
-    y += row_h
-    value_row("Vitesse",
-              [(unifi.get("speed_dl", ""), "bold", BLACK), ("/", "regular", BLACK),
-               (unifi.get("speed_ul", ""), "bold", BLACK), ("Mbps", "regular", BLACK)],
-              y, unifi.get("speed_trend"), invert_bad=False)
     y += row_h
     value_row("Données hier/mois",
               [(unifi.get("usage_hier", ""), "bold", BLACK), ("/", "regular", BLACK),
