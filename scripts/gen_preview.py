@@ -61,6 +61,22 @@ if "cumulus" not in data:
 if data.get("talon", {}).get("yesterday_text") in (None, "N/A"):
     data["talon"] = {"yesterday_text": "318", "avg_text": "305", "avg_w": 305, "trend_pct": -4.0}
 
+# The UniFi panel needs live gateway credentials we don't have here; inject a
+# representative snapshot so the preview shows the bottom-right Réseau panel.
+if "unifi" not in data:
+    data["unifi"] = {
+        "isp_name": "Free", "isp_pct": 100, "isp_bad": False, "isp_trend": None,
+        "wifi_pct": 100, "wifi_bad": False, "wifi_trend": None,
+        "wifi_exp_text": "99/100",
+        "latency_val": "2", "latency_trend": 12.0,
+        "speed_dl": "926", "speed_ul": "686", "speed_trend": -3.0,
+        "usage_hier": "35,1", "usage_mois": "86,1", "usage_trend": 8.0,
+        "iot": {"label": "IoT", "count": 12, "top": [
+            ("Salon 8d:f7", "0,1"), ("Chambre Minipc…", "0,1"), ("Cuisine 8a:8b", "0,1")]},
+        "main": {"label": "Perso", "count": 7, "top": [
+            ("MacBookPro Tibo", "8,2"), ("iPhone Tibo", "0,2"), ("Iphone Lamia", "0,0")]},
+    }
+
 print("days:", len(data.get("days", [])),
       "| solar:", len(data.get("production_days", [])),
       "| crypto:", bool(data.get("crypto")),
