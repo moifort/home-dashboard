@@ -400,13 +400,19 @@ def _build_consumption_items(stats):
 
 def _build_production_items(stats):
     # Solar: more is better, so a rising trend is good (black), falling is bad (red).
-    return [
+    items = [
         [("Solaire", "bold", BLACK)],
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
-        [(str(stats.get('savings_eur', 0)), "bold", BLACK), ("€   ", "regular", BLACK),
-         (str(stats.get('total_kwh', 0)), "bold", BLACK), ("kWh total", "regular", BLACK)],
+        [("Total ", "regular", BLACK), (str(stats.get('total_kwh', 0)), "bold", BLACK),
+         ("kWh   ", "regular", BLACK), (str(stats.get('savings_eur', 0)), "bold", BLACK),
+         ("€", "regular", BLACK)],
     ]
+    # Share of the base load (talon) the solar covers, when the talon is known.
+    pct = stats.get("talon_cover_pct")
+    if pct is not None:
+        items.append([("Talon ", "regular", BLACK), (str(pct), "bold", BLACK), ("%", "regular", BLACK)])
+    return items
 
 
 def _draw_stats_bar(draw, fonts, items, x, y, width, line_y):
