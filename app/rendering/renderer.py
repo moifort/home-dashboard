@@ -496,7 +496,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
                 hc_top = bar_bottom - hc_h
                 draw.rectangle([cx, hc_top, cx + BAR_WIDTH - 1, hc_top + 1], fill=BLACK)
 
-        val_text = f"{total:.1f}"
+        val_text = f"{total:.2f}" if mode == "production" else f"{total:.1f}"
         vbox = draw.textbbox((0, 0), val_text, font=font_value)
         vw = vbox[2] - vbox[0]
         vh = vbox[3] - vbox[1]

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-05-31
+
+- **Solar chart precision** — the value above each bar of the solar production chart now shows two decimals (e.g. `0.06` instead of `0.1`), so small daily yields stay readable. The EDF consumption chart below keeps its one-decimal format.
+
 ## 2026-05-30
 
 - **UniFi network panel** — optional `Réseau` panel in the bottom-right (under the crypto grid): internet (ISP name + health %) and Wi-Fi quality in the title, then latency, Wi-Fi signal score, data usage (yesterday/month), and the top-3 clients per SSID with per-network client counts (main Wi-Fi first, then IoT). All fields are mapped from the gateway's aggregated-dashboard payload: ISP from `wan_routability_info`, health from the WAN downtime history, latency from the WAN activity history, Wi-Fi from per-standard satisfaction (weighted by station count), month usage summed from the daily WAN report, and top clients by their rx+tx traffic. ▲▼ trends (7-day average from a `daily_unifi` snapshot, no backfill) on internet/Wi-Fi, latency and data usage (neutral, black). Talks to the local UniFi gateway (cookie auth, self-signed cert). Enabled by setting `UNIFI_PASSWORD`.
