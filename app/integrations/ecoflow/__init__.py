@@ -98,10 +98,11 @@ def start():
 
 
 def attach(data: dict):
-    """Add the solar production history: always the last 9 completed days.
+    """Add the solar production history: always the last 9 days, ending today.
 
-    Days without accumulated data show as N/A. Today is excluded (only complete
-    days, whose total we are sure was fully accumulated).
+    Days without accumulated data show as N/A. Today is included so its bar grows
+    as production accumulates through the day (the EDF chart can't do this — it
+    has no same-day data).
     """
     now = datetime.now(PARIS_TZ)
     today = now.date()
@@ -111,15 +112,16 @@ def attach(data: dict):
 
     production_days = []
     recent = []
-    for i in range(9, 0, -1):
+    for i in range(8, -1, -1):
         d = today - timedelta(days=i)
         ds = d.strftime("%Y-%m-%d")
         pv = prod_by_date.get(ds, 0.0)
-        production_days.append({"day": DAYS_FR[d.weekday()], "date": ds, "pv_kwh": pv})
+        production_days.append({"day": DAYS_FR[d.weekday()], "date": ds, "pv_kwh": pv,
+                                "today": d == today})
         recent.append({"pv_kwh": pv})
 
     previous = [{"pv_kwh": prod_by_date[ds]}
-                for i in range(37, 9, -1)
+                for i in range(36, 8, -1)
                 if (ds := (today - timedelta(days=i)).strftime("%Y-%m-%d")) in prod_by_date]
 
     data["production_days"] = production_days

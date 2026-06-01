@@ -4,7 +4,7 @@
   <img src="docs/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right.
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, a **water meter daily consumption** chart (`Eau`, top-center), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right.
 
 Rendered output:
 
@@ -55,6 +55,10 @@ A **table** below the consumption chart (under a thin separator line) shows the 
 ### Cumulus consumption (optional)
 
 When a Zigbee2MQTT broker is configured, a `Cumulus` row is added at the top of the bottom table (above the Talon row), showing the water-heater's daily consumption: yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
+
+### Water consumption (optional, top-center)
+
+When an MQTT broker is configured, an `Eau` chart is drawn in the top-center space, between the Solar chart and the Crypto panel. It shows the last **9 days** of water use as daily-litres bars (the rightmost bar, labelled `Auj.`, is **today** and grows as the day accumulates), with a title showing the average **L/day** (and its trend), the month-to-date volume in **m³** and its **€** cost. An ESPHome wM-Bus reader publishes the meter's **cumulative index (m³)** to the broker; the dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus), so history starts at the first connection (no backfill). A day with no reading shows **N/A** — including today until its first frame arrives. See the setup section below.
 
 ### UniFi network panel (optional, bottom-right)
 
@@ -149,6 +153,19 @@ UNIFI_PASSWORD=your_gateway_password
 UNIFI_SITE=default
 UNIFI_SSID_IOT=your_iot_wifi_ssid      # your IoT Wi-Fi SSID
 UNIFI_SSID_MAIN=your_main_wifi_ssid    # your main Wi-Fi SSID
+```
+
+#### Optional — Water meter consumption
+
+Point the dashboard at the MQTT broker where an ESPHome wM-Bus reader publishes your water meter's **cumulative index (m³)**. The dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus) — there is **no backfill**, the history starts at the first connection. Use the broker's **LAN IP** (bridge network). Credentials are optional if the broker allows anonymous connections. Set `WATER_PRICE_M3` (water + sanitation, €/m³) to show the monthly cost.
+
+```env
+WATER_MQTT_HOST=192.168.1.50
+WATER_MQTT_PORT=1883
+WATER_TOPIC=watermeter/index_m3        # cumulative index in m³ (raw float payload)
+WATER_MQTT_USERNAME=                   # omit if the broker is anonymous
+WATER_MQTT_PASSWORD=
+WATER_PRICE_M3=4.30                    # €/m³ for the cost figure (0 = hide cost)
 ```
 
 ### 3. Run with Docker Compose

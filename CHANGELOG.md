@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-01
+
+- **Water meter consumption** — optional `Eau` chart in the top-center space, between the Solar chart and the Crypto panel: the last **9 days** of water use as daily-litres bars, with a title showing the average **L/day** (and trend), the month-to-date **m³** and its **€** cost. An ESPHome wM-Bus reader publishes the meter's cumulative index (m³) over MQTT; the dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus) — no backfill, history starts at first connection. A day with no reading shows **N/A**, including today until its first frame arrives. Enabled by setting `WATER_MQTT_HOST`.
+- **Solar & water "today" bar** — the Solar and Water charts now end on **today** (rightmost bar labelled `Auj.`) instead of yesterday, so the current day's accumulation is visible. The EDF consumption chart still ends on yesterday (no same-day data).
+
 ## 2026-05-31
 
 - **Solar chart precision** — the value above each bar of the solar production chart now shows two decimals (e.g. `0.06` instead of `0.1`), so small daily yields stay readable. The EDF consumption chart below keeps its one-decimal format.
