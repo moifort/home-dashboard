@@ -50,6 +50,15 @@ services:
       UNIFI_SITE: default
       UNIFI_SSID_IOT: ""
       UNIFI_SSID_MAIN: ""
+      # Optional water meter daily consumption ("Eau" chart, top-center) via an
+      # ESPHome wM-Bus reader publishing the cumulative index (m³) over MQTT —
+      # leave host empty to disable. Use the broker's LAN IP (bridge network).
+      WATER_MQTT_HOST: ""
+      WATER_MQTT_PORT: "1883"
+      WATER_TOPIC: watermeter/index_m3
+      WATER_MQTT_USERNAME: ""
+      WATER_MQTT_PASSWORD: ""
+      WATER_PRICE_M3: "0"
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/status')" || exit 1
       interval: 30s

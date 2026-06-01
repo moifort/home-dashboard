@@ -15,9 +15,9 @@ sys.path.insert(0, str(ROOT))
 # Point at the local DB (server defaults to the in-container /data path).
 os.environ.setdefault("DB_PATH", str(ROOT / ".data" / "linky.db"))
 
-# Pull the real grid from the bot for the preview unless already configured.
-os.environ.setdefault("CRYPTO_API_URL", "http://192.168.1.50:3003/graphql")
-os.environ.setdefault("CRYPTO_API_TOKEN", "***REMOVED***")
+# Pull the real grid from the bot for the preview: export CRYPTO_API_URL and
+# CRYPTO_API_TOKEN before running (kept out of the repo). Without them the
+# preview simply renders without the crypto panel.
 
 from datetime import datetime  # noqa: E402
 
@@ -74,6 +74,22 @@ if "unifi" not in data:
             ("Salon 8d:f7", "0,5"), ("Cuisine 8a:8b", "0,5"), ("Chambre Minipc…", "0,4")]},
         "main": {"label": "Perso", "count": 4, "top": [
             ("MacBookPro Tibo", "15,5"), ("MacBookPro Lam…", "3,4"), ("iPhone Tibo", "0,8")]},
+    }
+
+# The water meter needs a live MQTT broker we don't have here; inject a
+# representative 7-day history so the preview shows the top-center Eau chart.
+if "water_days" not in data:
+    from app.config import DAYS_FR
+
+    sample = [118, 142, 168, 95, 210, 130, None, 155, 64]  # last = today, mid-day partial
+    data["water_days"] = [
+        {"day": DAYS_FR[(now.weekday() - (len(sample) - 1 - i)) % 7], "liters": v,
+         "today": i == len(sample) - 1}
+        for i, v in enumerate(sample)
+    ]
+    data["water_stats"] = {
+        "avg_text": "153", "avg_pct": -6.5,
+        "month_total_text": "4.18", "cost_text": "16.30",
     }
 
 print("days:", len(data.get("days", [])),

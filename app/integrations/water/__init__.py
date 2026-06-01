@@ -28,7 +28,7 @@ MQTT_PASSWORD = os.environ.get("WATER_MQTT_PASSWORD", "")
 PRICE_M3 = float(os.environ.get("WATER_PRICE_M3", "0") or 0)
 
 ENABLED = bool(MQTT_HOST)
-CHART_DAYS = 7  # daily bars shown in the dedicated water chart
+CHART_DAYS = 9  # daily bars shown in the dedicated water chart
 
 _last_water_report = ""
 
@@ -97,21 +97,28 @@ def attach(data: dict):
     today = now.date()
     first_of_month = today.replace(day=1)
 
-    # Fetch enough history for the 7-day chart, its trend baseline (prev 7 days)
-    # and the month-to-date total, whichever reaches furthest back.
-    start = min(today - timedelta(days=15), first_of_month - timedelta(days=2))
+    # Fetch enough history for the chart (CHART_DAYS), its trend baseline (the
+    # CHART_DAYS before) and the month-to-date total, whichever reaches furthest
+    # back. +1 day for the diff against the day before the oldest shown.
+    start = min(today - timedelta(days=2 * CHART_DAYS + 1), first_of_month - timedelta(days=2))
     end_str = (today + timedelta(days=1)).strftime("%Y-%m-%d")
     rows = db.get_cached_water(start.strftime("%Y-%m-%d"), end_str)
 
-    # Per-day litres for the last 14 days (last 7 shown; the 7 before feed trend).
+    # No reading recorded yet today → today's bar is N/A, not a carry-forward 0
+    # (otherwise the diff against yesterday's carried-forward index reads as zero).
+    today_str = today.strftime("%Y-%m-%d")
+    has_today_reading = any(r["date"] == today_str for r in rows)
+
+    # Per-day litres for the last 2*CHART_DAYS days (last CHART_DAYS shown; the
+    # CHART_DAYS before feed the trend baseline).
     daily = []  # list of (date, litres|None) oldest->newest
-    for i in range(13, -1, -1):
+    for i in range(2 * CHART_DAYS - 1, -1, -1):
         d = today - timedelta(days=i)
         d_str = d.strftime("%Y-%m-%d")
         prev_str = (d - timedelta(days=1)).strftime("%Y-%m-%d")
         idx_d = _index_asof(rows, d_str)
         idx_prev = _index_asof(rows, prev_str)
-        if idx_d is None or idx_prev is None:
+        if idx_d is None or idx_prev is None or (i == 0 and not has_today_reading):
             litres = None
         else:
             litres = max(0.0, (idx_d - idx_prev) * 1000)
@@ -119,7 +126,8 @@ def attach(data: dict):
 
     shown = daily[-CHART_DAYS:]
     data["water_days"] = [
-        {"day": DAYS_FR[d.weekday()], "liters": litres} for d, litres in shown
+        {"day": DAYS_FR[d.weekday()], "liters": litres, "today": d == today}
+        for d, litres in shown
     ]
 
     def avg(seq):

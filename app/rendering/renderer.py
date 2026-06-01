@@ -98,9 +98,9 @@ def render_dashboard(data: dict) -> Image.Image:
                           region_top=(crypto_bottom or 12) - 2,
                           region_bottom=split - DIVIDER_GAP)
 
-    # Water consumption chart in the top-right quadrant (right of the Solar
-    # chart) — its own stats banner + daily-litres bars. Shares this region with
-    # the Crypto panel; water takes priority when present.
+    # Water consumption chart in the empty top-center space, between the Solar
+    # chart (left) and the Crypto panel (right) — its own stats banner +
+    # daily-litres bars. Sits in its own column so it never overlaps Crypto.
     water_days = data.get("water_days")
     if water_days:
         _draw_water_chart(draw, fonts, water_days, data.get("water_stats", {}),
@@ -277,15 +277,18 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
 
 
 def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_bottom) -> None:
-    """Draw the dedicated water chart in the top-right quadrant (right of the
-    Solar chart): a stats banner ("Eau" + avg L/j, month total m³, cost €) over
-    daily-litres bars (single full-black bars, value in L on top, day label
-    below). Mirrors the EDF/Solar look, anchored to the right column."""
+    """Draw the dedicated water chart in the top row, right after the Solar chart
+    (small gap between them): a stats banner ("Eau" + avg L/j, month total m³,
+    cost €) over daily-litres bars (single full-black bars, value in L on top,
+    day label below). Mirrors the EDF/Solar look; sits in its own column so it
+    never overlaps the Crypto panel anchored to the right edge."""
     font_value = fonts["value"]
     font_label = fonts["label"]
 
     banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
-    region_left = WIDTH - CHART_LEFT - banner_width
+    # Butt up against the Solar chart (which hugs the left edge for banner_width)
+    # with a small gap, leaving the right column free for the Crypto panel.
+    region_left = CHART_LEFT + banner_width + 8
 
     # Stats banner anchored at the top of the region (same look as chart titles).
     stats_top = region_top + CHART_TOP
@@ -311,7 +314,7 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
 
     for i, d in enumerate(water_days):
         cx = region_left + i * col_width
-        label_text = d.get("day", "").lower()
+        label_text = "Auj." if d.get("today") else d.get("day", "").lower()
         lbox = draw.textbbox((0, 0), label_text, font=font_label)
         draw.text((cx + (BAR_WIDTH - (lbox[2] - lbox[0])) // 2, baseline_y + 4),
                   label_text, fill=BLACK, font=font_label)
@@ -527,7 +530,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
     # --- Bars ---
     for i, d in enumerate(days):
         cx = CHART_LEFT + i * col_width
-        label_text = d.get("day", "").lower()
+        label_text = "Auj." if d.get("today") else d.get("day", "").lower()
 
         lbox = draw.textbbox((0, 0), label_text, font=font_label)
         lw = lbox[2] - lbox[0]
