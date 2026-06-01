@@ -111,8 +111,12 @@ def attach(data: dict):
     now = datetime.now(PARIS_TZ)
     today = now.date()
     full_start = (now - timedelta(days=40)).strftime("%Y-%m-%d")
+    # get_cached_production filters `date < end` (exclusive), so the end bound must
+    # be tomorrow — otherwise today's row (the live "Auj." bar) is dropped and falls
+    # back to 0 even while production accumulates in the DB.
+    end = (today + timedelta(days=1)).strftime("%Y-%m-%d")
     prod_by_date = {p["date"]: p["pv_kwh"]
-                    for p in db.get_cached_production(full_start, today.strftime("%Y-%m-%d"))}
+                    for p in db.get_cached_production(full_start, end)}
 
     production_days = []
     recent = []
