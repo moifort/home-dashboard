@@ -36,6 +36,8 @@ _solar_state = {"date": None, "wh": 0.0, "last_ts": None, "last_persist": 0.0}
 MAX_SAMPLE_GAP_H = 5 / 60  # cap a sample's time weight at 5 min to avoid overcounting silence
 PERSIST_INTERVAL = 30  # seconds between SQLite writes
 _last_solar_report = ""
+_last_pv_watts = None  # last PV power decoded from a heartbeat (diagnostics)
+_sample_count = 0  # heartbeats integrated since process start (diagnostics)
 
 
 def enabled() -> bool:
@@ -58,10 +60,12 @@ def init_schema():
 
 def _on_solar_power(pv_watts: float):
     """MQTT callback: integrate reported PV power into today's kWh total."""
-    global _last_solar_report
+    global _last_solar_report, _last_pv_watts, _sample_count
     now = datetime.now(PARIS_TZ)
     today = now.strftime("%Y-%m-%d")
     st = _solar_state
+    _last_pv_watts = pv_watts
+    _sample_count += 1
 
     if st["date"] != today:
         if st["date"] is not None:
@@ -160,4 +164,11 @@ def _compute_production_stats(current: list[dict], previous: list[dict]) -> dict
 
 
 def status() -> dict:
-    return {"ecoflow_enabled": ENABLED, "last_solar_report": _last_solar_report}
+    return {
+        "ecoflow_enabled": ENABLED,
+        "last_solar_report": _last_solar_report,
+        "solar_wh_today": round(_solar_state["wh"], 2),
+        "solar_state_date": _solar_state["date"],
+        "solar_last_pv_watts": _last_pv_watts,
+        "solar_samples": _sample_count,
+    }
