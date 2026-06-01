@@ -29,8 +29,7 @@ BAR_GAP = 16
 STATS_FONT_SIZE = 13
 VALUE_FONT_SIZE = 13
 LABEL_FONT_SIZE = 12
-NA_THRESHOLD_KWH = 1.0
-PROD_NA_THRESHOLD_KWH = 0.05
+NA_THRESHOLD_KWH = 1.0  # EDF consumption chart only; the solar chart has no N/A floor
 MAX_DAYS = 9  # reference column count for the stats banner width
 WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto grid
 # Bottom strip under the EDF chart: a 3-column table (name | yesterday | avg+trend),
@@ -500,10 +499,11 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
 
     font_value = fonts["value"]
     font_label = fonts["label"]
-    na_threshold = PROD_NA_THRESHOLD_KWH if mode == "production" else NA_THRESHOLD_KWH
-
+    # The N/A floor applies only to the EDF consumption chart. The solar chart
+    # shows every value, however small (a 0 just draws a zero-height bar) — small
+    # PV yields must never be hidden behind a threshold.
     for d in days:
-        d["_na"] = _bar_total(d, mode) < na_threshold
+        d["_na"] = mode != "production" and _bar_total(d, mode) < NA_THRESHOLD_KWH
 
     valid_days = [d for d in days if not d["_na"]]
     max_kwh = max((_bar_total(d, mode) for d in valid_days), default=1) or 1

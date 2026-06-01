@@ -65,15 +65,19 @@ class EcoflowMqttListener:
         client.tls_set(ca_certs=certifi.where(), cert_reqs=ssl.CERT_REQUIRED)
         client.tls_insecure_set(False)
 
+        get_topic = f"/app/{user_id}/{self._sn}/thing/property/get"
+
+        # PV data arrives on get_reply (the response to our get-quota poll) and on
+        # the device broadcast. We deliberately do NOT subscribe to get_topic even
+        # though we publish the keep-alive there: the broker would echo our own
+        # payload-less request back as a phantom 0 W heartbeat. (decode_pv_power
+        # also guards against it, but not subscribing removes the source entirely.)
         topics = [
             f"/app/device/property/{self._sn}",
-            f"/app/{user_id}/{self._sn}/thing/property/get",
             f"/app/{user_id}/{self._sn}/thing/property/get_reply",
             f"/app/{user_id}/{self._sn}/thing/property/set",
             f"/app/{user_id}/{self._sn}/thing/property/set_reply",
         ]
-
-        get_topic = f"/app/{user_id}/{self._sn}/thing/property/get"
 
         def on_connect(c, userdata, flags, reason_code, properties):
             if reason_code != 0:
