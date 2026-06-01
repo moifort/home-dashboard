@@ -2,6 +2,7 @@
 
 ## 2026-06-01
 
+- **Solar "today" bar fix** — today's solar bar showed **N/A** despite live production. The MQTT listener subscribes to the same topic it publishes its 60s keep-alive request to, so the broker echoed that request back; sharing the heartbeat's `cmd_func/cmd_id` but carrying an empty payload, it decoded to a phantom **0 W** sample that claimed the whole interval since the last real reading at zero watts, collapsing the day's integral to ~0. Payload-less control echoes are now ignored (a genuine night-time 0 W heartbeat still carries a full payload, so it is unaffected).
 - **Water meter consumption** — optional `Eau` chart in the top-center space, between the Solar chart and the Crypto panel: the last **9 days** of water use as daily-litres bars, with a title showing the average **L/day** (and trend), the month-to-date **m³** and its **€** cost. An ESPHome wM-Bus reader publishes the meter's cumulative index (m³) over MQTT; the dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus) — no backfill, history starts at first connection. A day with no reading shows **N/A**, including today until its first frame arrives. Enabled by setting `WATER_MQTT_HOST`.
 - **Solar & water "today" bar** — the Solar and Water charts now end on **today** (rightmost bar labelled `Auj.`) instead of yesterday, so the current day's accumulation is visible. The EDF consumption chart still ends on yesterday (no same-day data).
 
