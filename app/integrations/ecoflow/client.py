@@ -91,6 +91,13 @@ def decode_pv_power(payload: bytes) -> float | None:
     for message in packet.msg:
         if message.cmd_func != HEARTBEAT_CMD_FUNC or message.cmd_id != HEARTBEAT_CMD_ID:
             continue
+        # The broker echoes our own keep-alive get-quota request back to us: it
+        # shares cmd_func/cmd_id with the heartbeat but carries no payload. Parsing
+        # its empty pdata yields an all-zero heartbeat (0 W), which would otherwise
+        # claim the whole ~60s interval since the last real sample at zero watts and
+        # collapse the daily integral. Skip payload-less control messages.
+        if not message.pdata:
+            continue
         hb = powerstream_pb2.PowerStreamInverterHeartbeat()
         try:
             hb.ParseFromString(message.pdata)
