@@ -98,6 +98,14 @@ def render_dashboard(data: dict) -> Image.Image:
                           region_top=(crypto_bottom or 12) - 2,
                           region_bottom=split - DIVIDER_GAP)
 
+    # Water consumption chart in the top-right quadrant (right of the Solar
+    # chart) — its own stats banner + daily-litres bars. Shares this region with
+    # the Crypto panel; water takes priority when present.
+    water_days = data.get("water_days")
+    if water_days:
+        _draw_water_chart(draw, fonts, water_days, data.get("water_stats", {}),
+                          region_top=0, region_bottom=split - DIVIDER_GAP)
+
     if bottom_rows:
         _draw_bottom_table(draw, fonts, bottom_rows, bottom_h)
 
@@ -266,6 +274,63 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
             [(marker_cx, y - half), (marker_cx - half, y + half), (marker_cx + half, y + half)],
             fill=YELLOW,
         )
+
+
+def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_bottom) -> None:
+    """Draw the dedicated water chart in the top-right quadrant (right of the
+    Solar chart): a stats banner ("Eau" + avg L/j, month total m³, cost €) over
+    daily-litres bars (single full-black bars, value in L on top, day label
+    below). Mirrors the EDF/Solar look, anchored to the right column."""
+    font_value = fonts["value"]
+    font_label = fonts["label"]
+
+    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
+    region_left = WIDTH - CHART_LEFT - banner_width
+
+    # Stats banner anchored at the top of the region (same look as chart titles).
+    stats_top = region_top + CHART_TOP
+    separator_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    items = [[("Eau", "bold", BLACK)],
+             [(water_stats.get("avg_text", "N/A"), "bold", BLACK), ("L/j ", "regular", BLACK),
+              _trend(water_stats.get("avg_pct", 0), True)],
+             [(water_stats.get("month_total_text", "N/A"), "bold", BLACK), ("m³", "regular", BLACK)]]
+    cost = water_stats.get("cost_text")
+    if cost:
+        items.append([(cost, "bold", BLACK), ("€", "regular", BLACK)])
+    _draw_stats_bar(draw, fonts, items, region_left, stats_top, banner_width, separator_y)
+
+    # Bars: hug the bottom of the region, day labels below the baseline.
+    label_h = draw.textbbox((0, 0), "lun", font=font_label)[3]
+    value_h = draw.textbbox((0, 0), "0", font=font_value)[3]
+    baseline_y = region_bottom - label_h - 4
+    bar_max_height = max(20, baseline_y - separator_y - value_h - 14)
+
+    valid = [d["liters"] for d in water_days if d.get("liters") is not None]
+    max_l = max(valid, default=1) or 1
+    col_width = BAR_WIDTH + BAR_GAP
+
+    for i, d in enumerate(water_days):
+        cx = region_left + i * col_width
+        label_text = d.get("day", "").lower()
+        lbox = draw.textbbox((0, 0), label_text, font=font_label)
+        draw.text((cx + (BAR_WIDTH - (lbox[2] - lbox[0])) // 2, baseline_y + 4),
+                  label_text, fill=BLACK, font=font_label)
+
+        litres = d.get("liters")
+        if litres is None:
+            draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
+            nbox = draw.textbbox((0, 0), "N/A", font=font_value)
+            draw.text((cx + (BAR_WIDTH - (nbox[2] - nbox[0])) // 2, baseline_y - (nbox[3] - nbox[1]) - 6),
+                      "N/A", fill=BLACK, font=font_value)
+            continue
+
+        bar_h = round((litres / max_l) * bar_max_height)
+        if bar_h > 0:
+            draw.rectangle([cx, baseline_y - bar_h, cx + BAR_WIDTH - 1, baseline_y - 1], fill=BLACK)
+        val_text = f"{litres:.0f}"
+        vbox = draw.textbbox((0, 0), val_text, font=font_value)
+        draw.text((cx + (BAR_WIDTH - (vbox[2] - vbox[0])) // 2, baseline_y - bar_h - (vbox[3] - vbox[1]) - 10),
+                  val_text, fill=BLACK, font=font_value)
 
 
 def _build_bottom_rows(data) -> list:
