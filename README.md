@@ -64,7 +64,7 @@ When an MQTT broker is configured, an `Eau` chart is drawn in the top-center spa
 
 The empty space to the left of the packed columns holds two stacked sections.
 
-- **`Home`** — the screen-refresh schedule on one line: the time this image is shown on the panel (`Écran`) and the next refresh, e.g. `14:00 ► 16:00`. Both follow the ESP32's clock-aligned wake interval; the server regenerates the buffer a few minutes before each wake.
+- **`Home`** — the screen-refresh schedule on one line: the time the image was actually pulled by the panel (`Écran`) and the next refresh, e.g. `14:01 ► 16:00`. The left time is the **real moment of the `GET /display`** (recomputed on every pull); the right time is the next clock-aligned wake boundary. The server regenerates the buffer a few minutes before each wake.
 - **`Alertes`** — an always-on **status board**, one section per monitored domain (`EDF`, `Eau`, `Solaire`, `Réseau`, `Cumulus`, `Crypto`). Each domain is a section title; under it, plain-language notes turn the daily trends into something a human reads at a glance. A **problem** is written entirely in **red** (e.g. *Forte hausse de consommation 15%/j*, *Fuite d'eau probable 240 L*, *Panneaux solaires déconnectés ?*, *Latence réseau élevée 78 ms*), a **positive** note entirely in **black** (e.g. *Forte production solaire 45%*, *Belle baisse de consommation*, *Bot devant le hold +5%*). When computable, each line ends with its **financial impact** — `dépense`/`économie` in €/j (EDF consumption, off-peak shift, standby, cumulus, water), € for solar (production value) or `gain`/`manque` in $ for **Crypto** (the strategy's edge over buy-and-hold, estimated from the **alpha** × the invested amount). A domain with nothing wrong shows *Rien à signaler*. Because vertical space is limited, the domains with the **most alerts** are listed first (then by severity), and the quiet ones last. Detection is purely **trend-based** from the values already computed by each integration — no extra capture; thresholds are hard-coded constants in `app/alerts.py` and reuse `PRICE_HP`/`PRICE_HC`.
 
 ### UniFi network panel (optional, bottom-right)
@@ -227,7 +227,7 @@ To reconfigure later, type `reset` within 3 seconds of boot.
 
 ### Refresh schedule
 
-The ESP32 refreshes the display twice a day at **8:00** and **17:00** (CET/CEST). Time is synced via NTP on each wake cycle.
+The ESP32 wakes on a clock-aligned interval (`REFRESH_INTERVAL_MIN`, default **120 min** → 00:00, 02:00 … 22:00 CET/CEST), refreshes the display, then returns to deep sleep until the next boundary. Time is synced via NTP on each wake cycle. On a failed cycle (Wi-Fi, fetch or PSRAM allocation) it deep-sleeps and retries — quick 5-min retries for a brief outage, then backing off to the full interval to save battery — so it always returns to sleep.
 
 ## Endpoints
 
