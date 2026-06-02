@@ -28,6 +28,7 @@ SSID_MAIN = os.environ.get("UNIFI_SSID_MAIN", "")
 ENABLED = bool(PASSWORD)
 HEALTH_BAD_PCT = 99  # internet/Wi-Fi quality below this reads as degraded (red)
 TREND_DAYS = 7  # the latest completed day is compared to this many prior days
+ROLLING_DAYS = 30  # data-usage window: this many complete days ending yesterday
 _last_unifi_time = ""
 
 # Snapshot columns that carry a ▲▼ trend, paired with the panel key they fill.
@@ -219,9 +220,9 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
            if not c.get("is_wired") and c.get("wifi_experience_score")]
     wifi_exp_text = f"{round(sum(exp) / len(exp))}/100" if exp else "—"
 
-    # --- Data usage: yesterday + current-month total, both from the daily report
+    # --- Data usage: yesterday + rolling 30-day total, both from the daily report
     # (the aggregated dashboard only covers a 24h window, no monthly counter).
-    yesterday_bytes, month_bytes = _usage_from_daily(raw.get("daily"))
+    yesterday_bytes, rolling_bytes = _usage_from_daily(raw.get("daily"))
     if yesterday_bytes is None:  # report unavailable -> 24h WAN total from the dashboard
         summary = _dig(dash, "wan_activity", "activity_by_network_group", "WAN", "summary",
                        default={})
@@ -234,9 +235,9 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
         "wifi_exp_text": wifi_exp_text,
         # Detail rows: numeric strings only — the renderer appends the unit.
         "latency_val": str(latency_ms), "latency_trend": None,
-        "usage_hier": _gb(yesterday_bytes), "usage_mois": _gb(month_bytes), "usage_trend": None,
-        "iot": _network(clients, ssids["iot"], "IoT"),
-        "main": _network(clients, ssids["main"], "Perso"),
+        "usage_hier": _gb(yesterday_bytes), "usage_mois": _gb(rolling_bytes), "usage_trend": None,
+        "iot": _network(clients, ssids["iot"], ssids["iot"] or "IoT"),
+        "main": _network(clients, ssids["main"], ssids["main"] or "Perso"),
         # Raw values snapshotted by attach() to compute the 7-day trends.
         "_snap": {
             "usage_bytes": yesterday_bytes,
@@ -246,18 +247,20 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
 
 
 def _usage_from_daily(daily) -> tuple[int | None, int]:
-    """(yesterday, current-month total) WAN tx+rx bytes from the daily.gw report.
+    """(yesterday, rolling 30-day total) WAN tx+rx bytes from the daily.gw report.
 
     yesterday is None when the report is unavailable (caller falls back); the
-    month total is the running sum of every day in the current month (today
-    included, partial)."""
+    rolling total sums the ROLLING_DAYS complete days ending yesterday (today
+    excluded), so the figure is always a full window and comparable day-to-day —
+    unlike a calendar month that collapses to near-zero on the 1st."""
     rows = (daily or {}).get("data") if isinstance(daily, dict) else None
     if not rows:
         return None, 0
     today = datetime.now(PARIS_TZ).date()
     yesterday = today - timedelta(days=1)
+    window_start = today - timedelta(days=ROLLING_DAYS)  # 30 complete days back
     y_bytes: int | None = None
-    month_total = 0
+    rolling_total = 0
     for row in rows:
         ts = row.get("time")
         if ts is None:
@@ -266,9 +269,9 @@ def _usage_from_daily(daily) -> tuple[int | None, int]:
         day_bytes = int((row.get("wan-tx_bytes", 0) or 0) + (row.get("wan-rx_bytes", 0) or 0))
         if day == yesterday:
             y_bytes = day_bytes
-        if (day.year, day.month) == (today.year, today.month):
-            month_total += day_bytes
-    return y_bytes, month_total
+        if window_start <= day <= yesterday:
+            rolling_total += day_bytes
+    return y_bytes, rolling_total
 
 
 def status() -> dict:
