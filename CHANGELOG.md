@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-02
+
+- **Réseau : top-4 clients + repère « aujourd'hui »** — la mini-table des clients du panneau `Réseau` passe du top-3 au **top-4** par trafic, et l'en-tête de chaque réseau porte un repère **« · aujourd'hui »** (ex. `Perso · aujourd'hui … 4 clients`) précisant que le trafic affiché est le rx+tx de la session en cours de chaque client. Le réseau principal (Perso) est rendu en premier ; si la hauteur d'écran manque, la dernière ligne du réseau IoT (plus petits trafics) est rognée par la dégradation existante.
+- **Colonnes packées à droite** — les colonnes Solaire/EDF et Eau sont décalées vers la droite pour se coller (8 px d'écart) à la colonne Crypto/Réseau ancrée à droite, de sorte que l'espace vide se retrouve tout à gauche de l'écran au lieu d'être coincé entre Eau et Crypto.
+
 ## 2026-06-01
 
 - **Solar "today" bar fix (real root cause)** — today's solar bar was stuck at `0` even though production was accumulating correctly in the database. The read-back query used an **exclusive** upper bound set to *today*, so `WHERE date < today` dropped today's own row and fell back to 0. The bound is now *tomorrow*, matching the water slice. (The earlier keep-alive/echo and threshold changes were genuine improvements but not the cause of this symptom — the `today` bar had never worked since it was introduced.)
