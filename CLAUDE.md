@@ -1,11 +1,31 @@
 # Dashboard e-Paper — Development Guide
 
 ## Architecture
-- **`app/` package**: Python Docker server (CasaOS, port 5000, run with `python -m app`) that fetches Linky data, renders the dashboard bitmap with **Pillow** (`app/rendering/renderer.py` → `ImageDraw`, no browser), converts it to the 4-color EPD buffer (`app/rendering/converter.py`), and serves it at `/display` for the ESP32 to pull
 
-### Project structure (vertical slices)
+The repo is split in two top-level sides; the root itself stays minimal (README,
+CHANGELOG, CLAUDE.md + hidden config):
+
 ```
-app/
+hardware/                # everything physical
+  esp32-display/         # Arduino firmware (sketch name == folder name)
+  case/Dashboard.3mf     # 3D-printed enclosure
+  device.jpg             # device photo (README)
+server/                  # the server side — the Python import ROOT
+  requirements.txt  requirements-dev.txt
+  infra/                 # Dockerfile + docker-compose*.yml + .env.example
+  tests/                 # golden-master net (run pytest from server/)
+  scripts/               # gen_preview.py (+ committed preview.png)
+  app/                   # the Python package (run `python -m app` from server/)
+```
+
+**Run everything from `server/`** (`cd server` → `python -m app`, `pytest`): `app`
+and `tests` are top-level packages whose import root is `server/`.
+
+- **`app/` package** (`server/app/`): Python Docker server (CasaOS, port 5000, run with `python -m app`) that fetches Linky data, renders the dashboard bitmap with **Pillow** (`app/rendering/renderer.py` → `ImageDraw`, no browser), converts it to the 4-color EPD buffer (`app/rendering/converter.py`), and serves it at `/display` for the ESP32 to pull
+
+### app/ package structure (vertical slices)
+```
+server/app/
   __main__.py          # python -m app
   config.py            # global settings (paths, version, TZ, DB_PATH, PORT…)
   db.py                # SQLite primitive: connect() + daily-table accessors
@@ -23,29 +43,30 @@ Each integration's `__init__.py` exposes the uniform slice API — `enabled()`,
 `init_schema()`, `start()`, `attach(data)`, `status()` — and owns its env config,
 DB table, power integrator and render panel. Tech-specific transport lives in a
 subfolder (`mqtt/`, `proto/`, `graphql/`, `api/`). Removing an integration is
-`rm -rf app/integrations/<name>/` + removing its entry from `OPTIONAL`.
+`rm -rf server/app/integrations/<name>/` + removing its entry from `OPTIONAL`.
 
 ## Tests / Anti-régression (golden master) — LIRE AVANT TOUT REFACTO
 
-Un filet golden-master (`tests/`) protège le pipeline contre les régressions. **À
-prendre en compte dans tout plan de refacto** : il fige une entrée connue et
-compare la sortie au bit près à une référence commitée.
+Un filet golden-master (`server/tests/`) protège le pipeline contre les régressions.
+**Lancer pytest depuis `server/`.** **À prendre en compte dans tout plan de
+refacto** : il fige une entrée connue et compare la sortie au bit près à une
+référence commitée.
 
-- **Couche 1** `tests/test_data_pipeline.py` : DB seedée + temps figé →
-  `build_dashboard_data()` → `tests/fixtures/data.golden.json`. Couvre
+- **Couche 1** `server/tests/test_data_pipeline.py` : DB seedée + temps figé →
+  `build_dashboard_data()` → `server/tests/fixtures/data.golden.json`. Couvre
   l'orchestrateur, les slices adossées DB (linky core, solar, cumulus, water) et
   les alertes. **Portable** (byte-exact macOS/Linux, aucun rendu police).
-- **Couche 2** `tests/test_render_golden.py` : dict figé complet →
-  `render_dashboard()` → `png_to_epd_buffer()` → `tests/fixtures/display.golden.bin`
+- **Couche 2** `server/tests/test_render_golden.py` : dict figé complet →
+  `render_dashboard()` → `png_to_epd_buffer()` → `server/tests/fixtures/display.golden.bin`
   (163 200 o). Sensible à FreeType/Pillow (**`Pillow` épinglé**) ; tolérance
   `GOLDEN_TOLERANCE` (défaut 0) ; PNG actual/golden/diff écrits dans `/tmp` si écart.
 
-Workflow :
+Workflow (depuis `server/`) :
 - **Avant/pendant un refacto** : `pytest -q` doit rester **vert** (rien n'a changé
   visiblement). `pip install -r requirements-dev.txt` si pytest absent.
 - **Changement volontaire** de layout/données : `pytest --update-golden`, inspecter
   le diff (`/tmp/render_diff.png`), recommiter les goldens **dans le même commit**.
-- Détails : DB déterministe et `FIXED_NOW=2026-06-02` dans `tests/fixtures/seed_db.py`.
+- Détails : DB déterministe et `FIXED_NOW=2026-06-02` dans `server/tests/fixtures/seed_db.py`.
 - **Garde-fou par plateforme** : la couche 1 (données, sans rendu police) est
   **byte-exact partout** → garde-fou strict en local **et** en CI. La couche 2
   (rendu) dépend de **FreeType**, qui diffère macOS↔Linux d'environ **5%** du buffer
@@ -63,7 +84,7 @@ Workflow :
 - **Resolution**: 1360×480, 2 bits/pixel, buffer = 163,200 bytes
 - **ESP32 IP**: variable (scan with `arp -a | grep esp32`)
 
-## ESP32 Firmware (esp32-display/)
+## ESP32 Firmware (hardware/esp32-display/)
 
 ### Hardware
 - **Board**: Seeed XIAO ESP32S3
@@ -95,10 +116,10 @@ arduino-cli core install esp32:esp32
 
 ```bash
 # Compile (PSRAM=opi is mandatory — ps_malloc fails without it)
-arduino-cli compile --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" esp32-display/
+arduino-cli compile --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" hardware/esp32-display/
 
 # Flash (port may vary — check with: ls /dev/cu.usb*)
-arduino-cli upload --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" --port /dev/cu.usbmodem101 esp32-display/
+arduino-cli upload --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" --port /dev/cu.usbmodem101 hardware/esp32-display/
 
 # Serial monitor
 arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
@@ -136,7 +157,7 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 ### Workflow
 - After every template change, **analyze the rendered PNG** before sending to ESP32
 - Check: alignment with separator line, text sharpness, digit spacing
-- **After any UI change, regenerate `docs/preview.png` and open it in the macOS Preview app** (`open -a Preview docs/preview.png`) so the user can review the result
+- **After any UI change, regenerate `server/scripts/preview.png` and open it in the macOS Preview app** (`open -a Preview server/scripts/preview.png`) so the user can review the result
 
 ## Git Workflow
 
@@ -150,15 +171,15 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 Before pushing, verify and update as needed:
 - **CHANGELOG.md** — an entry exists for every user-facing change in the push.
 - **README.md** — features, readings, endpoints and the **Optional** env setup blocks are complete and accurate (every new integration documented).
-- **`docker-compose.yml` + `docker-compose.casaos.yml`** — every new env var is declared (empty default = disabled), ports/volumes correct, image/labels valid.
-- **`.env.example`** — every new env var present with a helpful comment.
-- **`docs/preview.png`** — regenerated when the rendered layout changed.
+- **`server/infra/docker-compose.yml` + `server/infra/docker-compose.casaos.yml`** — every new env var is declared (empty default = disabled), ports/volumes correct, image/labels valid.
+- **`server/infra/.env.example`** — every new env var present with a helpful comment.
+- **`server/scripts/preview.png`** — regenerated when the rendered layout changed.
 - **Environment variables** — if the push adds/renames env vars, tell the user which ones to add or fill on their CasaOS deployment.
 
 
 ## Integration dev notes
 
-Each integration is a vertical slice in `app/integrations/<name>/` (see structure
+Each integration is a vertical slice in `server/app/integrations/<name>/` (see structure
 above). **Feature behaviour, what each panel shows and env setup live in the
 README** — below are only the non-obvious implementation gotchas per slice.
 

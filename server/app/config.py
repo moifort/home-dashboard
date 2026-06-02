@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-# Repo root: app/config.py -> app/ -> repo root.
+# Server root (the Python import root): server/app/config.py -> server/app -> server.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 PARIS_TZ = ZoneInfo("Europe/Paris")

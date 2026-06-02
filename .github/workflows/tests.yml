@@ -15,6 +15,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install -r requirements-dev.txt
+        working-directory: server
       # Layer 1 (data pipeline → JSON) is byte-exact on every platform, so it runs
       # strict. Layer 2 (render → EPD buffer) depends on FreeType, which differs
       # macOS↔Linux by ~5% of the buffer for an identical layout — so the golden
@@ -23,5 +24,6 @@ jobs:
       # and only gross breakage (a crash, wrong size, a whole panel gone) fails it.
       # The precise render gate is the local `pytest` (tolerance 0) on the Mac.
       - run: pytest -q
+        working-directory: server
         env:
           GOLDEN_TOLERANCE: "0.10"

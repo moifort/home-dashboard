@@ -1,6 +1,6 @@
-"""Render docs/preview.png from local DB data + live crypto, for UI review.
+"""Render server/scripts/preview.png from local DB data + live crypto, for UI review.
 
-Usage: python3 scripts/gen_preview.py
+Usage (from the server/ directory): python3 scripts/gen_preview.py
 Needs the local data DB (Linky/solar/cumulus history). Crypto is pulled live
 when CRYPTO_API_URL/TOKEN are set in the environment (or defaulted below).
 """
@@ -153,6 +153,6 @@ print("days:", len(data.get("days", [])),
       "| grid:", bool(data.get("crypto_grid")),
       "| cumulus:", bool(data.get("cumulus")))
 
-out = ROOT / "docs" / "preview.png"
+out = ROOT / "scripts" / "preview.png"
 render_dashboard(data).save(str(out))
 print("saved", out)
