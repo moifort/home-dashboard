@@ -94,6 +94,59 @@ if "water_days" not in data:
         "month_total_text": "4.18", "cost_text": "16.30",
     }
 
+# The crypto bot needs live API credentials (CRYPTO_API_URL/TOKEN) we don't
+# have here; inject a representative banner + grid snapshot so the preview shows
+# the top-right Crypto panel and its grid chart.
+if "crypto" not in data:
+    data["crypto"] = {
+        "pct_text": "+12", "profit_positive": True,
+        "profit_text": "+$1 234", "portfolio_text": "$11 234",
+        "alpha_text": "+5", "alpha_positive": True, "sandbox": False,
+    }
+if "crypto_grid" not in data:
+    _grid_prices = [98000, 99500, 101000, 100200, 99800, 100800,
+                    102000, 101200, 100500, 101800, 102500, 101500]
+    data["crypto_grid"] = {
+        "lower": 96000.0, "upper": 104000.0, "levels": 8,
+        "current_price": 101500.0, "current_price_text": "$101 500",
+        "points": [(i, float(p)) for i, p in enumerate(_grid_prices)],
+        "skips": [{"price": 97000.0, "side": "buy", "kind": "insufficient_funds"}],
+    }
+
+# Preview only: force a representative set of triggering values so the
+# top-left "Alertes" panel renders populated, then recompute the alerts (the
+# build above ran before the unifi/water injections below). Set ALERTS_DEMO
+# to False to preview the empty "Tout va bien" state instead.
+from app.alerts import build_board  # noqa: E402
+
+ALERTS_DEMO = True
+if ALERTS_DEMO:
+    # A believable mix of problems (red) and positive notes (black): EDF + Eau
+    # alert, Solaire + Cumulus show good trends, Réseau stays "ok".
+    data.setdefault("stats", {})
+    data["stats"]["avg_kwh_pct"] = 15      # EDF bad: Conso ▲15%/j
+    data["stats"]["hc_ratio_pct"] = -14    # EDF bad: Heures creuses ▼14% (2nd EDF item)
+    # Eau bad: leak — lower the average and spike the last finished (non-today) day.
+    data["water_stats"]["avg_text"] = "120"
+    for d in reversed(data["water_days"]):
+        if not d.get("today") and d.get("liters"):
+            d["liters"] = 360              # -> Eau: Fuite ▲240L
+            break
+    # Solaire good (black): strong production rise — clear the real 0-kWh outage.
+    data.setdefault("production_stats", {})
+    data["production_stats"]["avg_kwh_pct"] = 45   # -> Solaire: Production ▲45%
+    data["production_stats"]["savings_eur"] = 8.4  # -> économie 8,40 €
+    for d in reversed(data.get("production_days", [])):
+        if not d.get("today"):
+            d["pv_kwh"] = 1.5
+            break
+    # Cumulus good (black): strong drop.
+    data["cumulus"]["trend_pct"] = -28             # -> Cumulus: Conso ▼28%
+data["alert_board"] = build_board(data)
+print("board:", [(r["label"], [f"{m} {f} {mo}".strip() for m, f, mo, _ in r["items"]]
+                              if r.get("alert") else "RAS")
+                 for r in data["alert_board"]])
+
 print("days:", len(data.get("days", [])),
       "| solar:", len(data.get("production_days", [])),
       "| crypto:", bool(data.get("crypto")),
