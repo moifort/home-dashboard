@@ -25,6 +25,32 @@ DB table, power integrator and render panel. Tech-specific transport lives in a
 subfolder (`mqtt/`, `proto/`, `graphql/`, `api/`). Removing an integration is
 `rm -rf app/integrations/<name>/` + removing its entry from `OPTIONAL`.
 
+## Tests / Anti-régression (golden master) — LIRE AVANT TOUT REFACTO
+
+Un filet golden-master (`tests/`) protège le pipeline contre les régressions. **À
+prendre en compte dans tout plan de refacto** : il fige une entrée connue et
+compare la sortie au bit près à une référence commitée.
+
+- **Couche 1** `tests/test_data_pipeline.py` : DB seedée + temps figé →
+  `build_dashboard_data()` → `tests/fixtures/data.golden.json`. Couvre
+  l'orchestrateur, les slices adossées DB (linky core, solar, cumulus, water) et
+  les alertes. **Portable** (byte-exact macOS/Linux, aucun rendu police).
+- **Couche 2** `tests/test_render_golden.py` : dict figé complet →
+  `render_dashboard()` → `png_to_epd_buffer()` → `tests/fixtures/display.golden.bin`
+  (163 200 o). Sensible à FreeType/Pillow (**`Pillow` épinglé**) ; tolérance
+  `GOLDEN_TOLERANCE` (défaut 0) ; PNG actual/golden/diff écrits dans `/tmp` si écart.
+
+Workflow :
+- **Avant/pendant un refacto** : `pytest -q` doit rester **vert** (rien n'a changé
+  visiblement). `pip install -r requirements-dev.txt` si pytest absent.
+- **Changement volontaire** de layout/données : `pytest --update-golden`, inspecter
+  le diff (`/tmp/render_diff.png`), recommiter les goldens **dans le même commit**.
+- Détails : DB déterministe et `FIXED_NOW=2026-06-02` dans `tests/fixtures/seed_db.py`.
+- **CI** `.github/workflows/tests.yml` : pytest sur push + PR. Si la couche 2 échoue
+  en CI seulement (écart FreeType macOS↔Linux), lancer le job manuel
+  `regenerate-golden` (onglet Actions), récupérer l'artefact et commiter le golden
+  Linux comme baseline.
+
 ## e-Paper Display
 
 - **Model**: Waveshare 10.85" **(G) 4-color** (black, white, yellow, red)
