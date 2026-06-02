@@ -40,6 +40,12 @@ BOTTOM_TOP_GAP = 8  # gap between the chart's day labels and the top separator
 BOTTOM_TEXT_GAP = 6  # first row below the separator
 SOLAR_HEIGHT = HEIGHT // 2 - 24  # top (solar) chart height; EDF gets the rest (a bit taller)
 
+COL_GAP = 8  # écart horizontal entre les colonnes packées (Solaire/EDF, Eau, Crypto)
+# Les trois colonnes (largeur de référence MAX_DAYS) sont collées au bord droit,
+# l'espace libre est donc reporté tout à gauche au lieu d'être coincé entre Eau et Crypto.
+PANEL_LEFT = WIDTH - CHART_LEFT - 3 * (MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP) - 2 * COL_GAP
+# = 1360 - 2 - 3*380 - 16 = 202
+
 
 def _bottom_table_height(n_rows: int) -> int:
     """Height of the bottom strip reserved for an n-row table (0 if empty)."""
@@ -287,7 +293,7 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
     banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     # Butt up against the Solar chart (which hugs the left edge for banner_width)
     # with a small gap, leaving the right column free for the Crypto panel.
-    region_left = CHART_LEFT + banner_width + 8
+    region_left = PANEL_LEFT + banner_width + COL_GAP
 
     # Stats banner anchored at the top of the region (same look as chart titles).
     stats_top = region_top + CHART_TOP
@@ -366,7 +372,7 @@ def _draw_bottom_table(draw, fonts, rows, bottom_h) -> None:
     separator line sits above the rows, dividing them from the chart's day labels
     (no surrounding box)."""
     width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
-    x = CHART_LEFT
+    x = PANEL_LEFT
     line_y = HEIGHT - bottom_h + BOTTOM_TOP_GAP
     y0 = line_y + BOTTOM_TEXT_GAP
     col_w = width // 3
@@ -529,7 +535,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
 
     # --- Bars ---
     for i, d in enumerate(days):
-        cx = CHART_LEFT + i * col_width
+        cx = PANEL_LEFT + i * col_width
         label_text = "Auj." if d.get("today") else d.get("day", "").lower()
 
         lbox = draw.textbbox((0, 0), label_text, font=font_label)
@@ -575,7 +581,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
     if stats:
         items = _build_production_items(stats) if mode == "production" else _build_consumption_items(stats)
         if items:
-            _draw_stats_bar(draw, fonts, items, CHART_LEFT, stats_top, banner_width, separator_y)
+            _draw_stats_bar(draw, fonts, items, PANEL_LEFT, stats_top, banner_width, separator_y)
 
 
 # Segment = (text, font_key, color). font_key is "bold" (values) or "regular"
