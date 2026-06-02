@@ -1,5 +1,5 @@
 requests>=2.31
-Pillow>=10.0
+Pillow==12.2.0  # pinned: the golden render buffer is sensitive to FreeType/Pillow
 numpy>=1.24
 paho-mqtt>=2.0
 protobuf>=6.31.1,<7
