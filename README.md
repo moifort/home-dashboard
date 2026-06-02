@@ -4,7 +4,7 @@
   <img src="docs/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, a **water meter daily consumption** chart (`Eau`, top-center), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right.
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, a **water meter daily consumption** chart (`Eau`, top-center), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right. The empty top-left gutter holds a **`Home`** panel (last/next refresh) and an **`Alertes`** status board that turns the daily trends into plain-language notes per domain, with their financial impact.
 
 Rendered output:
 
@@ -59,6 +59,13 @@ When a Zigbee2MQTT broker is configured, a `Cumulus` row is added at the top of 
 ### Water consumption (optional, top-center)
 
 When an MQTT broker is configured, an `Eau` chart is drawn in the top-center space, between the Solar chart and the Crypto panel. It shows the last **9 days** of water use as daily-litres bars (the rightmost bar, labelled `Auj.`, is **today** and grows as the day accumulates), with a title showing the average **L/day** (and its trend), the month-to-date volume in **m³** and its **€** cost. An ESPHome wM-Bus reader publishes the meter's **cumulative index (m³)** to the broker; the dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus), so history starts at the first connection (no backfill). A day with no reading shows **N/A** — including today until its first frame arrives. See the setup section below.
+
+### Home & Alertes (top-left gutter)
+
+The empty space to the left of the packed columns holds two stacked sections.
+
+- **`Home`** — the day + time of the **last refresh** and the time of the **next** one.
+- **`Alertes`** — an always-on **status board**, one section per monitored domain (`EDF`, `Eau`, `Solaire`, `Réseau`, `Cumulus`, `Crypto`). Each domain is a section title; under it, plain-language notes turn the daily trends into something a human reads at a glance. A **problem** is written entirely in **red** (e.g. *Forte hausse de consommation 15%/j*, *Fuite d'eau probable 240 L*, *Panneaux solaires déconnectés ?*, *Latence réseau élevée 78 ms*), a **positive** note entirely in **black** (e.g. *Forte production solaire 45%*, *Belle baisse de consommation*, *Bot devant le hold +5%*). When computable, each line ends with its **financial impact** — `dépense`/`économie` in €/j (EDF consumption, off-peak shift, standby, cumulus, water), € for solar (production value) or `gain`/`manque` in $ for **Crypto** (the strategy's edge over buy-and-hold, estimated from the **alpha** × the invested amount). A domain with nothing wrong shows *Rien à signaler*. Because vertical space is limited, the domains with the **most alerts** are listed first (then by severity), and the quiet ones last. Detection is purely **trend-based** from the values already computed by each integration — no extra capture; thresholds are hard-coded constants in `app/alerts.py` and reuse `PRICE_HP`/`PRICE_HC`.
 
 ### UniFi network panel (optional, bottom-right)
 
