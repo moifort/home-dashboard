@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:  # manual trigger for the regenerate-golden job
+
+jobs:
+  # Golden-master regression net. Layer 1 (data pipeline → JSON) is byte-exact on
+  # every platform. Layer 2 (render → EPD buffer) depends on FreeType; it runs
+  # strict (GOLDEN_TOLERANCE defaults to 0). If this job's render test fails on a
+  # fresh checkout purely from a macOS↔Linux FreeType difference, run the
+  # `regenerate-golden` job once (Actions tab → Run workflow), download the
+  # artifact and commit it — the committed golden then becomes the Linux baseline.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  # Manual: rebuild the committed goldens in the Linux environment and upload them
+  # so they can be committed as the canonical baseline. Never runs automatically.
+  regenerate-golden:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q --update-golden
+      - uses: actions/upload-artifact@v4
+        with:
+          name: golden-fixtures
+          path: tests/fixtures/

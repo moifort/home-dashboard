@@ -1,0 +1,414 @@
+{
+  "alert_board": [
+    {
+      "alert": true,
+      "items": [
+        [
+          "Forte hausse de consommation",
+          "15%/j",
+          "dépense 0,31€/j",
+          false
+        ],
+        [
+          "Heures creuses en forte baisse",
+          "14%",
+          "dépense 0,06€/j",
+          false
+        ]
+      ],
+      "label": "EDF",
+      "n_bad": 2,
+      "severity": 50
+    },
+    {
+      "alert": true,
+      "items": [
+        [
+          "Fuite d'eau probable",
+          "240 L",
+          "dépense 0,95€",
+          false
+        ]
+      ],
+      "label": "Eau",
+      "n_bad": 1,
+      "severity": 90
+    },
+    {
+      "alert": true,
+      "items": [
+        [
+          "Forte production solaire",
+          "45%",
+          "économie 8,40€",
+          true
+        ]
+      ],
+      "label": "Solaire",
+      "n_bad": 0,
+      "severity": 9
+    },
+    {
+      "alert": true,
+      "items": [
+        [
+          "Baisse de consommation du cumulus",
+          "28%",
+          "économie 0,11€/j",
+          true
+        ]
+      ],
+      "label": "Cumulus",
+      "n_bad": 0,
+      "severity": 4
+    },
+    {
+      "alert": true,
+      "items": [
+        [
+          "Bot devant le hold",
+          "+5%",
+          "gain 500$",
+          true
+        ]
+      ],
+      "label": "Crypto",
+      "n_bad": 0,
+      "severity": 3
+    },
+    {
+      "alert": false,
+      "label": "Réseau",
+      "n_bad": 0,
+      "severity": -1
+    }
+  ],
+  "crypto": {
+    "alpha_positive": true,
+    "alpha_text": "+5",
+    "pct_text": "+12",
+    "portfolio_text": "$11 234",
+    "profit_positive": true,
+    "profit_text": "+$1 234",
+    "sandbox": false
+  },
+  "crypto_grid": {
+    "current_price": 101500.0,
+    "current_price_text": "$101 500",
+    "levels": 8,
+    "lower": 96000.0,
+    "points": [
+      [
+        0,
+        98000.0
+      ],
+      [
+        1,
+        99500.0
+      ],
+      [
+        2,
+        101000.0
+      ],
+      [
+        3,
+        100200.0
+      ],
+      [
+        4,
+        99800.0
+      ],
+      [
+        5,
+        100800.0
+      ],
+      [
+        6,
+        102000.0
+      ],
+      [
+        7,
+        101200.0
+      ],
+      [
+        8,
+        100500.0
+      ],
+      [
+        9,
+        101800.0
+      ],
+      [
+        10,
+        102500.0
+      ],
+      [
+        11,
+        101500.0
+      ]
+    ],
+    "skips": [
+      {
+        "kind": "insufficient_funds",
+        "price": 97000.0,
+        "side": "buy"
+      }
+    ],
+    "upper": 104000.0
+  },
+  "cumulus": {
+    "avg_text": "2.5",
+    "trend_pct": -28,
+    "yesterday_text": "3.2"
+  },
+  "days": [
+    {
+      "date": "2026-05-24",
+      "day": "Dim",
+      "hc_kwh": 3.05,
+      "hp_kwh": 4.2
+    },
+    {
+      "date": "2026-05-25",
+      "day": "Lun",
+      "hc_kwh": 3.15,
+      "hp_kwh": 4.0
+    },
+    {
+      "date": "2026-05-26",
+      "day": "Mar",
+      "hc_kwh": 3.75,
+      "hp_kwh": 4.7
+    },
+    {
+      "date": "2026-05-27",
+      "day": "Mer",
+      "hc_kwh": 3.85,
+      "hp_kwh": 5.4
+    },
+    {
+      "date": "2026-05-28",
+      "day": "Jeu",
+      "hc_kwh": 4.45,
+      "hp_kwh": 5.2
+    },
+    {
+      "date": "2026-05-29",
+      "day": "Ven",
+      "hc_kwh": 2.8,
+      "hp_kwh": 5.9
+    },
+    {
+      "date": "2026-05-30",
+      "day": "Sam",
+      "hc_kwh": 3.4,
+      "hp_kwh": 6.6
+    },
+    {
+      "date": "2026-05-31",
+      "day": "Dim",
+      "hc_kwh": 3.5,
+      "hp_kwh": 3.6
+    },
+    {
+      "date": "2026-06-01",
+      "day": "Lun",
+      "hc_kwh": 4.1,
+      "hp_kwh": 4.3
+    }
+  ],
+  "home": {
+    "last_text": "mar 14:30",
+    "next_text": "15:30"
+  },
+  "last_updated": "2026-06-02T14:30:45+02:00",
+  "production_days": [
+    {
+      "date": "2026-05-25",
+      "day": "Lun",
+      "pv_kwh": 0.0,
+      "today": false
+    },
+    {
+      "date": "2026-05-26",
+      "day": "Mar",
+      "pv_kwh": 5.2,
+      "today": false
+    },
+    {
+      "date": "2026-05-27",
+      "day": "Mer",
+      "pv_kwh": 9.8,
+      "today": false
+    },
+    {
+      "date": "2026-05-28",
+      "day": "Jeu",
+      "pv_kwh": 14.2,
+      "today": false
+    },
+    {
+      "date": "2026-05-29",
+      "day": "Ven",
+      "pv_kwh": 11.8,
+      "today": false
+    },
+    {
+      "date": "2026-05-30",
+      "day": "Sam",
+      "pv_kwh": 7.4,
+      "today": false
+    },
+    {
+      "date": "2026-05-31",
+      "day": "Dim",
+      "pv_kwh": 13.1,
+      "today": false
+    },
+    {
+      "date": "2026-06-01",
+      "day": "Lun",
+      "pv_kwh": 1.5,
+      "today": false
+    },
+    {
+      "date": "2026-06-02",
+      "day": "Mar",
+      "pv_kwh": 3.1,
+      "today": true
+    }
+  ],
+  "production_stats": {
+    "avg_kwh": 8.4,
+    "avg_kwh_pct": 45,
+    "savings_eur": 8.4,
+    "talon_cover_pct": 111,
+    "total_kwh": 67.2
+  },
+  "stats": {
+    "avg_kwh": 8.4,
+    "avg_kwh_pct": 15,
+    "avg_price": 2.08,
+    "avg_price_pct": -2.9,
+    "hc_ratio": 42.2,
+    "hc_ratio_pct": -14
+  },
+  "talon": {
+    "avg_text": "316",
+    "avg_w": 316,
+    "trend_pct": -0.5,
+    "yesterday_text": "303"
+  },
+  "unifi": {
+    "iot": {
+      "count": 13,
+      "label": "Iotchoum",
+      "top": [
+        [
+          "Salon 8d:f7",
+          "0,5"
+        ],
+        [
+          "Cuisine 8a:8b",
+          "0,5"
+        ],
+        [
+          "Chambre Minipc…",
+          "0,4"
+        ],
+        [
+          "Bureau 7c:2a",
+          "0,3"
+        ]
+      ]
+    },
+    "isp_bad": false,
+    "isp_name": "Free",
+    "isp_pct": 100,
+    "isp_trend": null,
+    "latency_trend": 12.0,
+    "latency_val": "2",
+    "main": {
+      "count": 4,
+      "label": "Atchoum",
+      "top": [
+        [
+          "MacBookPro Tibo",
+          "15,5"
+        ],
+        [
+          "MacBookPro Lam…",
+          "3,4"
+        ],
+        [
+          "iPhone Tibo",
+          "0,8"
+        ],
+        [
+          "iPad Lamia",
+          "0,6"
+        ]
+      ]
+    },
+    "usage_hier": "18,0",
+    "usage_mois": "117,5",
+    "usage_trend": 8.0,
+    "wifi_bad": false,
+    "wifi_exp_text": "99/100",
+    "wifi_pct": 99,
+    "wifi_trend": null
+  },
+  "water_days": [
+    {
+      "day": "Lun",
+      "liters": 118.00000000005184,
+      "today": false
+    },
+    {
+      "day": "Mar",
+      "liters": 154.99999999997272,
+      "today": false
+    },
+    {
+      "day": "Mer",
+      "liters": 179.99999999994998,
+      "today": false
+    },
+    {
+      "day": "Jeu",
+      "liters": 101.99999999997544,
+      "today": false
+    },
+    {
+      "day": "Ven",
+      "liters": 120.00000000000455,
+      "today": false
+    },
+    {
+      "day": "Sam",
+      "liters": 142.00000000005275,
+      "today": false
+    },
+    {
+      "day": "Dim",
+      "liters": 168.00000000000637,
+      "today": false
+    },
+    {
+      "day": "Lun",
+      "liters": 360,
+      "today": false
+    },
+    {
+      "day": "Mar",
+      "liters": 209.9999999999227,
+      "today": true
+    }
+  ],
+  "water_stats": {
+    "avg_pct": -0.9,
+    "avg_text": "120",
+    "cost_text": "1.19",
+    "month_total_text": "0.30"
+  }
+}
