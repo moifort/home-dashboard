@@ -46,10 +46,15 @@ Workflow :
 - **Changement volontaire** de layout/données : `pytest --update-golden`, inspecter
   le diff (`/tmp/render_diff.png`), recommiter les goldens **dans le même commit**.
 - Détails : DB déterministe et `FIXED_NOW=2026-06-02` dans `tests/fixtures/seed_db.py`.
-- **CI** `.github/workflows/tests.yml` : pytest sur push + PR. Si la couche 2 échoue
-  en CI seulement (écart FreeType macOS↔Linux), lancer le job manuel
-  `regenerate-golden` (onglet Actions), récupérer l'artefact et commiter le golden
-  Linux comme baseline.
+- **Garde-fou par plateforme** : la couche 1 (données, sans rendu police) est
+  **byte-exact partout** → garde-fou strict en local **et** en CI. La couche 2
+  (rendu) dépend de **FreeType**, qui diffère macOS↔Linux d'environ **5%** du buffer
+  pour un layout identique → le golden (généré sur le Mac) ne peut pas être
+  byte-exact en CI. Donc : **strict en local Mac** (tolérance 0, c'est là que tu
+  juges le rendu), **smoke test en CI** (`GOLDEN_TOLERANCE=0.10` dans
+  `.github/workflows/tests.yml`, n'attrape que les cassures grossières). Le golden
+  rendu commité est **celui du Mac** — régénère-le en local (`--update-golden`), pas
+  en CI.
 
 ## e-Paper Display
 
