@@ -253,10 +253,14 @@ pytest -q --update-golden # re-baseline after an intentional layout/data change
 ```
 
 On a render mismatch the actual/golden/diff PNGs are written to `/tmp`. CI runs
-the suite on every push and pull request (`.github/workflows/tests.yml`). The
-render golden is sensitive to the FreeType/Pillow build, so `Pillow` is pinned;
-`GOLDEN_TOLERANCE` (fraction of differing bytes, default `0`) relaxes the render
-compare if needed.
+the suite on every push and pull request (`.github/workflows/tests.yml`).
+
+The render golden is sensitive to the FreeType/Pillow build (`Pillow` is pinned),
+which differs across platforms by ~5% of the buffer for the same layout. So the
+committed render golden is generated **locally** and the render check is strict
+(`GOLDEN_TOLERANCE=0`, byte-exact) on that machine, while **CI runs it as a smoke
+test** (`GOLDEN_TOLERANCE=0.10`, catching only gross breakage). The **data**
+golden is byte-exact everywhere and is the precise cross-platform gate.
 
 ## 3D Printed Case
 
