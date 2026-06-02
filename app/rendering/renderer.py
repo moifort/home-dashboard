@@ -4,6 +4,7 @@ Two stacked charts share the same day columns: solar production (top half,
 full-black bars) above electricity consumption (bottom half, stacked HC/HP).
 """
 import os
+import re
 from PIL import Image, ImageDraw, ImageFont
 
 WIDTH = 1360
@@ -113,6 +114,14 @@ def render_dashboard(data: dict) -> Image.Image:
 
     if bottom_rows:
         _draw_bottom_table(draw, fonts, bottom_rows, bottom_h)
+
+    # "Home" panel in the empty top-left gutter (left of the packed columns):
+    # a title banner over the last/next refresh times, then the "Alertes" panel
+    # stacked just below it (same gutter).
+    home = data.get("home")
+    if home:
+        home_bottom = _draw_home_panel(draw, fonts, home, region_top=0)
+        _draw_alerts_panel(draw, fonts, data.get("alert_board") or [], region_top=home_bottom + 10)
 
     # UniFi "Réseau" panel in the empty bottom-right column, directly under the
     # crypto grid (same right column), down to the screen bottom.
@@ -335,6 +344,9 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
         bar_h = round((litres / max_l) * bar_max_height)
         if bar_h > 0:
             draw.rectangle([cx, baseline_y - bar_h, cx + BAR_WIDTH - 1, baseline_y - 1], fill=BLACK)
+        else:
+            # Zero value: draw a baseline line, same marker as N/A.
+            draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
         val_text = f"{litres:.0f}"
         vbox = draw.textbbox((0, 0), val_text, font=font_value)
         draw.text((cx + (BAR_WIDTH - (vbox[2] - vbox[0])) // 2, baseline_y - bar_h - (vbox[3] - vbox[1]) - 10),
@@ -397,6 +409,127 @@ def _draw_bottom_table(draw, fonts, rows, bottom_h) -> None:
         put(right, x + width - seg_w(right), ry)  # right-aligned to the table edge
 
     draw.line([(x, line_y), (x + width - 1, line_y)], fill=BLACK, width=1)
+
+
+def _draw_home_panel(draw, fonts, home, region_top) -> int:
+    """Draw the "Home" panel in the empty top-left gutter (left of the packed
+    Solar/EDF column): a title banner with a 1px separator, then two rows — the
+    last refresh (weekday + time) and the next scheduled refresh (time) — each
+    a label (regular) left, value (bold) right-aligned. Mirrors the other panels."""
+    width = PANEL_LEFT - CHART_LEFT - COL_GAP
+    x = CHART_LEFT
+    right = x + width
+
+    def put(segments, sx, sy):
+        cx = sx
+        for text, fk, color in segments:
+            draw.text((round(cx), sy), text, fill=color, font=fonts[fk])
+            cx += draw.textlength(text, font=fonts[fk])
+
+    def row(left, right_segs, sy):  # label left, value right-aligned to the edge
+        put(left, x, sy)
+        rw = sum(draw.textlength(t, font=fonts[fk]) for t, fk, _ in right_segs)
+        put(right_segs, right - rw, sy)
+
+    line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
+    row_h = line_h + 3
+
+    stats_top = region_top + CHART_TOP
+    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    _draw_stats_bar(draw, fonts, [[("Home", "bold", BLACK)]], x, stats_top, width, sep_y)
+
+    y = sep_y + 6
+    row([("Mise à jour", "regular", BLACK)], [(home.get("last_text", ""), "bold", BLACK)], y)
+    y += row_h
+    row([("Prochaine", "regular", BLACK)], [(home.get("next_text", ""), "bold", BLACK)], y)
+    return y + line_h  # bottom of the panel content (for the Alerts panel below)
+
+
+def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
+    """Draw the alert status board in the top-left gutter, under the Home panel.
+    Each monitored domain is its own section: a bold title with a 1px separator
+    (same look as the other panel titles) over its lines — one per active item
+    (label + unit black, the ▲/▼ arrow + number bold, red for a problem, black
+    for a positive note), or a discreet "ok" when the domain is quiet. Domains
+    with problems come first (most severe on top). Capped by the screen bottom so
+    it never writes out of the region; falls back to a "Tout va bien" section if
+    no domain is monitored."""
+    width = PANEL_LEFT - CHART_LEFT - COL_GAP
+    x = CHART_LEFT
+
+    title_h = draw.textbbox((0, 0), "X", font=fonts["bold"])[3]
+    line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
+    row_h = line_h + 3
+    max_y = HEIGHT - CHART_BOTTOM - line_h
+    space_w = draw.textlength(" ", font=fonts["regular"])
+
+    def section_title(label, y):
+        """Draw a domain title + its 1px separator; return the y of the first row."""
+        draw.text((x, y), label, fill=BLACK, font=fonts["bold"])
+        sep = y + title_h + 4
+        draw.line([(x, sep), (x + width - 1, sep)], fill=BLACK, width=1)
+        return sep + 5
+
+    def num_atom(word):
+        """Split a word into a bold numeric part + its glued regular unit, e.g.
+        '240 L' -> [('240','bold'),('L','regular')], '0,39€/j' -> [('0,39','bold'),
+        ('€/j','regular')]. House rule: numbers bold, unit regular, glued. A word
+        with no leading number stays regular."""
+        m = re.match(r"^([+\-]?[\d.,]+)\s*(.*)$", word)
+        if not m:
+            return [(word, "regular")]
+        atom = [(m.group(1), "bold")]
+        if m.group(2):
+            atom.append((m.group(2), "regular"))
+        return atom
+
+    def wrap_atoms(atoms, color, y):
+        """Draw atoms (each a list of glued (text, font_key) sub-tokens) word-wrapped
+        to the panel width in `color`; return the y below the last line drawn."""
+        cx = x
+        first = True
+        for atom in atoms:
+            w = sum(draw.textlength(t, font=fonts[fk]) for t, fk in atom)
+            if not first and cx + space_w + w > x + width:
+                y += row_h
+                cx = x
+                first = True
+                if y > max_y:
+                    return y
+            if not first:
+                cx += space_w
+            for t, fk in atom:
+                draw.text((round(cx), y), t, fill=color, font=fonts[fk])
+                cx += draw.textlength(t, font=fonts[fk])
+            first = False
+        return y + row_h
+
+    if not rows:
+        y = section_title("Alertes", region_top)
+        wrap_atoms([[(w, "regular")] for w in "Tout va bien".split()], BLACK, y)
+        return
+
+    y = region_top
+    for r in rows:
+        if y > max_y:
+            break
+        y = section_title(r["label"], y)
+        if r.get("alert"):
+            for message, figure, money, good in r["items"]:
+                if y > max_y:
+                    break
+                # A negative alert is written entirely in red; a positive note is
+                # all black. Figures follow the house rule (bold number, regular
+                # glued unit) via num_atom.
+                color = BLACK if good else RED
+                atoms = [[(w, "regular")] for w in message.split()]
+                if figure:
+                    atoms.append(num_atom(figure))
+                atoms += [num_atom(w) for w in money.split()]
+                y = wrap_atoms(atoms, color, y)
+        else:
+            y = wrap_atoms([[(w, "regular")] for w in "Rien à signaler".split()], BLACK, y)
+        y += 6  # gap before the next domain section
 
 
 def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
@@ -555,10 +688,12 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
         total = _bar_total(d, mode)
         total_h = round((total / max_kwh) * bar_max_height)
 
-        if mode == "production":
+        if total_h <= 0:
+            # Zero value: draw a baseline line, same marker as N/A.
+            draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
+        elif mode == "production":
             # Single full-black bar (no split data).
-            if total_h > 0:
-                draw.rectangle([cx, baseline_y - total_h, cx + BAR_WIDTH - 1, baseline_y - 1], fill=BLACK)
+            draw.rectangle([cx, baseline_y - total_h, cx + BAR_WIDTH - 1, baseline_y - 1], fill=BLACK)
         else:
             # Stacked bar: HP at bottom (black), HC on top (2px top border).
             hp = d.get("hp_kwh", 0)
