@@ -69,12 +69,12 @@ services:
       retries: 3
     network_mode: bridge
     labels:
-      icon: https://raw.githubusercontent.com/moifort/dashboard/main/docs/preview.png
+      icon: https://raw.githubusercontent.com/moifort/dashboard/main/server/scripts/preview.png
 
 x-casaos:
   author: moifort
   category: Utilities
-  icon: https://raw.githubusercontent.com/moifort/dashboard/main/docs/preview.png
+  icon: https://raw.githubusercontent.com/moifort/dashboard/main/server/scripts/preview.png
   index: /
   port_map: "5000"
   scheme: http

@@ -15,7 +15,7 @@ def apply_demo_panels(data: dict) -> dict:
     """Inject the network-only panels + demo alert values onto a built data dict.
 
     Mutates and returns `data`. Keeps the same values as gen_preview.py so the
-    golden reflects the current preview the user reviews in docs/preview.png.
+    golden reflects the current preview the user reviews in server/scripts/preview.png.
     """
     # UniFi: needs live gateway credentials → representative snapshot (SSID names
     # Atchoum / Iotchoum, matching the device).

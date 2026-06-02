@@ -2,7 +2,7 @@
 and the Home panel.
 
 The ESP32 wakes on a clock-aligned interval (`SCREEN_REFRESH_INTERVAL_MIN`, e.g.
-every 2 h at 00:00, 02:00 … 22:00 — see `esp32-display/esp32-display.ino`) and
+every 2 h at 00:00, 02:00 … 22:00 — see `hardware/esp32-display/esp32-display.ino`) and
 pulls `/display`. To serve fresh data the server regenerates the buffer
 `DATA_LEAD_MIN` minutes *before* each of those boundaries (so the ESP always picks
 up a render that is at most a few minutes old). Both numbers live in `config.py`.

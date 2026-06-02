@@ -1,0 +1,12 @@
+# Build context is server/. Keep only the app package + requirements; everything
+# below is dev/deploy-only and must not bloat the image (or leak secrets).
+.env
+.data/
+.version
+__pycache__/
+*.py[cod]
+.DS_Store
+*.md
+infra/
+tests/
+scripts/

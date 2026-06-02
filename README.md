@@ -1,7 +1,7 @@
 # Linky e-Paper Dashboard
 
 <p align="center">
-  <img src="docs/device.jpg" alt="Dashboard on its stand" width="760">
+  <img src="hardware/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
 Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, a **water meter daily consumption** chart (`Eau`, top-center), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right. The empty top-left gutter holds a **`Home`** panel (screen-refresh schedule) and an **`Alertes`** status board that turns the daily trends into plain-language notes per domain, with their financial impact.
@@ -9,7 +9,7 @@ Monitor your electricity consumption from a Linky smart meter on an e-paper disp
 Rendered output:
 
 <p align="center">
-  <img src="docs/preview.png" alt="Dashboard preview" width="760">
+  <img src="server/scripts/preview.png" alt="Dashboard preview" width="760">
 </p>
 
 ## Dashboard readings
@@ -78,7 +78,7 @@ When a UniFi gateway (UniFi OS) is configured, a `Réseau` panel is drawn in the
 | e-Paper display | [Waveshare 10.85" (G) 4-color](https://www.waveshare.com/10.85inch-e-paper-hat-plus.htm) |
 | Microcontroller | [Seeed XIAO ESP32-S3](https://www.seeedstudio.com/XIAO-ESP32S3-p-5627.html) |
 | Server | Any Docker host (CasaOS, Raspberry Pi, NAS...) |
-| 3D printed case | [Dashboard.3mf](Dashboard.3mf) — matte PLA recommended |
+| 3D printed case | [Dashboard.3mf](hardware/case/Dashboard.3mf) — matte PLA recommended |
 
 ## Installation
 
@@ -92,10 +92,10 @@ When a UniFi gateway (UniFi OS) is configured, a `Réseau` panel is drawn in the
 ### 2. Configure environment variables
 
 ```bash
-cp .env.example .env
+cp server/infra/.env.example server/infra/.env
 ```
 
-Edit `.env` with your values:
+Edit `server/infra/.env` with your values:
 
 ```env
 # Required — your Linky token
@@ -181,7 +181,7 @@ WATER_PRICE_M3=4.30                    # €/m³ for the cost figure (0 = hide c
 ### 3. Run with Docker Compose
 
 ```bash
-curl -O https://raw.githubusercontent.com/moifort/dashboard/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/moifort/dashboard/main/server/infra/docker-compose.yml
 docker compose up -d
 ```
 
@@ -192,7 +192,7 @@ The dashboard will be available at `http://your-server:5000`.
 Import the CasaOS compose file from the CasaOS interface using this URL:
 
 ```
-https://raw.githubusercontent.com/moifort/dashboard/main/docker-compose.casaos.yml
+https://raw.githubusercontent.com/moifort/dashboard/main/server/infra/docker-compose.casaos.yml
 ```
 
 ### 5. Flash the ESP32
@@ -207,8 +207,8 @@ arduino-cli core install esp32:esp32
 Compile and flash:
 
 ```bash
-arduino-cli compile --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" esp32-display/
-arduino-cli upload --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" --port /dev/cu.usbmodem101 esp32-display/
+arduino-cli compile --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" hardware/esp32-display/
+arduino-cli upload --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" --port /dev/cu.usbmodem101 hardware/esp32-display/
 ```
 
 ### 6. Configure the ESP32
@@ -244,12 +244,13 @@ A golden-master test suite guards the render pipeline against regressions. It
 freezes a known input (a seeded SQLite DB + a fixed clock) and compares the
 output byte-for-byte to committed references:
 
-- **Data pipeline** — `build_dashboard_data()` → `tests/fixtures/data.golden.json`
+- **Data pipeline** — `build_dashboard_data()` → `server/tests/fixtures/data.golden.json`
   (portable; covers the orchestrator, the DB-backed slices and the alerts engine).
 - **Render** — `render_dashboard()` → `png_to_epd_buffer()` →
-  `tests/fixtures/display.golden.bin` (the 163,200-byte EPD buffer).
+  `server/tests/fixtures/display.golden.bin` (the 163,200-byte EPD buffer).
 
 ```bash
+cd server
 pip install -r requirements-dev.txt
 pytest -q                 # must stay green: nothing changed
 pytest -q --update-golden # re-baseline after an intentional layout/data change
@@ -267,7 +268,7 @@ golden is byte-exact everywhere and is the precise cross-platform gate.
 
 ## 3D Printed Case
 
-The [Dashboard.3mf](Dashboard.3mf) file contains the printable case. Recommended settings:
+The [Dashboard.3mf](hardware/case/Dashboard.3mf) file contains the printable case. Recommended settings:
 
 - **Material**: matte PLA (cleaner look, no reflections)
 - **Infill**: 15%
