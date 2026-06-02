@@ -413,9 +413,10 @@ def _draw_bottom_table(draw, fonts, rows, bottom_h) -> None:
 
 def _draw_home_panel(draw, fonts, home, region_top) -> int:
     """Draw the "Home" panel in the empty top-left gutter (left of the packed
-    Solar/EDF column): a title banner with a 1px separator, then two rows — the
-    last refresh (weekday + time) and the next scheduled refresh (time) — each
-    a label (regular) left, value (bold) right-aligned. Mirrors the other panels."""
+    Solar/EDF column): a title banner with a 1px separator, then a single line —
+    label (regular) left, the screen-refresh schedule right-aligned as
+    "HH:MM ► HH:MM" (this refresh and the next, bold times, regular arrow).
+    Mirrors the other panels."""
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
     right = x + width
@@ -432,16 +433,18 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
         put(right_segs, right - rw, sy)
 
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
-    row_h = line_h + 3
 
     stats_top = region_top + CHART_TOP
     sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
     _draw_stats_bar(draw, fonts, [[("Home", "bold", BLACK)]], x, stats_top, width, sep_y)
 
     y = sep_y + 6
-    row([("Mise à jour", "regular", BLACK)], [(home.get("last_text", ""), "bold", BLACK)], y)
-    y += row_h
-    row([("Prochaine", "regular", BLACK)], [(home.get("next_text", ""), "bold", BLACK)], y)
+    schedule = [
+        (home.get("last_text", ""), "bold", BLACK),
+        (" ► ", "regular", BLACK),
+        (home.get("next_text", ""), "bold", BLACK),
+    ]
+    row([("Écran", "regular", BLACK)], schedule, y)
     return y + line_h  # bottom of the panel content (for the Alerts panel below)
 
 

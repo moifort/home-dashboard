@@ -14,7 +14,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PARIS_TZ = ZoneInfo("Europe/Paris")
 DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
 
-REFRESH_INTERVAL = int(os.environ.get("REFRESH_INTERVAL", "3600"))
+# Screen-refresh schedule (see app/schedule.py). The ESP32 wakes every
+# SCREEN_REFRESH_INTERVAL_MIN minutes (clock-aligned, must match REFRESH_INTERVAL_MIN
+# in the firmware); the server regenerates the buffer DATA_LEAD_MIN minutes before
+# each of those boundaries so the ESP always pulls a fresh render.
+SCREEN_REFRESH_INTERVAL_MIN = int(os.environ.get("SCREEN_REFRESH_INTERVAL_MIN", "120"))
+DATA_LEAD_MIN = int(os.environ.get("DATA_LEAD_MIN", "10"))
 RENDER_MODE = os.environ.get("RENDER_MODE", "4color")
 DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")
 PORT = int(os.environ.get("PORT", "5000"))

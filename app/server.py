@@ -10,8 +10,18 @@ from io import BytesIO
 from pathlib import Path
 
 from app import dashboard_data as dashboard
-from app.config import DB_PATH, PARIS_TZ, PORT, REFRESH_INTERVAL, RENDER_MODE, SAVE_PNG, VERSION
+from app.config import (
+    DATA_LEAD_MIN,
+    DB_PATH,
+    PARIS_TZ,
+    PORT,
+    RENDER_MODE,
+    SAVE_PNG,
+    SCREEN_REFRESH_INTERVAL_MIN,
+    VERSION,
+)
 from app.integrations import OPTIONAL, crypto, linky
+from app.schedule import next_data_update
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
 
@@ -105,7 +115,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "days_cached": days_count,
             "buffer_ready": len(epd_buffer) > 0,
             "buffer_size": len(epd_buffer),
-            "refresh_interval": REFRESH_INTERVAL,
+            "screen_refresh_interval_min": SCREEN_REFRESH_INTERVAL_MIN,
+            "data_lead_min": DATA_LEAD_MIN,
             "solar_days_cached": solar_days,
         }
         status.update(linky.status())
@@ -162,10 +173,15 @@ def refresh_cycle():
 
 
 def schedule_loop():
+    """Regenerate the buffer DATA_LEAD_MIN minutes before each screen-refresh
+    boundary, so the ESP32 always pulls a render that is at most a few minutes old."""
     while True:
         refresh_cycle()
-        logger.info("Next refresh in %ds", REFRESH_INTERVAL)
-        time.sleep(REFRESH_INTERVAL)
+        now = datetime.now(PARIS_TZ)
+        target = next_data_update(now)
+        sleep_s = max(1.0, (target - now).total_seconds())
+        logger.info("Next data update at %s (%ds)", target.strftime("%H:%M"), int(sleep_s))
+        time.sleep(sleep_s)
 
 
 # --- Main ---
