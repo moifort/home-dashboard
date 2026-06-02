@@ -21,7 +21,7 @@ from app.config import (
     VERSION,
 )
 from app.integrations import OPTIONAL, crypto, linky
-from app.schedule import next_data_update
+from app.schedule import next_data_update, next_screen_refresh
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
 
@@ -78,19 +78,30 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def _fresh_or_cached_buffer(self) -> bytes:
-        """Buffer for /display: re-render with fresh crypto on the ESP32's pull.
+        """Buffer for /display: re-render at the ESP32's pull so the Home panel's
+        time is the actual GET moment, with fresh crypto.
 
-        Linky/solar data stay on the hourly cache; only the crypto panel is
-        refreshed here. Any failure falls back to the cached hourly buffer.
-        """
-        if crypto.enabled():
-            try:
-                with data_lock:
-                    data = dict(dashboard_data)
+        The Home "displayed at" time and "next refresh" boundary are recomputed
+        from the real wall clock here (not the build-time estimate); Linky/solar
+        data stay on the hourly cache; the crypto panel is refreshed. Any failure
+        falls back to the cached hourly buffer (whose Home time is the build-time
+        boundary estimate)."""
+        try:
+            with data_lock:
+                data = dict(dashboard_data)
+            if not data:
+                with buffer_lock:
+                    return epd_buffer
+            now = datetime.now(PARIS_TZ)
+            data["home"] = {
+                "last_text": f"{now:%H:%M}",
+                "next_text": f"{next_screen_refresh(now):%H:%M}",
+            }
+            if crypto.enabled():
                 crypto.attach(data)
-                return render_to_buffer(data)
-            except Exception as e:
-                logger.warning("Live crypto render failed, serving cached buffer: %s", e)
+            return render_to_buffer(data)
+        except Exception as e:
+            logger.warning("Live pull render failed, serving cached buffer: %s", e)
         with buffer_lock:
             return epd_buffer
 
