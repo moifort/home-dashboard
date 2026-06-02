@@ -235,6 +235,29 @@ The ESP32 refreshes the display twice a day at **8:00** and **17:00** (CET/CEST)
 | `GET` | `/status` | Server status as JSON (last fetch, cache, config) |
 | `POST` | `/refresh` | Force a data refresh |
 
+## Development / tests
+
+A golden-master test suite guards the render pipeline against regressions. It
+freezes a known input (a seeded SQLite DB + a fixed clock) and compares the
+output byte-for-byte to committed references:
+
+- **Data pipeline** — `build_dashboard_data()` → `tests/fixtures/data.golden.json`
+  (portable; covers the orchestrator, the DB-backed slices and the alerts engine).
+- **Render** — `render_dashboard()` → `png_to_epd_buffer()` →
+  `tests/fixtures/display.golden.bin` (the 163,200-byte EPD buffer).
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q                 # must stay green: nothing changed
+pytest -q --update-golden # re-baseline after an intentional layout/data change
+```
+
+On a render mismatch the actual/golden/diff PNGs are written to `/tmp`. CI runs
+the suite on every push and pull request (`.github/workflows/tests.yml`). The
+render golden is sensitive to the FreeType/Pillow build, so `Pillow` is pinned;
+`GOLDEN_TOLERANCE` (fraction of differing bytes, default `0`) relaxes the render
+compare if needed.
+
 ## 3D Printed Case
 
 The [Dashboard.3mf](Dashboard.3mf) file contains the printable case. Recommended settings:
