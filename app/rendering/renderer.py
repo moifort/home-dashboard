@@ -403,7 +403,7 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
     """Draw the "Réseau" panel in the bottom-right column (under the crypto grid):
     a title banner with internet/Wi-Fi health (each with a ▲▼ trend), detail rows
     (latency, Wi-Fi signal, data usage — values with their unit in regular weight,
-    glued to the bold number), then a top-3 clients mini-table per
+    glued to the bold number), then a top-4 clients mini-table per
     network (main Wi-Fi first, then IoT) with its client count."""
     width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     x = WIDTH - CHART_LEFT - width
@@ -472,20 +472,22 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
               y, unifi.get("usage_trend"), neutral=True)
     y += row_h + 4
 
-    # --- Top-3 clients per network (main Wi-Fi first, then IoT): a header
-    # (name + count) over a separator, then up to three "name … traffic" rows.
+    # --- Top-4 clients per network (main Wi-Fi first, then IoT): a header
+    # (name + "· aujourd'hui" period tag + count) over a separator, then up to
+    # four "name … traffic" rows. The traffic is each client's current-session
+    # rx+tx, so it reads as today's usage — hence the "aujourd'hui" tag.
     for key in ("main", "iot"):
         net = unifi.get(key) or {}
         rows = net.get("top") or []
         if y + line_h > region_bottom:
             break
         count = net.get("count", 0)
-        row([(net.get("label", ""), "bold", BLACK)],
+        row([(net.get("label", ""), "bold", BLACK), (" · aujourd'hui", "regular", BLACK)],
             [(str(count), "bold", BLACK), (" clients", "regular", BLACK)], y)
         hdr_y = y + line_h + 3
         draw.line([(x, hdr_y), (right - 1, hdr_y)], fill=BLACK, width=1)
         y = hdr_y + 5
-        for name, traffic in rows[:3]:
+        for name, traffic in rows[:4]:
             if y + line_h > region_bottom:
                 break
             row([(name, "regular", BLACK)], [(traffic, "bold", BLACK), ("Go", "regular", BLACK)], y)

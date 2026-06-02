@@ -160,13 +160,13 @@ def _client_bytes(c: dict) -> int:
 
 
 def _network(clients: list, ssid: str, label: str) -> dict:
-    """Client count + top-3 by total traffic for one SSID (wireless only)."""
+    """Client count + top-4 by total traffic for one SSID (wireless only)."""
     members = [c for c in clients if not c.get("is_wired") and c.get("essid") == ssid]
     members.sort(key=_client_bytes, reverse=True)
     top = [
         (_short(c.get("display_name") or c.get("hostname") or c.get("mac", "?")),
          _gb(_client_bytes(c)))
-        for c in members[:3]
+        for c in members[:4]
     ]
     return {"label": label, "count": len(members), "top": top}
 
