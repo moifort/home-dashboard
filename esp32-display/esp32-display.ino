@@ -110,19 +110,11 @@ static uint64_t computeSleepUs() {
     }
 
     int cur_min = now.tm_hour * 60 + now.tm_min;
-    int target1 = REFRESH_HOUR_1 * 60;
-    int target2 = REFRESH_HOUR_2 * 60;
 
-    int sleep_min;
-    if (cur_min < target1) {
-        sleep_min = target1 - cur_min;
-    } else if (cur_min < target2) {
-        sleep_min = target2 - cur_min;
-    } else {
-        sleep_min = (24 * 60 - cur_min) + target1;
-    }
+    // Wake on the next clock-aligned interval boundary (0h, 2h, 4h… for 120 min).
+    int sleep_min = REFRESH_INTERVAL_MIN - (cur_min % REFRESH_INTERVAL_MIN);
 
-    if (sleep_min < 5) sleep_min = 5;
+    if (sleep_min < 5) sleep_min += REFRESH_INTERVAL_MIN;
 
     Serial.printf("Now: %02d:%02d, next refresh in %dh%02dm\n",
                   now.tm_hour, now.tm_min, sleep_min / 60, sleep_min % 60);
