@@ -26,7 +26,10 @@ services:
       PRICE_HP: "0.2065"
       PRICE_HC: "0.1579"
       PRICE_ABO_MONTHLY: "15.65"
-      REFRESH_INTERVAL: "3600"
+      # Screen-refresh schedule — SCREEN_REFRESH_INTERVAL_MIN must match the
+      # firmware's REFRESH_INTERVAL_MIN; server renders DATA_LEAD_MIN before each wake.
+      SCREEN_REFRESH_INTERVAL_MIN: "120"
+      DATA_LEAD_MIN: "10"
       # Optional EcoFlow PowerStream solar production — leave empty to disable.
       ECOFLOW_EMAIL: ""
       ECOFLOW_PASSWORD: ""
