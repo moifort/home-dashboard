@@ -466,7 +466,7 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
     y += row_h
     value_row("Signal Wi-Fi", [(unifi.get("wifi_exp_text", ""), "bold", BLACK)], y)
     y += row_h
-    value_row("Données hier/30 j",
+    value_row("Données hier/30j",
               [(unifi.get("usage_hier", ""), "bold", BLACK), ("/", "regular", BLACK),
                (unifi.get("usage_mois", ""), "bold", BLACK), ("Go", "regular", BLACK)],
               y, unifi.get("usage_trend"), neutral=True)

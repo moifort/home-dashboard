@@ -70,10 +70,10 @@ if "unifi" not in data:
         "wifi_exp_text": "99/100",
         "latency_val": "2", "latency_trend": 12.0,
         "usage_hier": "18,0", "usage_mois": "117,5", "usage_trend": 8.0,
-        "iot": {"label": "Iochum", "count": 13, "top": [
+        "iot": {"label": "Iotchoum", "count": 13, "top": [
             ("Salon 8d:f7", "0,5"), ("Cuisine 8a:8b", "0,5"), ("Chambre Minipc…", "0,4"),
             ("Bureau 7c:2a", "0,3")]},
-        "main": {"label": "Achum", "count": 4, "top": [
+        "main": {"label": "Atchoum", "count": 4, "top": [
             ("MacBookPro Tibo", "15,5"), ("MacBookPro Lam…", "3,4"), ("iPhone Tibo", "0,8"),
             ("iPad Lamia", "0,6")]},
     }
