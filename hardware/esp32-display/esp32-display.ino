@@ -6,6 +6,24 @@
 #include "DEV_Config.h"
 #include "EPD_10in85g.h"
 
+// Survives deep sleep (reset only on power loss), so we can bound how often we
+// wake to retry after a failure instead of pinging every 5 min forever.
+RTC_DATA_ATTR static uint32_t failCount = 0;
+
+// Deep sleep after a failed cycle: quick 5-min retries for a brief outage
+// (router rebooting…), then back off to the normal interval to save battery.
+// Never returns.
+static void deepSleepRetry(const char *reason) {
+    failCount++;
+    uint64_t us = (failCount <= MAX_QUICK_RETRIES)
+                      ? RETRY_SLEEP_US
+                      : (uint64_t)REFRESH_INTERVAL_MIN * 60ULL * 1000000ULL;
+    Serial.printf("%s — retry #%lu, deep sleep %llus\n",
+                  reason, (unsigned long)failCount, (unsigned long long)(us / 1000000ULL));
+    Serial.flush();
+    esp_deep_sleep(us);
+}
+
 static String serialReadLine() {
     String line = "";
     while (true) {
@@ -106,7 +124,10 @@ static bool syncNtp() {
 static uint64_t computeSleepUs() {
     struct tm now;
     if (!getLocalTime(&now, 0)) {
-        return 3600ULL * 1000000ULL;
+        // No clock (NTP never succeeded): can't align to a boundary. Sleep one
+        // full interval unaligned; a later wake with NTP up re-aligns by itself.
+        Serial.println("No valid time — sleeping one full interval (unaligned)");
+        return (uint64_t)REFRESH_INTERVAL_MIN * 60ULL * 1000000ULL;
     }
 
     int cur_min = now.tm_hour * 60 + now.tm_min;
@@ -176,28 +197,27 @@ void setup() {
     }
 
     if (!connected) {
-        Serial.println("WiFi failed. Retrying in 5 minutes...");
-        Serial.flush();
-        esp_deep_sleep(RETRY_SLEEP_US);
+        deepSleepRetry("WiFi failed");
         return;
     }
 
     Serial.printf("Connected. IP: %s\n", WiFi.localIP().toString().c_str());
 
-    syncNtp();
+    if (!syncNtp()) {
+        Serial.println("WARNING: NTP failed — schedule may be unaligned this cycle");
+    }
 
     uint8_t *buf = (uint8_t *)ps_malloc(DISPLAY_BUFFER_SIZE);
     if (!buf) {
-        Serial.println("ERROR: PSRAM allocation failed");
-        while (1) delay(1000);
+        WiFi.disconnect(true);
+        deepSleepRetry("PSRAM allocation failed");
+        return;
     }
 
     if (!fetchDisplayBuffer(serverUrl, buf)) {
-        Serial.println("Fetch failed. Retrying in 5 minutes...");
         free(buf);
         WiFi.disconnect(true);
-        Serial.flush();
-        esp_deep_sleep(RETRY_SLEEP_US);
+        deepSleepRetry("Fetch failed");
         return;
     }
 
@@ -209,6 +229,7 @@ void setup() {
 
     free(buf);
 
+    failCount = 0;  // clean cycle — back to the normal aligned schedule
     uint64_t sleepUs = computeSleepUs();
 
     WiFi.disconnect(true);
