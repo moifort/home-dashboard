@@ -50,11 +50,11 @@ When a crypto-bot GraphQL endpoint is configured, an inline title-style banner i
 
 ### Talon (baseline power)
 
-A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **20th percentile (P20)** of the 30-min Linky load curve **over the night window (23h–05h)**, in **W**. The Linky curve is grid draw, already net of self-consumed solar, so daytime samples get pushed down by the panels and would understate the baseline — the night window is solar-free. P20 over the dozen night samples captures the true floor without being skewed by the deepest dips (the step where everything, fridge included, happens to be off at once). Each row has three columns — name and **yesterday's** value left-aligned, and the recent **daily average** with its trend (▲ in red = a rising baseline, i.e. more standby waste) right-aligned. The talon is always shown; when power sensors are configured (see below) their rows are stacked above the Talon row in the same table.
+A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **20th percentile (P20)** of the 30-min Linky load curve **over the night window (23h–05h)**, in **W**. The Linky curve is grid draw, already net of self-consumed solar, so daytime samples get pushed down by the panels and would understate the baseline — the night window is solar-free. P20 over the dozen night samples captures the true floor without being skewed by the deepest dips (the step where everything, fridge included, happens to be off at once). Each row is a five-column grid: **name** and **yesterday's** value left-aligned, the recent **daily average** right-aligned, its **trend** left-aligned (▲ in red = a rising baseline, i.e. more standby waste), and a **7-day sparkline** hugging the right edge — seven thin bars for the last seven completed days (same axis as the EDF chart), normalised to that row's own max so it reads the metric's recent shape (a missing day leaves a gap). The talon is always shown; when power sensors are configured (see below) their rows are stacked above the Talon row in the same table.
 
 ### Power sensors (optional)
 
-Any Zigbee2MQTT / ESPHome device that reports only **instantaneous power** (W) and has no energy counter can be added as a **power sensor**: a row at the top of the bottom table (above the Talon row) showing that device's daily consumption — yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The server subscribes to each device's topic and **integrates** the reported power into daily kWh (no historical backfill — history starts at first connection). They are all declared in **one variable**, `POWER_SENSORS` (a `;`-separated list of `topic:Display Name`), so adding a sensor is a config line — see the setup section below. Typical examples: a `Cumulus` (water-heater contactor) and a `Lave-linge` (washing-machine smart plug).
+Any Zigbee2MQTT / ESPHome device that reports only **instantaneous power** (W) and has no energy counter can be added as a **power sensor**: a row at the top of the bottom table (above the Talon row) showing that device's daily consumption — yesterday's kWh, the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more) and a 7-day sparkline. The server subscribes to each device's topic and **integrates** the reported power into daily kWh (no historical backfill — history starts at first connection). They are all declared in **one variable**, `POWER_SENSORS` (a `;`-separated list of `topic:Display Name`), so adding a sensor is a config line — see the setup section below. Typical examples: a `Cumulus` (water-heater contactor) and a `Lave-linge` (washing-machine smart plug).
 
 ### Water consumption (optional, center column)
 
@@ -239,7 +239,8 @@ The ESP32 wakes on a clock-aligned interval (`REFRESH_INTERVAL_MIN`, default **1
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/display` | EPD binary buffer (163,200 bytes) — for the ESP32 |
-| `GET` | `/` | HTML preview of the dashboard in a browser |
+| `GET` | `/` | HTML preview of the dashboard in a browser (auto-refreshing, embeds `/preview.png`) |
+| `GET` | `/preview.png` | The dashboard rendered as a PNG (the RGB image that feeds the EPD converter) |
 | `GET` | `/status` | Server status as JSON (last fetch, cache, config) |
 | `POST` | `/refresh` | Force a data refresh |
 
