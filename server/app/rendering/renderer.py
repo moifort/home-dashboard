@@ -34,9 +34,9 @@ LABEL_FONT_SIZE = 12
 NA_THRESHOLD_KWH = 1.0  # EDF consumption chart only; the solar chart has no N/A floor
 MAX_DAYS = 9  # reference column count for the stats banner width
 WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto grid
-# Bottom strip under the EDF chart: a 3-column table (name | yesterday | avg+trend),
-# all columns left-aligned, stacking the Cumulus and Talon rows under a single top
-# separator line. Its height grows with the number of rows.
+# Table under the EDF chart: a 3-column grid (name | yesterday | avg+trend), all
+# columns left-aligned, stacking the Cumulus/Lave-linge/Talon rows under a single
+# top separator line. It is anchored at the center-column mid-height split.
 BOTTOM_ROW_H = 17  # vertical pitch between table rows
 BOTTOM_TOP_GAP = 8  # gap between the chart's day labels and the top separator
 BOTTOM_TEXT_GAP = 6  # first row below the separator
@@ -48,13 +48,6 @@ COL_GAP = 8  # écart horizontal entre les colonnes packées (Solaire/EDF, Eau, 
 # l'espace libre est donc reporté tout à gauche au lieu d'être coincé entre Eau et Crypto.
 PANEL_LEFT = WIDTH - CHART_LEFT - 3 * (MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP) - 2 * COL_GAP
 # = 1360 - 2 - 3*380 - 16 = 202
-
-
-def _bottom_table_height(n_rows: int) -> int:
-    """Height of the bottom strip reserved for an n-row table (0 if empty)."""
-    if n_rows == 0:
-        return 0
-    return BOTTOM_TOP_GAP + BOTTOM_TEXT_GAP + n_rows * BOTTOM_ROW_H + MARGIN
 
 
 def render_dashboard(data: dict) -> Image.Image:
@@ -72,10 +65,9 @@ def render_dashboard(data: dict) -> Image.Image:
     days = data.get("days", [])
 
     # Bottom table rows (name | yesterday | avg+trend): Cumulus then Lave-linge
-    # (each if enabled) then Talon (core Linky, always shown). The consumption
-    # chart shrinks by the strip height so they don't overlap.
+    # (each if enabled) then Talon (core Linky, always shown). It sits directly
+    # under the EDF chart, at the center-column mid-height split.
     bottom_rows = _build_bottom_rows(data)
-    bottom_h = _bottom_table_height(len(bottom_rows))
 
     # Right column (Crypto / Réseau) keeps its own divider, a bit above mid-screen.
     split = SOLAR_HEIGHT
@@ -83,18 +75,26 @@ def render_dashboard(data: dict) -> Image.Image:
     banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     center_left = PANEL_LEFT + banner_width + COL_GAP
 
-    # EDF consumption chart takes the whole left column (minus the table strip
-    # below it) — stacked HC/HP bars.
+    # The bottom table's separator line is aligned with the Solar section title's
+    # separator line opposite it (mid-height split + the solar banner height). The
+    # EDF chart grows down to just above that line (its day labels sit in the gap),
+    # so the table divider and the solar-title divider share the same y.
+    bold_h = draw.textbbox((0, 0), "X", font=fonts["bold"])[3]
+    solar_title_sep = WATER_SPLIT + DIVIDER_GAP + bold_h + 8
+
+    # EDF consumption chart in the left column, with the bottom table directly
+    # beneath it (just under its day labels).
     _draw_chart(draw, fonts, days, data.get("stats", {}),
-                region_top=0, region_height=HEIGHT - bottom_h, mode="consumption")
+                region_top=0, region_height=solar_title_sep, mode="consumption")
 
     # Solar production chart in the bottom half of the center column, under the
-    # Eau chart — full-black single bars.
+    # Eau chart — full-black single bars. Sits right at the mid-height split (the
+    # chart adds its own small top inset) so the gap to the Eau chart stays tight.
     production_days = data.get("production_days", [])
     if production_days:
         _draw_chart(draw, fonts, production_days, data.get("production_stats", {}),
-                    region_top=WATER_SPLIT + DIVIDER_GAP,
-                    region_height=HEIGHT - CHART_BOTTOM - (WATER_SPLIT + DIVIDER_GAP),
+                    region_top=WATER_SPLIT,
+                    region_height=HEIGHT - CHART_BOTTOM - WATER_SPLIT,
                     mode="production", region_left=center_left)
 
     # Crypto title-style banner in the empty top-right space (aligned with the
@@ -118,10 +118,10 @@ def render_dashboard(data: dict) -> Image.Image:
     water_days = data.get("water_days")
     if water_days:
         _draw_water_chart(draw, fonts, water_days, data.get("water_stats", {}),
-                          region_top=0, region_bottom=WATER_SPLIT - DIVIDER_GAP)
+                          region_top=0, region_bottom=WATER_SPLIT)
 
     if bottom_rows:
-        _draw_bottom_table(draw, fonts, bottom_rows, bottom_h)
+        _draw_bottom_table(draw, fonts, bottom_rows, solar_title_sep - BOTTOM_TOP_GAP)
 
     # "Home" panel in the empty top-left gutter (left of the packed columns):
     # a title banner over the last/next refresh times, then the "Alertes" panel
@@ -393,15 +393,15 @@ def _build_bottom_rows(data) -> list:
     return rows
 
 
-def _draw_bottom_table(draw, fonts, rows, bottom_h) -> None:
-    """Draw the bottom table below the EDF chart: a 3-column grid with one row per
-    metric. The name and yesterday columns are left-aligned at fixed thirds; the
-    average+trend column is right-aligned to the table's right edge. A single 1px
-    separator line sits above the rows, dividing them from the chart's day labels
-    (no surrounding box)."""
+def _draw_bottom_table(draw, fonts, rows, top) -> None:
+    """Draw the table under the EDF chart (its strip starts at `top`): a 3-column
+    grid with one row per metric. The name and yesterday columns are left-aligned
+    at fixed thirds; the average+trend column is right-aligned to the table's right
+    edge. A single 1px separator line sits above the rows, dividing them from the
+    chart's day labels (no surrounding box)."""
     width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     x = PANEL_LEFT
-    line_y = HEIGHT - bottom_h + BOTTOM_TOP_GAP
+    line_y = top + BOTTOM_TOP_GAP
     y0 = line_y + BOTTOM_TEXT_GAP
     col_w = width // 3
 
