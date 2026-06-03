@@ -20,6 +20,11 @@ DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
 # each of those boundaries so the ESP always pulls a fresh render.
 SCREEN_REFRESH_INTERVAL_MIN = int(os.environ.get("SCREEN_REFRESH_INTERVAL_MIN", "120"))
 DATA_LEAD_MIN = int(os.environ.get("DATA_LEAD_MIN", "10"))
+# Clock drift can wake the ESP a minute before a boundary; the firmware then
+# skips that boundary (it just refreshed) and sleeps to the next one. Must match
+# the `sleep_min < 5` guard in the firmware's computeSleepUs so the Home panel's
+# "next refresh" reflects the device's real next wake.
+SCREEN_WAKE_SKIP_MIN = int(os.environ.get("SCREEN_WAKE_SKIP_MIN", "5"))
 RENDER_MODE = os.environ.get("RENDER_MODE", "4color")
 DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")
 PORT = int(os.environ.get("PORT", "5000"))

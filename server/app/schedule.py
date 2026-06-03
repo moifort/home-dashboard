@@ -12,7 +12,7 @@ can drive them with a frozen clock.
 """
 from datetime import datetime, timedelta
 
-from app.config import DATA_LEAD_MIN, SCREEN_REFRESH_INTERVAL_MIN
+from app.config import DATA_LEAD_MIN, SCREEN_REFRESH_INTERVAL_MIN, SCREEN_WAKE_SKIP_MIN
 
 
 def next_screen_refresh(now: datetime) -> datetime:
@@ -24,6 +24,22 @@ def next_screen_refresh(now: datetime) -> datetime:
     minute_of_day = base.hour * 60 + base.minute
     rem = SCREEN_REFRESH_INTERVAL_MIN - (minute_of_day % SCREEN_REFRESH_INTERVAL_MIN)
     return base + timedelta(minutes=rem)
+
+
+def next_screen_wake(now: datetime) -> datetime:
+    """The device's next *actual* wake, mirroring the firmware's skip guard.
+
+    Clock drift can wake the ESP a few minutes before a boundary; the firmware
+    then skips that boundary (it effectively just refreshed) and sleeps to the
+    following one (`sleep_min < SCREEN_WAKE_SKIP_MIN` → += interval in
+    computeSleepUs). The Home panel's "next refresh" must reflect that real wake,
+    not the raw next boundary — e.g. a pull at 09:59 shows 12:00, not 10:00."""
+    base = now.replace(second=0, microsecond=0)
+    minute_of_day = base.hour * 60 + base.minute
+    sleep_min = SCREEN_REFRESH_INTERVAL_MIN - (minute_of_day % SCREEN_REFRESH_INTERVAL_MIN)
+    if sleep_min < SCREEN_WAKE_SKIP_MIN:
+        sleep_min += SCREEN_REFRESH_INTERVAL_MIN
+    return base + timedelta(minutes=sleep_min)
 
 
 def current_screen_refresh(now: datetime) -> datetime:

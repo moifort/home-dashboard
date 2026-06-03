@@ -21,7 +21,7 @@ from app.config import (
     VERSION,
 )
 from app.integrations import OPTIONAL, crypto, linky
-from app.schedule import next_data_update, next_screen_refresh
+from app.schedule import next_data_update, next_screen_wake
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
 
@@ -95,7 +95,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             now = datetime.now(PARIS_TZ)
             data["home"] = {
                 "last_text": f"{now:%H:%M}",
-                "next_text": f"{next_screen_refresh(now):%H:%M}",
+                "next_text": f"{next_screen_wake(now):%H:%M}",
             }
             if crypto.enabled():
                 crypto.attach(data)
