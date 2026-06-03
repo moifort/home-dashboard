@@ -28,8 +28,11 @@ services:
       PRICE_ABO_MONTHLY: "15.65"
       # Screen-refresh schedule — SCREEN_REFRESH_INTERVAL_MIN must match the
       # firmware's REFRESH_INTERVAL_MIN; server renders DATA_LEAD_MIN before each wake.
+      # SCREEN_WAKE_SKIP_MIN mirrors the firmware's "skip a boundary within N min"
+      # guard so the Home panel's next-refresh time matches the real next wake.
       SCREEN_REFRESH_INTERVAL_MIN: "120"
       DATA_LEAD_MIN: "10"
+      SCREEN_WAKE_SKIP_MIN: "5"
       # Optional EcoFlow PowerStream solar production — leave empty to disable.
       ECOFLOW_EMAIL: ""
       ECOFLOW_PASSWORD: ""

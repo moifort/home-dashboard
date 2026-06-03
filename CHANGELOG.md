@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-03
+
+- **`Réseau` (Network): data-usage trend over the last 30 days** — the `Données hier/30j` (Data yesterday/30d) line now carries a ▲▼ trend comparing the **last 30 days to the prior 30** — whether the home used more or less data overall lately (neutral black arrow; more/less data isn't inherently good or bad). Computed straight from the daily WAN report (no DB, no backfill); the report fetch window grows 35→65 days to cover both windows, so the trend appears once ~60 days of history exist. Replaces the previous 7-day daily trend on that line. No new environment variable.
+- **`Home` next-refresh time matches the device's real next wake** — when clock drift wakes the ESP a minute before a boundary (e.g. 09:59 for the 10:00 wake), the firmware skips that boundary and sleeps to the next one (12:00); the `Home` panel used to show the raw next boundary (`09:59 ► 10:00`) and now shows the device's real next wake (`09:59 ► 12:00`). New optional env var `SCREEN_WAKE_SKIP_MIN` (default 5) — keep it equal to the firmware's `sleep_min < 5` guard.
+- **ESP32 firmware: boot diagnostics** — each boot logs its reset reason and wake cause over serial (timer wake vs a full power loss vs brownout), to tell a healthy 2 h timer wake apart from a power-supply issue (e.g. a host USB port cutting 5 V when it sleeps). Reflash to apply.
+- **Documentation now fully in English** — all docs (`README.md`, `CHANGELOG.md`, `CLAUDE.md`) read in English; each on-screen French string keeps its literal but gets an English gloss (e.g. `Réseau` (Network), `Eau` (Water)), while the code's French UI labels are untouched (the screen stays French).
+
 ## 2026-06-02
 
 - **`Home`: displayed time = real moment of the pull** — the left time of the `Home` panel (`Écran  HH:MM ► HH:MM`) is no longer the **refresh boundary** frozen at data-build time (≈`DATA_LEAD_MIN` before the boundary), but the **real moment of the `GET /display`** — when the ESP pulls the image — recomputed on every pull (with the next even-hour boundary on the right). Rendering now happens **on every pull** (no longer only when crypto is enabled); on a render error it falls back to the cached buffer. No environment variable; `build_dashboard_data` unchanged → goldens unchanged.
