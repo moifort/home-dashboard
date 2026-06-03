@@ -64,6 +64,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/display":
             self._serve_display()
+        elif self.path in ("/", "/index.html"):
+            self._serve_preview()
+        elif self.path == "/preview.png":
+            self._serve_preview_png()
         elif self.path == "/status":
             self._serve_status()
         elif self.path == "/api/data":
@@ -115,6 +119,53 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(buf)))
         self.end_headers()
         self.wfile.write(buf)
+
+    def _serve_preview(self):
+        """GET / — an HTML page embedding the dashboard as a PNG, auto-refreshing
+        so a browser shows the current screen (the actual 1360×480 render)."""
+        html = (
+            "<!doctype html><html><head><meta charset='utf-8'>"
+            "<title>Dashboard preview</title>"
+            "<meta http-equiv='refresh' content='30'>"
+            "<style>html,body{margin:0;height:100%;background:#222}"
+            "body{display:flex;align-items:center;justify-content:center}"
+            "img{max-width:100%;height:auto;border:1px solid #444;"
+            "image-rendering:pixelated}</style></head>"
+            "<body><img src='/preview.png' alt='Dashboard'></body></html>"
+        ).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(html)))
+        self.end_headers()
+        self.wfile.write(html)
+
+    def _serve_preview_png(self):
+        """GET /preview.png — the dashboard rendered to a PNG (the RGB image that
+        feeds the EPD converter), for the browser preview. Mirrors the live pull:
+        Home time + crypto are refreshed; falls back to 503 until the first build."""
+        with data_lock:
+            data = dict(dashboard_data)
+        if not data:
+            self.send_error(503, "No render available yet")
+            return
+        now = datetime.now(PARIS_TZ)
+        data["home"] = {
+            "last_text": f"{now:%H:%M}",
+            "next_text": f"{next_screen_wake(now):%H:%M}",
+        }
+        if crypto.enabled():
+            try:
+                crypto.attach(data)
+            except Exception as e:
+                logger.warning("Preview crypto attach failed: %s", e)
+        buf_io = BytesIO()
+        render_dashboard(data).save(buf_io, format="PNG")
+        body = buf_io.getvalue()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _serve_status(self):
         with data_lock:
