@@ -200,7 +200,7 @@ README** — below are only the non-obvious implementation gotchas per slice.
 
 ### Linky / Conso API (core)
 - API `conso.boris.sh/api/consumption_load_curve` (30-min samples, in W). **Max 7 days per request** (8 → 400). `LINKY_TOKEN`/`LINKY_PRM` live in `.env`, **never in code**.
-- `compute_daily_hc_hp` (`client.py`) aggregates samples into daily HC/HP kWh **and the talon** = P5 of the day's samples (`_percentile`, `TALON_PCT=5`; P5 not the strict min, which catches the single all-off step). Persisted in `daily_consumption.talon_w` (idempotent `ALTER TABLE` in `init_schema`).
+- `compute_daily_hc_hp` (`client.py`) aggregates samples into daily HC/HP kWh **and the talon** = P20 of the day's **night** samples (`23h–05h`, `TALON_NIGHT_START/END`; `_percentile`, `TALON_PCT=20`). The Conso curve is grid draw, **net of self-consumed solar**, so daytime PV injection would crush the percentile — the night window is solar-free. Over the ~12 night samples P20 ≈ the 3rd lowest, skipping the deepest dips (fridge + all off); a day with no night sample yields `talon_w=None`. Persisted in `daily_consumption.talon_w` (idempotent `ALTER TABLE` + a `PRAGMA user_version=1` migration that NULLs the old 24h talons once so they re-backfill night-only, both in `init_schema`).
 - The load curve returns history, so `fetch_and_cache` forces a **one-time refetch** of cached weeks still missing `talon_w` (the talon backfills; HC/HP, solar and cumulus do not). `build_core._compute_talon` derives yesterday / avg / trend.
 
 ### EcoFlow PowerStream / Solar
