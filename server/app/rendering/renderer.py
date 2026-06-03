@@ -54,7 +54,7 @@ SPARK_MAX_H = 11  # tallest bar (px), grown up from the row's text baseline
 # Bottom-table column anchors as fractions of the table width: name (left),
 # kWh-hier (left), kWh/j (right edge), trend (left); the sparkline owns the right
 # edge. kWh/j right-aligns just before the trend so its values line up per column.
-BOTTOM_COL_HIER = 0.24   # left edge of the "kWh hier" column
+BOTTOM_COL_HIER = 0.32   # left edge of the "kWh hier" column
 BOTTOM_COL_AVG_R = 0.705  # right edge of the "kWh/j" column (right-aligned)
 BOTTOM_COL_TREND = 0.72   # left edge of the trend column (tight after kWh/j)
 SOLAR_HEIGHT = HEIGHT // 2 - 24  # divider for the right column (Crypto top / Réseau bottom)
@@ -378,6 +378,11 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
                   val_text, fill=BLACK, font=font_value)
 
 
+def _short_name(name: str, limit: int = 33) -> str:
+    name = (name or "").strip()
+    return name if len(name) <= limit else name[: limit - 1] + "…"
+
+
 def _build_bottom_rows(data) -> list:
     """Assemble the bottom table rows: each configured power sensor (Cumulus,
     Lave-linge, …) then Talon (core Linky, always shown). Each row is a 5-column
@@ -386,7 +391,7 @@ def _build_bottom_rows(data) -> list:
     rows = []
     for sensor in data.get("power_sensors", []):
         rows.append((
-            [(sensor.get("name", ""), "bold", BLACK)],
+            [(_short_name(sensor.get("name", "")), "bold", BLACK)],
             [(sensor.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
             [(sensor.get("avg_text", "0"), "bold", BLACK), ("kWh/j", "regular", BLACK)],
             [_trend(sensor.get("trend_pct", 0), True)],

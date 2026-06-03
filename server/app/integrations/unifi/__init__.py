@@ -151,7 +151,7 @@ def _gb(num_bytes: float) -> str:
     return f"{(num_bytes or 0) / 1e9:.1f}".replace(".", ",")
 
 
-def _short(name: str, limit: int = 15) -> str:
+def _short(name: str, limit: int = 35) -> str:
     name = (name or "?").strip()
     return name if len(name) <= limit else name[: limit - 1] + "…"
 
