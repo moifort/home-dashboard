@@ -4,7 +4,7 @@
   <img src="hardware/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, a **water meter daily consumption** chart (`Eau` — Water, top-center), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right. The empty top-left gutter holds a **`Home`** panel (screen-refresh schedule) and an **`Alertes`** (Alerts) status board that turns the daily trends into plain-language notes per domain, with their financial impact.
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, the **washing-machine (lave-linge) daily consumption**, a **water meter daily consumption** chart (`Eau` — Water, center column above the Solar chart), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right. The empty top-left gutter holds a **`Home`** panel (screen-refresh schedule) and an **`Alertes`** (Alerts) status board that turns the daily trends into plain-language notes per domain, with their financial impact.
 
 Rendered output:
 
@@ -40,9 +40,9 @@ Three indicators are displayed above the chart. Each shows a **current value** a
 - **▲ in red** = degrading (more consumption or cost)
 - Days with less than 1 kWh are excluded from all calculations
 
-### Solar production (optional, top chart)
+### Solar production (optional, center column)
 
-When an EcoFlow PowerStream is configured, the top half shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). The talon coverage sits to the left of the `Total` group and falls back to `Talon N/A` until the talon is known. See the setup section below.
+When an EcoFlow PowerStream is configured, the bottom half of the center column (under the `Eau` chart) shows daily solar production as full-black bars (last 9 completed days). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). The talon coverage sits to the left of the `Total` group and falls back to `Talon N/A` until the talon is known. See the setup section below.
 
 ### Crypto-bot banner (optional, top-right)
 
@@ -50,15 +50,15 @@ When a crypto-bot GraphQL endpoint is configured, an inline title-style banner i
 
 ### Talon (baseline power)
 
-A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **20th percentile (P20)** of the 30-min Linky load curve **over the night window (23h–05h)**, in **W**. The Linky curve is grid draw, already net of self-consumed solar, so daytime samples get pushed down by the panels and would understate the baseline — the night window is solar-free. P20 over the dozen night samples captures the true floor without being skewed by the deepest dips (the step where everything, fridge included, happens to be off at once). Each row has three columns — name and **yesterday's** value left-aligned, and the recent **daily average** with its trend (▲ in red = a rising baseline, i.e. more standby waste) right-aligned. The talon is always shown; when the Cumulus integration is enabled its row is stacked above the Talon row in the same table.
+A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **20th percentile (P20)** of the 30-min Linky load curve **over the night window (23h–05h)**, in **W**. The Linky curve is grid draw, already net of self-consumed solar, so daytime samples get pushed down by the panels and would understate the baseline — the night window is solar-free. P20 over the dozen night samples captures the true floor without being skewed by the deepest dips (the step where everything, fridge included, happens to be off at once). Each row has three columns — name and **yesterday's** value left-aligned, and the recent **daily average** with its trend (▲ in red = a rising baseline, i.e. more standby waste) right-aligned. The talon is always shown; when the Cumulus and/or washing-machine integrations are enabled their rows are stacked above the Talon row in the same table.
 
-### Cumulus consumption (optional)
+### Cumulus & washing-machine consumption (optional)
 
-When a Zigbee2MQTT broker is configured, a `Cumulus` row is added at the top of the bottom table (above the Talon row), showing the water-heater's daily consumption: yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The contactor reports only instantaneous power, so daily kWh are integrated over time (no historical backfill). See the setup section below.
+When a Zigbee2MQTT broker is configured, a `Cumulus` (water-heater) row and/or a `Lave-linge` (washing machine) row is added at the top of the bottom table (above the Talon row), each showing that device's daily consumption: yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). Both devices report only instantaneous power, so daily kWh are integrated over time (no historical backfill). Each row appears only when its own topic is set. See the setup section below.
 
-### Water consumption (optional, top-center)
+### Water consumption (optional, center column)
 
-When an MQTT broker is configured, an `Eau` (Water) chart is drawn in the top-center space, between the Solar chart and the Crypto panel. It shows the last **9 days** of water use as daily-litres bars (the rightmost bar, labelled `Auj.` — Today, is **today** and grows as the day accumulates), with a title showing the average **L/day** (and its trend), the month-to-date volume in **m³** and its **€** cost. An ESPHome wM-Bus reader publishes the meter's **cumulative index (m³)** to the broker; the dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus), so history starts at the first connection (no backfill). A day with no reading shows **N/A** — including today until its first frame arrives. See the setup section below.
+When an MQTT broker is configured, an `Eau` (Water) chart is drawn in the top half of the center column, above the Solar chart. It shows the last **9 days** of water use as daily-litres bars (the rightmost bar, labelled `Auj.` — Today, is **today** and grows as the day accumulates), with a title showing the average **L/day** (and its trend), the month-to-date volume in **m³** and its **€** cost. An ESPHome wM-Bus reader publishes the meter's **cumulative index (m³)** to the broker; the dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus), so history starts at the first connection (no backfill). A day with no reading shows **N/A** — including today until its first frame arrives. See the setup section below.
 
 ### Home & Alertes (top-left gutter)
 
@@ -140,16 +140,31 @@ CRYPTO_API_URL=http://192.168.1.50:3003/graphql
 CRYPTO_API_TOKEN=your_crypto_bot_api_token   # the bot's NITRO_API_TOKEN; omit if no auth
 ```
 
-#### Optional — Cumulus (water-heater) consumption
+#### Optional — Local MQTT broker (cumulus, washing machine, water)
 
-Point the dashboard at your Zigbee2MQTT broker to show the water-heater's daily consumption. The `cumulus` device (a Legrand contactor) reports only instantaneous power, so the server subscribes to its MQTT topic and integrates that power into daily kWh — there is **no backfill**, the history starts at the first connection. Use the broker's **LAN IP** (bridge network). Credentials are optional if the broker allows anonymous connections.
+The cumulus, washing-machine and water slices all read the **same local MQTT broker** (your mosquitto on the LAN), so the host/port/credentials are configured **once**; each slice then only sets its own topic. Setting `MQTT_HOST` enables those slices (an empty host disables all three). Use the broker's **LAN IP** (bridge network). Credentials are optional if the broker allows anonymous connections. (EcoFlow's cloud broker is separate and does not use these.)
 
 ```env
-CUMULUS_MQTT_HOST=192.168.1.50
-CUMULUS_MQTT_PORT=1883
+MQTT_HOST=192.168.1.50
+MQTT_PORT=1883
+MQTT_USERNAME=                         # omit if the broker is anonymous
+MQTT_PASSWORD=
+```
+
+#### Optional — Cumulus (water-heater) consumption
+
+With the broker set above, point a topic at your `cumulus` device (a Legrand contactor). It reports only instantaneous power, so the server subscribes to its topic and integrates that power into daily kWh — there is **no backfill**, the history starts at the first connection. Leave the topic empty to disable just this device.
+
+```env
 CUMULUS_TOPIC=zigbee2mqtt/cumulus
-CUMULUS_MQTT_USERNAME=                 # omit if the broker is anonymous
-CUMULUS_MQTT_PASSWORD=
+```
+
+#### Optional — Washing-machine (lave-linge) consumption
+
+Same as cumulus, for a washing machine behind a Zigbee2MQTT smart plug: with the broker set above, point a topic at the plug. The plug reports only instantaneous power, integrated into daily kWh (no backfill). Leave the topic empty to disable just this device.
+
+```env
+WASHER_TOPIC=zigbee2mqtt/washing_machine
 ```
 
 #### Optional — UniFi network panel
@@ -167,14 +182,10 @@ UNIFI_SSID_MAIN=your_main_wifi_ssid    # your main Wi-Fi SSID
 
 #### Optional — Water meter consumption
 
-Point the dashboard at the MQTT broker where an ESPHome wM-Bus reader publishes your water meter's **cumulative index (m³)**. The dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus) — there is **no backfill**, the history starts at the first connection. Use the broker's **LAN IP** (bridge network). Credentials are optional if the broker allows anonymous connections. Set `WATER_PRICE_M3` (water + sanitation, €/m³) to show the monthly cost.
+With the broker set above, point a topic at the one where an ESPHome wM-Bus reader publishes your water meter's **cumulative index (m³)**. The dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus) — there is **no backfill**, the history starts at the first connection. Set `WATER_PRICE_M3` (water + sanitation, €/m³) to show the monthly cost. Leave the topic empty to disable just this device.
 
 ```env
-WATER_MQTT_HOST=192.168.1.50
-WATER_MQTT_PORT=1883
 WATER_TOPIC=watermeter/index_m3        # cumulative index in m³ (raw float payload)
-WATER_MQTT_USERNAME=                   # omit if the broker is anonymous
-WATER_MQTT_PASSWORD=
 WATER_PRICE_M3=4.30                    # €/m³ for the cost figure (0 = hide cost)
 ```
 

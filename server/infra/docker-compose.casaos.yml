@@ -41,13 +41,18 @@ services:
       # Optional crypto-bot stats panel (top-right) — leave URL empty to disable.
       CRYPTO_API_URL: ""
       CRYPTO_API_TOKEN: ""
-      # Optional cumulus (water-heater) daily consumption via Zigbee2MQTT —
-      # leave host empty to disable. Use the broker's LAN IP (bridge network).
-      CUMULUS_MQTT_HOST: ""
-      CUMULUS_MQTT_PORT: "1883"
+      # Optional shared local MQTT broker for the Z2M/ESPHome slices (cumulus,
+      # washer, water) — leave MQTT_HOST empty to disable all of them. Use the
+      # broker's LAN IP (bridge network). EcoFlow's cloud broker is separate.
+      MQTT_HOST: ""
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: ""
+      MQTT_PASSWORD: ""
+      # Each Z2M/ESPHome slice only sets its own topic (enabled with MQTT_HOST above).
+      # Cumulus (water-heater) daily kWh; leave empty to disable this one.
       CUMULUS_TOPIC: zigbee2mqtt/cumulus
-      CUMULUS_MQTT_USERNAME: ""
-      CUMULUS_MQTT_PASSWORD: ""
+      # Washing machine (lave-linge) daily kWh; leave empty to disable this one.
+      WASHER_TOPIC: zigbee2mqtt/washing_machine
       # Optional UniFi network panel (bottom-right) — set the password to enable.
       # Use the gateway's LAN IP (bridge network can't use localhost).
       UNIFI_HOST: https://192.168.1.1
@@ -56,14 +61,10 @@ services:
       UNIFI_SITE: default
       UNIFI_SSID_IOT: ""
       UNIFI_SSID_MAIN: ""
-      # Optional water meter daily consumption ("Eau" chart, top-center) via an
+      # Optional water meter daily consumption ("Eau" chart, center column) via an
       # ESPHome wM-Bus reader publishing the cumulative index (m³) over MQTT —
-      # leave host empty to disable. Use the broker's LAN IP (bridge network).
-      WATER_MQTT_HOST: ""
-      WATER_MQTT_PORT: "1883"
+      # leave the topic empty to disable this one.
       WATER_TOPIC: watermeter/index_m3
-      WATER_MQTT_USERNAME: ""
-      WATER_MQTT_PASSWORD: ""
       WATER_PRICE_M3: "0"
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/status')" || exit 1
