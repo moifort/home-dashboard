@@ -4,7 +4,7 @@
   <img src="hardware/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, the **water-heater (cumulus) daily consumption**, the **washing-machine (lave-linge) daily consumption**, a **water meter daily consumption** chart (`Eau` — Water, center column above the Solar chart), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right. The empty top-left gutter holds a **`Home`** panel (screen-refresh schedule) and an **`Alertes`** (Alerts) status board that turns the daily trends into plain-language notes per domain, with their financial impact.
+Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, **configurable power sensors** (any Zigbee2MQTT/ESPHome device reporting only instantaneous power — e.g. a water-heater `Cumulus` or a washing-machine `Lave-linge` — each shown as a daily-kWh row), a **water meter daily consumption** chart (`Eau` — Water, center column above the Solar chart), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right. The empty top-left gutter holds a **`Home`** panel (screen-refresh schedule) and an **`Alertes`** (Alerts) status board that turns the daily trends into plain-language notes per domain, with their financial impact.
 
 Rendered output:
 
@@ -50,11 +50,11 @@ When a crypto-bot GraphQL endpoint is configured, an inline title-style banner i
 
 ### Talon (baseline power)
 
-A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **20th percentile (P20)** of the 30-min Linky load curve **over the night window (23h–05h)**, in **W**. The Linky curve is grid draw, already net of self-consumed solar, so daytime samples get pushed down by the panels and would understate the baseline — the night window is solar-free. P20 over the dozen night samples captures the true floor without being skewed by the deepest dips (the step where everything, fridge included, happens to be off at once). Each row has three columns — name and **yesterday's** value left-aligned, and the recent **daily average** with its trend (▲ in red = a rising baseline, i.e. more standby waste) right-aligned. The talon is always shown; when the Cumulus and/or washing-machine integrations are enabled their rows are stacked above the Talon row in the same table.
+A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **20th percentile (P20)** of the 30-min Linky load curve **over the night window (23h–05h)**, in **W**. The Linky curve is grid draw, already net of self-consumed solar, so daytime samples get pushed down by the panels and would understate the baseline — the night window is solar-free. P20 over the dozen night samples captures the true floor without being skewed by the deepest dips (the step where everything, fridge included, happens to be off at once). Each row has three columns — name and **yesterday's** value left-aligned, and the recent **daily average** with its trend (▲ in red = a rising baseline, i.e. more standby waste) right-aligned. The talon is always shown; when power sensors are configured (see below) their rows are stacked above the Talon row in the same table.
 
-### Cumulus & washing-machine consumption (optional)
+### Power sensors (optional)
 
-When a Zigbee2MQTT broker is configured, a `Cumulus` (water-heater) row and/or a `Lave-linge` (washing machine) row is added at the top of the bottom table (above the Talon row), each showing that device's daily consumption: yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). Both devices report only instantaneous power, so daily kWh are integrated over time (no historical backfill). Each row appears only when its own topic is set. See the setup section below.
+Any Zigbee2MQTT / ESPHome device that reports only **instantaneous power** (W) and has no energy counter can be added as a **power sensor**: a row at the top of the bottom table (above the Talon row) showing that device's daily consumption — yesterday's kWh and the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more). The server subscribes to each device's topic and **integrates** the reported power into daily kWh (no historical backfill — history starts at first connection). They are all declared in **one variable**, `POWER_SENSORS` (a `;`-separated list of `topic:Display Name`), so adding a sensor is a config line — see the setup section below. Typical examples: a `Cumulus` (water-heater contactor) and a `Lave-linge` (washing-machine smart plug).
 
 ### Water consumption (optional, center column)
 
@@ -140,9 +140,9 @@ CRYPTO_API_URL=http://192.168.1.50:3003/graphql
 CRYPTO_API_TOKEN=your_crypto_bot_api_token   # the bot's NITRO_API_TOKEN; omit if no auth
 ```
 
-#### Optional — Local MQTT broker (cumulus, washing machine, water)
+#### Optional — Local MQTT broker (power sensors, water)
 
-The cumulus, washing-machine and water slices all read the **same local MQTT broker** (your mosquitto on the LAN), so the host/port/credentials are configured **once**; each slice then only sets its own topic. Setting `MQTT_HOST` enables those slices (an empty host disables all three). Use the broker's **LAN IP** (bridge network). Credentials are optional if the broker allows anonymous connections. (EcoFlow's cloud broker is separate and does not use these.)
+The power-sensor and water slices all read the **same local MQTT broker** (your mosquitto on the LAN), so the host/port/credentials are configured **once**; each slice then only sets its own topic(s). Setting `MQTT_HOST` enables those slices (an empty host disables them all). Use the broker's **LAN IP** (bridge network). Credentials are optional if the broker allows anonymous connections. (EcoFlow's cloud broker is separate and does not use these.)
 
 ```env
 MQTT_HOST=192.168.1.50
@@ -151,20 +151,14 @@ MQTT_USERNAME=                         # omit if the broker is anonymous
 MQTT_PASSWORD=
 ```
 
-#### Optional — Cumulus (water-heater) consumption
+#### Optional — Power sensors
 
-With the broker set above, point a topic at your `cumulus` device (a Legrand contactor). It reports only instantaneous power, so the server subscribes to its topic and integrates that power into daily kWh — there is **no backfill**, the history starts at the first connection. Leave the topic empty to disable just this device.
+With the broker set above, declare every device that reports only **instantaneous power** (W) — a Legrand contactor (`Cumulus`), a washing-machine smart plug (`Lave-linge`), an oven, etc. They all live in **one variable**, `POWER_SENSORS`: a `;`-separated list of `topic:Display Name` entries (the first `:` splits the MQTT topic from the on-screen label). The server subscribes to each topic and **integrates** the reported power into daily kWh — **no backfill**, history starts at the first connection. Each becomes one row in the bottom table (in declaration order, above the Talon row). Leave the variable empty to disable them all.
 
-```env
-CUMULUS_TOPIC=zigbee2mqtt/cumulus
-```
-
-#### Optional — Washing-machine (lave-linge) consumption
-
-Same as cumulus, for a washing machine behind a Zigbee2MQTT smart plug: with the broker set above, point a topic at the plug. The plug reports only instantaneous power, integrated into daily kWh (no backfill). Leave the topic empty to disable just this device.
+The label's slug (lowercased, accent-stripped, spaces→`-`) is the storage key. **Keep the labels `Cumulus` and `Lave-linge`** to inherit the history migrated from the previous `CUMULUS_TOPIC` / `WASHER_TOPIC` tables (slugs `cumulus` / `lave-linge`).
 
 ```env
-WASHER_TOPIC=zigbee2mqtt/washing_machine
+POWER_SENSORS=zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge
 ```
 
 #### Optional — UniFi network panel

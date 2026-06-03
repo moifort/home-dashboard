@@ -41,18 +41,18 @@ services:
       # Optional crypto-bot stats panel (top-right) — leave URL empty to disable.
       CRYPTO_API_URL: ""
       CRYPTO_API_TOKEN: ""
-      # Optional shared local MQTT broker for the Z2M/ESPHome slices (cumulus,
-      # washer, water) — leave MQTT_HOST empty to disable all of them. Use the
+      # Optional shared local MQTT broker for the Z2M/ESPHome slices (power
+      # sensors, water) — leave MQTT_HOST empty to disable all of them. Use the
       # broker's LAN IP (bridge network). EcoFlow's cloud broker is separate.
       MQTT_HOST: ""
       MQTT_PORT: "1883"
       MQTT_USERNAME: ""
       MQTT_PASSWORD: ""
-      # Each Z2M/ESPHome slice only sets its own topic (enabled with MQTT_HOST above).
-      # Cumulus (water-heater) daily kWh; leave empty to disable this one.
-      CUMULUS_TOPIC: zigbee2mqtt/cumulus
-      # Washing machine (lave-linge) daily kWh; leave empty to disable this one.
-      WASHER_TOPIC: zigbee2mqtt/washing_machine
+      # Power sensors (bottom-left table rows): any Z2M/ESPHome device reporting
+      # only instantaneous power (W). Declare them all here, ';'-separated, as
+      # `topic:Display Name`; each is integrated into daily kWh and shown as a row.
+      # Keep "Cumulus"/"Lave-linge" to inherit the migrated history. Empty = off.
+      POWER_SENSORS: zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge
       # Optional UniFi network panel (bottom-right) — set the password to enable.
       # Use the gateway's LAN IP (bridge network can't use localhost).
       UNIFI_HOST: https://192.168.1.1

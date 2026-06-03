@@ -36,7 +36,7 @@ server/app/
     __init__.py        # OPTIONAL registry — drop a slice = delete folder + 1 line
     linky/   {api/, client.py, __init__.py}        # core
     ecoflow/ {client.py, mqtt/, proto/, __init__.py}
-    cumulus/ {mqtt/, __init__.py}
+    power/   {mqtt/, __init__.py}                  # config-driven MQTT power sensors
     crypto/  {graphql/, __init__.py}
 ```
 Each integration's `__init__.py` exposes the uniform slice API — `enabled()`,
@@ -213,12 +213,14 @@ README** — below are only the non-obvious implementation gotchas per slice.
 - Fetched **on the ESP32 `/display` pull** (re-renders with fresh crypto; Linky/solar stay on the hourly cache); any failure falls back to the cached buffer.
 - Thousands separator: plain space — Arial renders U+202F as a tofu box on e-paper.
 
-### Cumulus (water heater)
-- The Legrand 412171 contactor exposes `power` (W) but **no kWh counter** → we integrate the reported power into `daily_cumulus` ourselves (`_on_cumulus_power`, same technique as solar). No backfill.
-- Z2M broker (mosquitto): subscribe `zigbee2mqtt/cumulus`, read `power`; re-request `{"power":""}` on `.../get` every 60s so integration keeps getting samples during steady heating.
+### Power sensors (config-driven, multi-device)
+- One generic slice (`integrations/power/`) for **any** Z2M/ESPHome device that reports only instantaneous `power` (W) and no kWh counter — e.g. a `Cumulus` water-heater contactor, a `Lave-linge` plug. Declared in **one env var** `POWER_SENSORS = "topic:Display Name;topic2:Name 2"` (`;`-separated; first `:` splits topic/label). `_parse_sensors` → `Sensor(slug, topic, name)` with `slug = _slugify(name)`.
+- Each sensor gets its own `PowerMqttListener` (subscribe its topic, re-request `{"power":""}` on `.../get` every 60s) and its own integrator state keyed by slug (`_make_on_power(slug)`, same technique as solar). All share one table `daily_power(slug, date, cons_wh, …)` via `db.get_cached_power`/`upsert_power`. No backfill.
+- **Legacy migration**: `init_schema()` one-time copies `daily_cumulus`/`daily_washer` into `daily_power` under slugs `cumulus`/`lave-linge` (idempotent; guarded on table-exists + slug-empty). History re-attaches only if the labels stay `Cumulus`/`Lave-linge`.
+- Alerts: the `Cumulus` domain + `cumulus_rise/drop` rules look up the sensor **named** `Cumulus` in `data["power_sensors"]` (`alerts._power_sensor`).
 
-### Bottom table rendering (Cumulus + Talon)
-- `renderer._draw_bottom_table`; `_build_bottom_rows` builds the rows (Cumulus if enabled, then Talon, always). 3-column grid: name + yesterday left-aligned at fixed thirds, avg + trend right-aligned; single 1px top separator (no box; not the *space-between* `_draw_stats_bar` of the title banners). `_bottom_table_height` grows with the row count, and the consumption chart shrinks by it.
+### Bottom table rendering (power sensors + Talon)
+- `renderer._draw_bottom_table`; `_build_bottom_rows` iterates `data["power_sensors"]` (one row each, in config order), then Talon (always). 3-column grid: name + yesterday left-aligned at fixed thirds, avg + trend right-aligned; single 1px top separator (no box; not the *space-between* `_draw_stats_bar` of the title banners). `_bottom_table_height` grows with the row count, and the consumption chart shrinks by it.
 
 ### Networking
 - The dashboard runs in `network_mode: bridge`, so it reaches co-located services (crypto bot, MQTT brokers) via their **LAN IP**, not `localhost`.
