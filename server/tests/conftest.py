@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from app import db
-from app.integrations import crypto, cumulus, ecoflow, unifi, water
+from app.integrations import crypto, cumulus, ecoflow, unifi, washer, water
 from tests.fixtures import seed_db
 from tests.fixtures.seed_db import FIXED_NOW
 
@@ -30,6 +30,7 @@ _TIME_MODULES = [
     "app.integrations.linky",
     "app.integrations.ecoflow",
     "app.integrations.cumulus",
+    "app.integrations.washer",
     "app.integrations.water",
 ]
 
@@ -73,6 +74,7 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
     # the water_drop money path are exercised.
     monkeypatch.setattr(ecoflow, "ENABLED", True)
     monkeypatch.setattr(cumulus, "ENABLED", True)
+    monkeypatch.setattr(washer, "ENABLED", True)
     monkeypatch.setattr(water, "ENABLED", True)
     monkeypatch.setattr(water, "PRICE_M3", 3.9)
 

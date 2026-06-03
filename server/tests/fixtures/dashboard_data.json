@@ -358,6 +358,11 @@
     "wifi_pct": 99,
     "wifi_trend": null
   },
+  "washer": {
+    "avg_text": "1.0",
+    "trend_pct": -4.9,
+    "yesterday_text": "1.1"
+  },
   "water_days": [
     {
       "day": "Lun",

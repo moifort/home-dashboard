@@ -1,7 +1,8 @@
 """Render dashboard to 1360×480 bitmap using Pillow (no browser needed).
 
-Two stacked charts share the same day columns: solar production (top half,
-full-black bars) above electricity consumption (bottom half, stacked HC/HP).
+The EDF consumption chart (stacked HC/HP) fills the left column; the center
+column stacks the Eau chart over the solar production chart (full-black bars);
+the right column stacks the Crypto panel over the UniFi "Réseau" panel.
 """
 import os
 import re
@@ -39,7 +40,8 @@ WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto g
 BOTTOM_ROW_H = 17  # vertical pitch between table rows
 BOTTOM_TOP_GAP = 8  # gap between the chart's day labels and the top separator
 BOTTOM_TEXT_GAP = 6  # first row below the separator
-SOLAR_HEIGHT = HEIGHT // 2 - 24  # top (solar) chart height; EDF gets the rest (a bit taller)
+SOLAR_HEIGHT = HEIGHT // 2 - 24  # divider for the right column (Crypto top / Réseau bottom)
+WATER_SPLIT = HEIGHT // 2  # center column split: Eau (top half) over Solaire (bottom half)
 
 COL_GAP = 8  # écart horizontal entre les colonnes packées (Solaire/EDF, Eau, Crypto)
 # Les trois colonnes (largeur de référence MAX_DAYS) sont collées au bord droit,
@@ -69,25 +71,31 @@ def render_dashboard(data: dict) -> Image.Image:
 
     days = data.get("days", [])
 
-    # Bottom table rows (name | yesterday | avg+trend): Cumulus on top (if the
-    # integration is enabled) then Talon below (core Linky, always shown). The
-    # consumption chart shrinks by the strip height so they don't overlap.
+    # Bottom table rows (name | yesterday | avg+trend): Cumulus then Lave-linge
+    # (each if enabled) then Talon (core Linky, always shown). The consumption
+    # chart shrinks by the strip height so they don't overlap.
     bottom_rows = _build_bottom_rows(data)
     bottom_h = _bottom_table_height(len(bottom_rows))
 
-    # The split between the two charts sits a bit above mid-screen so the EDF
-    # chart is slightly taller than the solar one.
+    # Right column (Crypto / Réseau) keeps its own divider, a bit above mid-screen.
     split = SOLAR_HEIGHT
+    # Center column (Eau / Solaire) splits at exactly mid-height.
+    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
+    center_left = PANEL_LEFT + banner_width + COL_GAP
 
-    # Solar production chart (top) — full-black single bars.
+    # EDF consumption chart takes the whole left column (minus the table strip
+    # below it) — stacked HC/HP bars.
+    _draw_chart(draw, fonts, days, data.get("stats", {}),
+                region_top=0, region_height=HEIGHT - bottom_h, mode="consumption")
+
+    # Solar production chart in the bottom half of the center column, under the
+    # Eau chart — full-black single bars.
     production_days = data.get("production_days", [])
     if production_days:
         _draw_chart(draw, fonts, production_days, data.get("production_stats", {}),
-                    region_top=0, region_height=split, mode="production")
-
-    # Consumption chart (bottom, minus the table strip) — stacked HC/HP bars.
-    _draw_chart(draw, fonts, days, data.get("stats", {}),
-                region_top=split, region_height=HEIGHT - split - bottom_h, mode="consumption")
+                    region_top=WATER_SPLIT + DIVIDER_GAP,
+                    region_height=HEIGHT - CHART_BOTTOM - (WATER_SPLIT + DIVIDER_GAP),
+                    mode="production", region_left=center_left)
 
     # Crypto title-style banner in the empty top-right space (aligned with the
     # solar title); the bottom table sits below the EDF chart, full chart width.
@@ -104,13 +112,13 @@ def render_dashboard(data: dict) -> Image.Image:
                           region_top=(crypto_bottom or 12) - 2,
                           region_bottom=split - DIVIDER_GAP)
 
-    # Water consumption chart in the empty top-center space, between the Solar
-    # chart (left) and the Crypto panel (right) — its own stats banner +
-    # daily-litres bars. Sits in its own column so it never overlaps Crypto.
+    # Water consumption chart in the top half of the center column, above the
+    # Solar chart — its own stats banner + daily-litres bars. Sits in its own
+    # column so it never overlaps Crypto.
     water_days = data.get("water_days")
     if water_days:
         _draw_water_chart(draw, fonts, water_days, data.get("water_stats", {}),
-                          region_top=0, region_bottom=split - DIVIDER_GAP)
+                          region_top=0, region_bottom=WATER_SPLIT - DIVIDER_GAP)
 
     if bottom_rows:
         _draw_bottom_table(draw, fonts, bottom_rows, bottom_h)
@@ -291,11 +299,11 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
 
 
 def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_bottom) -> None:
-    """Draw the dedicated water chart in the top row, right after the Solar chart
-    (small gap between them): a stats banner ("Eau" + avg L/j, month total m³,
-    cost €) over daily-litres bars (single full-black bars, value in L on top,
-    day label below). Mirrors the EDF/Solar look; sits in its own column so it
-    never overlaps the Crypto panel anchored to the right edge."""
+    """Draw the dedicated water chart in the top half of the center column, above
+    the Solar chart: a stats banner ("Eau" + avg L/j, month total m³, cost €) over
+    daily-litres bars (single full-black bars, value in L on top, day label below).
+    Mirrors the EDF/Solar look; sits in its own column so it never overlaps the
+    Crypto panel anchored to the right edge."""
     font_value = fonts["value"]
     font_label = fonts["label"]
 
@@ -354,9 +362,9 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
 
 
 def _build_bottom_rows(data) -> list:
-    """Assemble the bottom table rows: Cumulus (if enabled) then Talon (core
-    Linky, always shown). Each row is (name, yesterday, avg+trend) — a rising
-    value reads as bad (red) for both consumption-style metrics."""
+    """Assemble the bottom table rows: Cumulus then Lave-linge (each if enabled)
+    then Talon (core Linky, always shown). Each row is (name, yesterday, avg+trend)
+    — a rising value reads as bad (red) for these consumption-style metrics."""
     rows = []
     cumulus = data.get("cumulus")
     if cumulus:
@@ -365,6 +373,14 @@ def _build_bottom_rows(data) -> list:
             [(cumulus.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
             [(cumulus.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
              _trend(cumulus.get("trend_pct", 0), True)],
+        ))
+    washer = data.get("washer")
+    if washer:
+        rows.append((
+            [("Lave-linge", "bold", BLACK)],
+            [(washer.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
+            [(washer.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
+             _trend(washer.get("trend_pct", 0), True)],
         ))
     talon = data.get("talon")
     if talon:
@@ -637,7 +653,7 @@ def _bar_total(d: dict, mode: str) -> float:
     return d.get("hc_kwh", 0) + d.get("hp_kwh", 0)
 
 
-def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
+def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, region_left=PANEL_LEFT):
     if not days:
         return
 
@@ -673,7 +689,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
 
     # --- Bars ---
     for i, d in enumerate(days):
-        cx = PANEL_LEFT + i * col_width
+        cx = region_left + i * col_width
         label_text = "Auj." if d.get("today") else d.get("day", "").lower()
 
         lbox = draw.textbbox((0, 0), label_text, font=font_label)
@@ -721,7 +737,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode):
     if stats:
         items = _build_production_items(stats) if mode == "production" else _build_consumption_items(stats)
         if items:
-            _draw_stats_bar(draw, fonts, items, PANEL_LEFT, stats_top, banner_width, separator_y)
+            _draw_stats_bar(draw, fonts, items, region_left, stats_top, banner_width, separator_y)
 
 
 # Segment = (text, font_key, color). font_key is "bold" (values) or "regular"

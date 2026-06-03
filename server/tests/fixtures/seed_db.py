@@ -1,7 +1,7 @@
 """Seed a deterministic SQLite database for the golden tests.
 
 Fills every daily table the render pipeline reads (consumption, production,
-cumulus, water) with **fixed, reproducible** rows relative to a frozen "today".
+cumulus, washer, water) with **fixed, reproducible** rows relative to a frozen "today".
 Values come from pure index-based patterns (no randomness, no clock) so the same
 seed always yields the same `data` dict and the same rendered buffer.
 
@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 
 from app import db
 from app.config import PARIS_TZ
-from app.integrations import cumulus, ecoflow, linky, water
+from app.integrations import cumulus, ecoflow, linky, washer, water
 
 # Frozen reference instant for the whole test suite. Everything (seeded ranges,
 # build_core's "today", each attach's date math) is computed relative to this.
@@ -74,6 +74,17 @@ def _cumulus_rows():
     return rows
 
 
+def _washer_rows():
+    """Daily washer Wh ending yesterday (integrated, no same-day flush needed)."""
+    start = TODAY - timedelta(days=_SEED_DAYS)
+    end = TODAY - timedelta(days=1)
+    rows = []
+    for i, d in enumerate(_daterange(start, end)):
+        kwh = 0.5 + (i % 3) * 0.2 + (i % 5) * 0.15
+        rows.append((d.strftime("%Y-%m-%d"), round(kwh * 1000, 1), _FETCHED_AT))
+    return rows
+
+
 def _water_rows():
     """Cumulative water index (m³) including today. Daily litres follow a fixed
     pattern; the index is their running sum from a fixed base."""
@@ -93,6 +104,7 @@ def seed():
     linky.init_schema()
     ecoflow.init_schema()
     cumulus.init_schema()
+    washer.init_schema()
     water.init_schema()
 
     conn = db.connect()
@@ -108,6 +120,10 @@ def seed():
     conn.executemany(
         "INSERT OR REPLACE INTO daily_cumulus (date, cons_wh, fetched_at) VALUES (?, ?, ?)",
         _cumulus_rows(),
+    )
+    conn.executemany(
+        "INSERT OR REPLACE INTO daily_washer (date, cons_wh, fetched_at) VALUES (?, ?, ?)",
+        _washer_rows(),
     )
     conn.executemany(
         "INSERT OR REPLACE INTO daily_water (date, index_m3, fetched_at) VALUES (?, ?, ?)",
