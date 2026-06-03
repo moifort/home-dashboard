@@ -1,7 +1,7 @@
 """Seed a deterministic SQLite database for the golden tests.
 
 Fills every daily table the render pipeline reads (consumption, production,
-cumulus, washer, water) with **fixed, reproducible** rows relative to a frozen "today".
+power sensors, water) with **fixed, reproducible** rows relative to a frozen "today".
 Values come from pure index-based patterns (no randomness, no clock) so the same
 seed always yields the same `data` dict and the same rendered buffer.
 
@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 
 from app import db
 from app.config import PARIS_TZ
-from app.integrations import cumulus, ecoflow, linky, washer, water
+from app.integrations import ecoflow, linky, power, water
 
 # Frozen reference instant for the whole test suite. Everything (seeded ranges,
 # build_core's "today", each attach's date math) is computed relative to this.
@@ -63,25 +63,19 @@ def _production_rows():
     return rows
 
 
-def _cumulus_rows():
-    """Daily cumulus Wh ending yesterday (integrated, no same-day flush needed)."""
+def _power_rows():
+    """Daily power-sensor Wh ending yesterday, for both seeded slugs (integrated,
+    no same-day flush needed). Mirrors the old cumulus/washer value patterns so the
+    rendered bottom table stays stable."""
     start = TODAY - timedelta(days=_SEED_DAYS)
     end = TODAY - timedelta(days=1)
     rows = []
     for i, d in enumerate(_daterange(start, end)):
-        kwh = 1.4 + (i % 4) * 0.5 + (i % 3) * 0.3
-        rows.append((d.strftime("%Y-%m-%d"), round(kwh * 1000, 1), _FETCHED_AT))
-    return rows
-
-
-def _washer_rows():
-    """Daily washer Wh ending yesterday (integrated, no same-day flush needed)."""
-    start = TODAY - timedelta(days=_SEED_DAYS)
-    end = TODAY - timedelta(days=1)
-    rows = []
-    for i, d in enumerate(_daterange(start, end)):
-        kwh = 0.5 + (i % 3) * 0.2 + (i % 5) * 0.15
-        rows.append((d.strftime("%Y-%m-%d"), round(kwh * 1000, 1), _FETCHED_AT))
+        ds = d.strftime("%Y-%m-%d")
+        cumulus_kwh = 1.4 + (i % 4) * 0.5 + (i % 3) * 0.3
+        washer_kwh = 0.5 + (i % 3) * 0.2 + (i % 5) * 0.15
+        rows.append(("cumulus", ds, round(cumulus_kwh * 1000, 1), _FETCHED_AT))
+        rows.append(("lave-linge", ds, round(washer_kwh * 1000, 1), _FETCHED_AT))
     return rows
 
 
@@ -103,8 +97,7 @@ def seed():
     `app.db.DB_PATH` already points at the (empty) target file."""
     linky.init_schema()
     ecoflow.init_schema()
-    cumulus.init_schema()
-    washer.init_schema()
+    power.init_schema()
     water.init_schema()
 
     conn = db.connect()
@@ -118,12 +111,8 @@ def seed():
         _production_rows(),
     )
     conn.executemany(
-        "INSERT OR REPLACE INTO daily_cumulus (date, cons_wh, fetched_at) VALUES (?, ?, ?)",
-        _cumulus_rows(),
-    )
-    conn.executemany(
-        "INSERT OR REPLACE INTO daily_washer (date, cons_wh, fetched_at) VALUES (?, ?, ?)",
-        _washer_rows(),
+        "INSERT OR REPLACE INTO daily_power (slug, date, cons_wh, fetched_at) VALUES (?, ?, ?, ?)",
+        _power_rows(),
     )
     conn.executemany(
         "INSERT OR REPLACE INTO daily_water (date, index_m3, fetched_at) VALUES (?, ?, ?)",

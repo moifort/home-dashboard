@@ -23,7 +23,8 @@ from datetime import datetime  # noqa: E402
 
 from app import dashboard_data, db  # noqa: E402  (env must be set first)
 from app.config import PARIS_TZ  # noqa: E402
-from app.integrations import cumulus, ecoflow, linky  # noqa: E402
+from app.integrations import ecoflow, linky, power  # noqa: E402
+from app.integrations.power import Sensor  # noqa: E402
 from app.rendering.renderer import render_dashboard  # noqa: E402
 
 # Apply pending schema migrations (e.g. the talon_w column) as the server does
@@ -42,7 +43,14 @@ _tables = {
     )
 }
 ecoflow.ENABLED = "daily_production" in _tables
-cumulus.ENABLED = "daily_cumulus" in _tables
+# Migrate any legacy single-device tables into daily_power, then drive the
+# bottom power-sensor rows from the recommended Cumulus / Lave-linge config.
+power.init_schema()
+power.SENSORS = [
+    Sensor("cumulus", "zigbee2mqtt/cumulus", "Cumulus"),
+    Sensor("lave-linge", "zigbee2mqtt/lave-linge", "Lave-linge"),
+]
+power.ENABLED = bool(power.SENSORS)
 
 now = datetime.now(PARIS_TZ)
 start = (now - timedelta(days=45)).strftime("%Y-%m-%d")
@@ -51,10 +59,13 @@ end = now.strftime("%Y-%m-%d")
 days = db.get_cached_days(start, end)
 data = dashboard_data.build_dashboard_data(days)
 
-# The dev DB may predate the cumulus table; inject a representative banner so
-# the preview still shows the bottom Cumulus row the device renders.
-if "cumulus" not in data:
-    data["cumulus"] = {"yesterday_text": "2.4", "avg_text": "3.1", "trend_pct": 4.5}
+# The dev DB may hold no power-sensor history; inject representative rows so the
+# preview still shows the bottom Cumulus / Lave-linge rows the device renders.
+if not data.get("power_sensors"):
+    data["power_sensors"] = [
+        {"name": "Cumulus", "yesterday_text": "2.4", "avg_text": "3.1", "trend_pct": 4.5},
+        {"name": "Lave-linge", "yesterday_text": "0.8", "avg_text": "0.9", "trend_pct": -5.0},
+    ]
 
 # The talon needs the new talon_w column populated (one fetch cycle). On a dev DB
 # that predates it, inject representative values so the bottom Talon row shows.
@@ -140,8 +151,11 @@ if ALERTS_DEMO:
         if not d.get("today"):
             d["pv_kwh"] = 1.5
             break
-    # Cumulus good (black): strong drop.
-    data["cumulus"]["trend_pct"] = -28             # -> Cumulus: Conso ▼28%
+    # Cumulus good (black): strong drop — override the Cumulus sensor's trend.
+    for s in data.get("power_sensors", []):
+        if s.get("name", "").lower() == "cumulus":
+            s["trend_pct"] = -28                   # -> Cumulus: Conso ▼28%
+            break
 data["alert_board"] = build_board(data)
 print("board:", [(r["label"], [f"{m} {f} {mo}".strip() for m, f, mo, _ in r["items"]]
                               if r.get("alert") else "RAS")
@@ -151,7 +165,7 @@ print("days:", len(data.get("days", [])),
       "| solar:", len(data.get("production_days", [])),
       "| crypto:", bool(data.get("crypto")),
       "| grid:", bool(data.get("crypto_grid")),
-      "| cumulus:", bool(data.get("cumulus")))
+      "| power:", len(data.get("power_sensors", [])))
 
 out = ROOT / "scripts" / "preview.png"
 render_dashboard(data).save(str(out))

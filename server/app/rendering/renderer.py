@@ -362,25 +362,17 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
 
 
 def _build_bottom_rows(data) -> list:
-    """Assemble the bottom table rows: Cumulus then Lave-linge (each if enabled)
-    then Talon (core Linky, always shown). Each row is (name, yesterday, avg+trend)
-    — a rising value reads as bad (red) for these consumption-style metrics."""
+    """Assemble the bottom table rows: each configured power sensor (Cumulus,
+    Lave-linge, …) then Talon (core Linky, always shown). Each row is
+    (name, yesterday, avg+trend) — a rising value reads as bad (red) for these
+    consumption-style metrics."""
     rows = []
-    cumulus = data.get("cumulus")
-    if cumulus:
+    for sensor in data.get("power_sensors", []):
         rows.append((
-            [("Cumulus", "bold", BLACK)],
-            [(cumulus.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
-            [(cumulus.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
-             _trend(cumulus.get("trend_pct", 0), True)],
-        ))
-    washer = data.get("washer")
-    if washer:
-        rows.append((
-            [("Lave-linge", "bold", BLACK)],
-            [(washer.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
-            [(washer.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
-             _trend(washer.get("trend_pct", 0), True)],
+            [(sensor.get("name", ""), "bold", BLACK)],
+            [(sensor.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
+            [(sensor.get("avg_text", "0"), "bold", BLACK), ("kWh/j ", "regular", BLACK),
+             _trend(sensor.get("trend_pct", 0), True)],
         ))
     talon = data.get("talon")
     if talon:

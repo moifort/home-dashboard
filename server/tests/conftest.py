@@ -16,7 +16,8 @@ from pathlib import Path
 import pytest
 
 from app import db
-from app.integrations import crypto, cumulus, ecoflow, unifi, washer, water
+from app.integrations import crypto, ecoflow, power, unifi, water
+from app.integrations.power import Sensor
 from tests.fixtures import seed_db
 from tests.fixtures.seed_db import FIXED_NOW
 
@@ -29,8 +30,7 @@ _TIME_MODULES = [
     "app.db",
     "app.integrations.linky",
     "app.integrations.ecoflow",
-    "app.integrations.cumulus",
-    "app.integrations.washer",
+    "app.integrations.power",
     "app.integrations.water",
 ]
 
@@ -73,8 +73,11 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
     # Enable the slices the seeded tables back; give water a €/m³ so its cost +
     # the water_drop money path are exercised.
     monkeypatch.setattr(ecoflow, "ENABLED", True)
-    monkeypatch.setattr(cumulus, "ENABLED", True)
-    monkeypatch.setattr(washer, "ENABLED", True)
+    monkeypatch.setattr(power, "SENSORS", [
+        Sensor("cumulus", "zigbee2mqtt/cumulus", "Cumulus"),
+        Sensor("lave-linge", "zigbee2mqtt/lave-linge", "Lave-linge"),
+    ])
+    monkeypatch.setattr(power, "ENABLED", True)
     monkeypatch.setattr(water, "ENABLED", True)
     monkeypatch.setattr(water, "PRICE_M3", 3.9)
 

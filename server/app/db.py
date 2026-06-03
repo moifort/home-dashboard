@@ -21,45 +21,24 @@ def connect() -> sqlite3.Connection:
     return sqlite3.connect(DB_PATH)
 
 
-def get_cached_cumulus(start: str, end: str) -> list[dict]:
+def get_cached_power(slug: str, start: str, end: str) -> list[dict]:
     conn = connect()
     cur = conn.execute(
-        "SELECT date, cons_wh FROM daily_cumulus WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
+        "SELECT date, cons_wh FROM daily_power "
+        "WHERE slug = ? AND date >= ? AND date < ? ORDER BY date",
+        (slug, start, end),
     )
     rows = [{"date": r[0], "cons_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
     conn.close()
     return rows
 
 
-def upsert_cumulus(date: str, cons_wh: float):
+def upsert_power(slug: str, date: str, cons_wh: float):
     now = datetime.now(PARIS_TZ).isoformat()
     conn = connect()
     conn.execute(
-        "INSERT OR REPLACE INTO daily_cumulus (date, cons_wh, fetched_at) VALUES (?, ?, ?)",
-        (date, cons_wh, now),
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_cached_washer(start: str, end: str) -> list[dict]:
-    conn = connect()
-    cur = conn.execute(
-        "SELECT date, cons_wh FROM daily_washer WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
-    )
-    rows = [{"date": r[0], "cons_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-
-def upsert_washer(date: str, cons_wh: float):
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = connect()
-    conn.execute(
-        "INSERT OR REPLACE INTO daily_washer (date, cons_wh, fetched_at) VALUES (?, ?, ?)",
-        (date, cons_wh, now),
+        "INSERT OR REPLACE INTO daily_power (slug, date, cons_wh, fetched_at) VALUES (?, ?, ?, ?)",
+        (slug, date, cons_wh, now),
     )
     conn.commit()
     conn.close()

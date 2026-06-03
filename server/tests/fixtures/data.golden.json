@@ -25,11 +25,6 @@
       "severity": -1
     }
   ],
-  "cumulus": {
-    "avg_text": "2.5",
-    "trend_pct": 3.4,
-    "yesterday_text": "3.2"
-  },
   "days": [
     {
       "date": "2026-05-24",
@@ -91,6 +86,20 @@
     "next_text": "16:00"
   },
   "last_updated": "2026-06-02T14:30:45+02:00",
+  "power_sensors": [
+    {
+      "avg_text": "2.5",
+      "name": "Cumulus",
+      "trend_pct": 3.4,
+      "yesterday_text": "3.2"
+    },
+    {
+      "avg_text": "1.0",
+      "name": "Lave-linge",
+      "trend_pct": -4.9,
+      "yesterday_text": "1.1"
+    }
+  ],
   "production_days": [
     {
       "date": "2026-05-25",
@@ -167,11 +176,6 @@
     "avg_w": 316,
     "trend_pct": -0.5,
     "yesterday_text": "303"
-  },
-  "washer": {
-    "avg_text": "1.0",
-    "trend_pct": -4.9,
-    "yesterday_text": "1.1"
   },
   "water_days": [
     {

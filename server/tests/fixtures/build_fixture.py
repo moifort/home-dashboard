@@ -69,9 +69,11 @@ def apply_demo_panels(data: dict) -> dict:
         if not d.get("today"):
             d["pv_kwh"] = 1.5
             break
-    # Cumulus good (black): strong drop.
-    data.setdefault("cumulus", {})
-    data["cumulus"]["trend_pct"] = -28             # -> Cumulus: Conso ▼28%
+    # Cumulus good (black): strong drop — override the seeded sensor's trend.
+    for s in data.get("power_sensors", []):
+        if s.get("name", "").lower() == "cumulus":
+            s["trend_pct"] = -28                   # -> Cumulus: Conso ▼28%
+            break
 
     data["alert_board"] = build_board(data)
     return data

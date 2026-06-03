@@ -30,9 +30,9 @@ DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")
 PORT = int(os.environ.get("PORT", "5000"))
 SAVE_PNG = os.environ.get("SAVE_PNG", "false").lower() == "true"
 
-# Local MQTT broker shared by every Z2M / ESPHome slice (cumulus, washer, water):
+# Local MQTT broker shared by every Z2M / ESPHome slice (power sensors, water):
 # it's the same mosquitto on the LAN, so host/port/credentials live here once and
-# each slice only declares its own topic. (EcoFlow's cloud broker is separate and
+# each slice only declares its own topic(s). (EcoFlow's cloud broker is separate and
 # authenticates dynamically — it does not use these.) An empty MQTT_HOST disables
 # all the local-broker slices at once.
 MQTT_HOST = os.environ.get("MQTT_HOST", "")

@@ -106,6 +106,14 @@ def _usd_fmt(value):
     return f"{round(abs(value)):,}".replace(",", " ")
 
 
+def _power_sensor(data, name):
+    """Find a configured power sensor by its display name (case-insensitive)."""
+    for s in data.get("power_sensors") or []:
+        if s.get("name", "").lower() == name.lower():
+            return s
+    return None
+
+
 def _crypto_alpha_gain(crypto, alpha):
     """$ the strategy earned over buy-and-hold = invested x alpha%.
     invested = portfolio - profit. Returns None if the amounts can't be parsed."""
@@ -225,7 +233,7 @@ def _talon_rise(data):
 
 
 def _cumulus_rise(data):
-    cumulus = data.get("cumulus") or {}
+    cumulus = _power_sensor(data, "Cumulus") or {}
     pct = cumulus.get("trend_pct")
     if pct is not None and pct >= CUMULUS_RISE_PCT:
         avg = _to_float(cumulus.get("avg_text"))
@@ -300,7 +308,7 @@ def _talon_drop(data):
 
 
 def _cumulus_drop(data):
-    cumulus = data.get("cumulus") or {}
+    cumulus = _power_sensor(data, "Cumulus") or {}
     pct = cumulus.get("trend_pct")
     if pct is not None and pct <= -CUMULUS_DROP_PCT:
         avg = _to_float(cumulus.get("avg_text"))
@@ -380,7 +388,7 @@ def _domain_present(data: dict, domain: str) -> bool:
         "Eau": bool(data.get("water_stats") or data.get("water_days")),
         "Solaire": bool(data.get("production_stats") or data.get("production_days")),
         "Réseau": bool(data.get("unifi")),
-        "Cumulus": bool(data.get("cumulus")),
+        "Cumulus": bool(_power_sensor(data, "Cumulus")),
         "Crypto": bool(data.get("crypto")),
     }.get(domain, False)
 

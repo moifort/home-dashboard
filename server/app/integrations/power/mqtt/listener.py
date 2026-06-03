@@ -1,7 +1,8 @@
-"""Cumulus MQTT transport: reads `power` from the Zigbee2MQTT contactor topic.
+"""Generic power-sensor MQTT transport: reads `power` from a Z2M device topic.
 
 Z2M publishes power on change; we also re-request it periodically (a `get`) so
-samples keep flowing during long, steady heating periods.
+samples keep flowing during long, steady loads. One listener runs per configured
+sensor (its topic); the integration owns the power -> energy accumulation.
 """
 import json
 import logging
@@ -29,13 +30,14 @@ def _parse_power(payload: bytes) -> float | None:
     return None
 
 
-class CumulusMqttListener:
+class PowerMqttListener:
     """Background thread reading `power` from a Zigbee2MQTT device topic.
 
     Calls on_power(watts) on each reported value. Reconnects automatically.
     """
 
-    def __init__(self, host, port, topic, username, password, on_power):
+    def __init__(self, slug, host, port, topic, username, password, on_power):
+        self._slug = slug
         self._host = host
         self._port = port
         self._topic = topic
@@ -46,7 +48,9 @@ class CumulusMqttListener:
         self._thread: threading.Thread | None = None
 
     def start(self):
-        self._thread = threading.Thread(target=self._run, name="cumulus-mqtt", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name=f"power-{self._slug}-mqtt", daemon=True
+        )
         self._thread.start()
 
     def _run(self):
@@ -54,7 +58,9 @@ class CumulusMqttListener:
             try:
                 self._connect_and_listen()
             except Exception as exc:
-                logger.warning("Cumulus MQTT session ended (%s), retrying in 60s", exc)
+                logger.warning(
+                    "Power MQTT session (%s) ended (%s), retrying in 60s", self._slug, exc
+                )
                 self._stop.wait(60)
 
     def _connect_and_listen(self):
@@ -65,11 +71,11 @@ class CumulusMqttListener:
 
         def on_connect(c, userdata, flags, reason_code, properties):
             if reason_code != 0:
-                logger.error("Cumulus MQTT connect failed: %s", reason_code)
+                logger.error("Power MQTT connect failed (%s): %s", self._slug, reason_code)
                 return
             c.subscribe(self._topic, qos=0)
             c.publish(get_topic, json.dumps({"power": ""}), qos=0)
-            logger.info("Cumulus MQTT connected, subscribed to %s", self._topic)
+            logger.info("Power MQTT connected (%s), subscribed to %s", self._slug, self._topic)
 
         def on_message(c, userdata, msg):
             watts = _parse_power(msg.payload)
@@ -77,7 +83,7 @@ class CumulusMqttListener:
                 try:
                     self._on_power(watts)
                 except Exception:
-                    logger.exception("on_power callback failed")
+                    logger.exception("on_power callback failed (%s)", self._slug)
 
         client.on_connect = on_connect
         client.on_message = on_message
