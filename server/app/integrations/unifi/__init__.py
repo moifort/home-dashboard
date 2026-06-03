@@ -31,9 +31,10 @@ TREND_DAYS = 7  # the latest completed day is compared to this many prior days
 ROLLING_DAYS = 30  # data-usage window: this many complete days ending yesterday
 _last_unifi_time = ""
 
-# Snapshot columns that carry a ▲▼ trend, paired with the panel key they fill.
+# Snapshot columns that carry a 7-day ▲▼ trend, paired with the panel key they
+# fill. (Data usage is NOT here: its trend compares the last 30 days to the prior
+# 30, computed directly from the daily report — see build_unifi_panel.)
 _TREND_COLUMNS = (
-    ("usage_bytes", "usage_trend"),
     ("latency_ms", "latency_trend"),
     ("isp_pct", "isp_trend"),
     ("wifi_pct", "wifi_trend"),
@@ -222,11 +223,13 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
 
     # --- Data usage: yesterday + rolling 30-day total, both from the daily report
     # (the aggregated dashboard only covers a 24h window, no monthly counter).
-    yesterday_bytes, rolling_bytes = _usage_from_daily(raw.get("daily"))
+    yesterday_bytes, rolling_bytes, prev_bytes = _usage_from_daily(raw.get("daily"))
     if yesterday_bytes is None:  # report unavailable -> 24h WAN total from the dashboard
         summary = _dig(dash, "wan_activity", "activity_by_network_group", "WAN", "summary",
                        default={})
         yesterday_bytes = (summary.get("rx_bytes", 0) or 0) + (summary.get("tx_bytes", 0) or 0)
+    # Usage trend: the last 30 days vs the 30 before them (more/less data overall).
+    usage_trend = _pct_change(rolling_bytes, prev_bytes)
 
     return {
         # Title health figures (name + percentage); units drawn by the renderer.
@@ -235,7 +238,8 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
         "wifi_exp_text": wifi_exp_text,
         # Detail rows: numeric strings only — the renderer appends the unit.
         "latency_val": str(latency_ms), "latency_trend": None,
-        "usage_hier": _gb(yesterday_bytes), "usage_mois": _gb(rolling_bytes), "usage_trend": None,
+        "usage_hier": _gb(yesterday_bytes), "usage_mois": _gb(rolling_bytes),
+        "usage_trend": usage_trend,
         "iot": _network(clients, ssids["iot"], ssids["iot"] or "IoT"),
         "main": _network(clients, ssids["main"], ssids["main"] or "Perso"),
         # Raw values snapshotted by attach() to compute the 7-day trends.
@@ -246,21 +250,35 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
     }
 
 
-def _usage_from_daily(daily) -> tuple[int | None, int]:
-    """(yesterday, rolling 30-day total) WAN tx+rx bytes from the daily.gw report.
+def _pct_change(new: float, old: float) -> float | None:
+    """Percent change of `new` vs `old`, or None when there's no baseline to
+    compare against (old is zero/missing — e.g. a fresh install)."""
+    if not old:
+        return None
+    return round((new - old) / old * 100, 1)
 
-    yesterday is None when the report is unavailable (caller falls back); the
-    rolling total sums the ROLLING_DAYS complete days ending yesterday (today
-    excluded), so the figure is always a full window and comparable day-to-day —
-    unlike a calendar month that collapses to near-zero on the 1st."""
+
+def _usage_from_daily(daily, today=None) -> tuple[int | None, int, int]:
+    """(yesterday, last-30-day total, previous-30-day total) WAN tx+rx bytes from
+    the daily.gw report.
+
+    yesterday is None when the report is unavailable (caller falls back). Both
+    totals are full ROLLING_DAYS windows: the last sums the 30 complete days
+    ending yesterday (today excluded, so always a full window — unlike a calendar
+    month that collapses on the 1st); the previous sums the 30 before that (days
+    -60..-31), giving the panel a 30-vs-30 trend. The previous total is 0 (→ no
+    trend) when the report doesn't reach that far back."""
     rows = (daily or {}).get("data") if isinstance(daily, dict) else None
     if not rows:
-        return None, 0
-    today = datetime.now(PARIS_TZ).date()
+        return None, 0, 0
+    today = today or datetime.now(PARIS_TZ).date()
     yesterday = today - timedelta(days=1)
-    window_start = today - timedelta(days=ROLLING_DAYS)  # 30 complete days back
+    last_start = today - timedelta(days=ROLLING_DAYS)          # -30 .. -1 (yesterday)
+    prev_start = today - timedelta(days=2 * ROLLING_DAYS)      # -60 ..
+    prev_end = today - timedelta(days=ROLLING_DAYS + 1)        #     .. -31
     y_bytes: int | None = None
-    rolling_total = 0
+    last_total = 0
+    prev_total = 0
     for row in rows:
         ts = row.get("time")
         if ts is None:
@@ -269,9 +287,11 @@ def _usage_from_daily(daily) -> tuple[int | None, int]:
         day_bytes = int((row.get("wan-tx_bytes", 0) or 0) + (row.get("wan-rx_bytes", 0) or 0))
         if day == yesterday:
             y_bytes = day_bytes
-        if window_start <= day <= yesterday:
-            rolling_total += day_bytes
-    return y_bytes, rolling_total
+        if last_start <= day <= yesterday:
+            last_total += day_bytes
+        elif prev_start <= day <= prev_end:
+            prev_total += day_bytes
+    return y_bytes, last_total, prev_total
 
 
 def status() -> dict:

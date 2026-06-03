@@ -94,7 +94,9 @@ def _fetch_daily_usage(host: str, site: str, timeout: float) -> dict | None:
     """
     try:
         end = int(time.time() * 1000)
-        start = end - 35 * 24 * 60 * 60 * 1000  # ~5 weeks of daily WAN totals
+        # ~9 weeks: enough for the rolling 30-day total AND the previous 30 days
+        # it is compared against (the panel's usage trend).
+        start = end - 65 * 24 * 60 * 60 * 1000
         body = {"attrs": ["time", "wan-tx_bytes", "wan-rx_bytes"], "start": start, "end": end}
         return _post(host, f"/proxy/network/api/s/{site}/stat/report/daily.gw", body, timeout)
     except (requests.RequestException, ValueError) as e:
