@@ -59,18 +59,50 @@ end = now.strftime("%Y-%m-%d")
 days = db.get_cached_days(start, end)
 data = dashboard_data.build_dashboard_data(days)
 
+# The dev DB may hold no Linky history; inject a representative EDF stacked
+# HC/HP week so the preview always shows the left-column consumption chart.
+if not data.get("days"):
+    from app.config import DAYS_FR
+
+    edf = [(4.8, 2.4), (5.1, 2.6), (4.2, 2.0), (5.6, 3.1), (4.9, 2.5),
+           (6.0, 3.4), (3.8, 1.9), (5.2, 2.7), (4.5, 2.3)]  # (hc, hp) kWh, ends yesterday
+    data["days"] = [
+        {"day": DAYS_FR[(now.weekday() - (len(edf) - i)) % 7], "date": "",
+         "hc_kwh": hc, "hp_kwh": hp}
+        for i, (hc, hp) in enumerate(edf)
+    ]
+    data["stats"] = {"avg_kwh": 7.4, "avg_kwh_pct": 3, "hc_ratio": 64,
+                     "hc_ratio_pct": -2, "avg_price": 2.08, "avg_price_pct": 3}
+
+# The dev DB may hold no solar history; inject a representative production week so
+# the preview shows the center-bottom Solaire chart.
+if not data.get("production_days"):
+    from app.config import DAYS_FR
+
+    pv = [3.1, 5.8, 6.4, 2.2, 7.1, 4.5, 6.9, 5.2, 1.4]  # kWh/day, last = today (partial)
+    data["production_days"] = [
+        {"day": DAYS_FR[(now.weekday() - (len(pv) - 1 - i)) % 7], "pv_kwh": v,
+         "today": i == len(pv) - 1}
+        for i, v in enumerate(pv)
+    ]
+    data["production_stats"] = {"avg_kwh": 5.3, "avg_kwh_pct": 8, "total_kwh": 67.2,
+                                "savings_eur": 8.4, "talon_cover_pct": 111}
+
 # The dev DB may hold no power-sensor history; inject representative rows so the
 # preview still shows the bottom Cumulus / Lave-linge rows the device renders.
 if not data.get("power_sensors"):
     data["power_sensors"] = [
-        {"name": "Cumulus", "yesterday_text": "2.4", "avg_text": "3.1", "trend_pct": 4.5},
-        {"name": "Lave-linge", "yesterday_text": "0.8", "avg_text": "0.9", "trend_pct": -5.0},
+        {"name": "Cumulus", "yesterday_text": "2.4", "avg_text": "3.1", "trend_pct": 4.5,
+         "spark": [3.4, 2.9, 3.1, 1.8, 3.0, 2.6, 2.4]},
+        {"name": "Lave-linge", "yesterday_text": "0.8", "avg_text": "0.9", "trend_pct": -5.0,
+         "spark": [0.9, 1.3, 0.7, None, 1.1, 0.6, 0.8]},
     ]
 
 # The talon needs the new talon_w column populated (one fetch cycle). On a dev DB
 # that predates it, inject representative values so the bottom Talon row shows.
 if data.get("talon", {}).get("yesterday_text") in (None, "N/A"):
-    data["talon"] = {"yesterday_text": "318", "avg_text": "305", "avg_w": 305, "trend_pct": -4.0}
+    data["talon"] = {"yesterday_text": "318", "avg_text": "305", "avg_w": 305, "trend_pct": -4.0,
+                     "spark": [298, 312, 305, 330, 321, 309, 318]}
 
 # The UniFi panel needs live gateway credentials we don't have here; inject a
 # representative snapshot so the preview shows the bottom-right Réseau panel.
@@ -152,10 +184,18 @@ if ALERTS_DEMO:
             d["pv_kwh"] = 1.5
             break
     # Cumulus good (black): strong drop — override the Cumulus sensor's trend.
+    # Also inject representative 7-day sparklines (the dev DB has no power history,
+    # so the real series are empty) — one with a gap to show missing-day handling.
+    _demo_spark = {
+        "cumulus": [3.4, 2.9, 3.1, 1.8, 3.0, 2.6, 2.4],
+        "lave-linge": [0.9, 1.3, 0.7, None, 1.1, 0.6, 0.8],
+    }
     for s in data.get("power_sensors", []):
-        if s.get("name", "").lower() == "cumulus":
+        name = s.get("name", "").lower()
+        if name == "cumulus":
             s["trend_pct"] = -28                   # -> Cumulus: Conso ▼28%
-            break
+        if not any(v is not None for v in (s.get("spark") or [])):
+            s["spark"] = _demo_spark.get(name, [2.0, 2.4, 1.9, 2.6, 2.1, 2.3, 2.5])
 data["alert_board"] = build_board(data)
 print("board:", [(r["label"], [f"{m} {f} {mo}".strip() for m, f, mo, _ in r["items"]]
                               if r.get("alert") else "RAS")

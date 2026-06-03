@@ -90,12 +90,30 @@
     {
       "avg_text": "2.5",
       "name": "Cumulus",
+      "spark": [
+        2.2,
+        3.0,
+        2.9,
+        1.7,
+        2.5,
+        2.4,
+        3.2
+      ],
       "trend_pct": 3.4,
       "yesterday_text": "3.2"
     },
     {
       "avg_text": "1.0",
       "name": "Lave-linge",
+      "spark": [
+        1.0,
+        1.35,
+        1.1,
+        0.7,
+        1.05,
+        0.8,
+        1.15
+      ],
       "trend_pct": -4.9,
       "yesterday_text": "1.1"
     }
@@ -174,6 +192,15 @@
   "talon": {
     "avg_text": "316",
     "avg_w": 316,
+    "spark": [
+      309.0,
+      313.0,
+      317.0,
+      333.0,
+      337.0,
+      299.0,
+      303.0
+    ],
     "trend_pct": -0.5,
     "yesterday_text": "303"
   },

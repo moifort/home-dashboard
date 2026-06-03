@@ -137,11 +137,17 @@ def _compute_talon(current: list[dict], previous: list[dict]) -> dict:
     avg_prev = sum(prev) / len(prev) if prev else 0.0
     trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
 
+    # Sparkline: the last 7 complete days' talon (oldest→newest, ending
+    # yesterday), left-padded with None when fewer than 7 days are available.
+    last7 = [d.get("talon_w") for d in current[-7:]]
+    spark = [None] * (7 - len(last7)) + last7
+
     return {
         "yesterday_text": f"{round(yesterday)}" if yesterday is not None else "N/A",
         "avg_text": f"{round(avg)}" if cur else "N/A",
         "avg_w": round(avg) if cur else None,
         "trend_pct": trend_pct,
+        "spark": spark,
     }
 
 

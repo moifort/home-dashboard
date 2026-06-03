@@ -176,6 +176,15 @@ def start():
     return listeners
 
 
+def _sensor_spark(slug: str, today, today_str: str) -> list:
+    """The last 7 complete days' kWh (oldest→newest, ending yesterday), aligned
+    with the EDF chart axis. `None` for any missing day so the sparkline leaves
+    a gap instead of inventing a zero."""
+    week_ago = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+    by_date = {r["date"]: r["cons_kwh"] for r in db.get_cached_power(slug, week_ago, today_str)}
+    return [by_date.get((today - timedelta(days=n)).strftime("%Y-%m-%d")) for n in range(7, 0, -1)]
+
+
 def _sensor_stats(slug: str, today, today_str: str) -> dict:
     """Yesterday's kWh, recent daily average and trend for one sensor."""
     yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -199,6 +208,7 @@ def _sensor_stats(slug: str, today, today_str: str) -> dict:
         "yesterday_text": f"{yesterday_kwh:.1f}",
         "avg_text": f"{avg:.1f}" if past else "N/A",
         "trend_pct": trend_pct,
+        "spark": _sensor_spark(slug, today, today_str),
     }
 
 
