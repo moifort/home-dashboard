@@ -14,20 +14,17 @@ import os
 from datetime import datetime, timedelta
 
 from app import db
-from app.config import DAYS_FR, PARIS_TZ
+from app.config import DAYS_FR, MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
 
 from .mqtt.listener import WaterMqttListener
 
 logger = logging.getLogger(__name__)
 
-MQTT_HOST = os.environ.get("WATER_MQTT_HOST", "")
-MQTT_PORT = int(os.environ.get("WATER_MQTT_PORT", "1883"))
-TOPIC = os.environ.get("WATER_TOPIC", "watermeter/index_m3")
-MQTT_USERNAME = os.environ.get("WATER_MQTT_USERNAME", "")
-MQTT_PASSWORD = os.environ.get("WATER_MQTT_PASSWORD", "")
+# Broker host/port/credentials are shared (app.config); this slice only owns its topic.
+TOPIC = os.environ.get("WATER_TOPIC", "")
 PRICE_M3 = float(os.environ.get("WATER_PRICE_M3", "0") or 0)
 
-ENABLED = bool(MQTT_HOST)
+ENABLED = bool(MQTT_HOST) and bool(TOPIC)
 CHART_DAYS = 9  # daily bars shown in the dedicated water chart
 
 _last_water_report = ""
@@ -64,7 +61,7 @@ def _on_water_index(m3: float):
 def start():
     """Start the water MQTT listener if enabled, else log and do nothing."""
     if not ENABLED:
-        logger.info("Water integration disabled (set WATER_MQTT_HOST to enable)")
+        logger.info("Water integration disabled (set MQTT_HOST + WATER_TOPIC to enable)")
         return None
     listener = WaterMqttListener(
         MQTT_HOST, MQTT_PORT, TOPIC, MQTT_USERNAME, MQTT_PASSWORD, _on_water_index,

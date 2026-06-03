@@ -13,22 +13,19 @@ import time
 from datetime import datetime, timedelta
 
 from app import db
-from app.config import PARIS_TZ
+from app.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
 
 from .mqtt.listener import CumulusMqttListener
 
 logger = logging.getLogger(__name__)
 
-MQTT_HOST = os.environ.get("CUMULUS_MQTT_HOST", "")
-MQTT_PORT = int(os.environ.get("CUMULUS_MQTT_PORT", "1883"))
-TOPIC = os.environ.get("CUMULUS_TOPIC", "zigbee2mqtt/cumulus")
-MQTT_USERNAME = os.environ.get("CUMULUS_MQTT_USERNAME", "")
-MQTT_PASSWORD = os.environ.get("CUMULUS_MQTT_PASSWORD", "")
+# Broker host/port/credentials are shared (app.config); this slice only owns its topic.
+TOPIC = os.environ.get("CUMULUS_TOPIC", "")
 
 
 # --- Slice orchestration: enable, integrate power -> daily kWh, panel, status ---
 
-ENABLED = bool(MQTT_HOST)
+ENABLED = bool(MQTT_HOST) and bool(TOPIC)
 NA_THRESHOLD_KWH = 0.05
 
 # Integration state for the contactor power -> daily kWh. Only the MQTT listener
@@ -91,7 +88,7 @@ def _on_cumulus_power(watts: float):
 def start():
     """Start the Cumulus MQTT listener if enabled, else log and do nothing."""
     if not ENABLED:
-        logger.info("Cumulus integration disabled (set CUMULUS_MQTT_HOST to enable)")
+        logger.info("Cumulus integration disabled (set MQTT_HOST + CUMULUS_TOPIC to enable)")
         return None
     listener = CumulusMqttListener(
         MQTT_HOST, MQTT_PORT, TOPIC, MQTT_USERNAME, MQTT_PASSWORD, _on_cumulus_power,
