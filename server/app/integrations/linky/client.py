@@ -32,10 +32,15 @@ def parse_hc_windows(windows_str: str) -> list[tuple[int, int, int, int]]:
     return windows
 
 
-# Talon (baseline) = a low percentile of the day's 30-min power samples, in W.
-# The strict minimum would catch the single step where everything (fridge
-# included) happened to be off at once; P5 gives the true permanent floor.
-TALON_PCT = 5
+# Talon (baseline) = a low percentile of the day's NIGHT 30-min power samples, in W.
+# The Conso load curve is grid draw (soutirage), already net of self-consumed
+# solar — so daytime samples get crushed by PV injection and would drag the
+# percentile down. We restrict to a solar-free night window (23h–05h) to read
+# the true permanent floor. Over the ~12 night samples, P20 lands on the ~3rd
+# lowest, skipping the deepest dips (e.g. fridge + everything off at once).
+TALON_PCT = 20
+TALON_NIGHT_START = 23  # hour, inclusive
+TALON_NIGHT_END = 5     # hour, exclusive  → 23h–05h, dark year-round
 
 
 def _percentile(values: list[float], pct: float) -> float:
@@ -69,7 +74,7 @@ def compute_daily_hc_hp(
         return []
 
     daily: dict[str, dict] = defaultdict(
-        lambda: {"hc_wh": 0.0, "hp_wh": 0.0, "watts": []}
+        lambda: {"hc_wh": 0.0, "hp_wh": 0.0, "night_watts": []}
     )
 
     for reading in readings:
@@ -83,7 +88,9 @@ def compute_daily_hc_hp(
             daily[date_key]["hc_wh"] += wh
         else:
             daily[date_key]["hp_wh"] += wh
-        daily[date_key]["watts"].append(watts)
+        # The talon only looks at the solar-free night window (see TALON_PCT note).
+        if ts.hour >= TALON_NIGHT_START or ts.hour < TALON_NIGHT_END:
+            daily[date_key]["night_watts"].append(watts)
 
     return sorted(
         [
@@ -91,7 +98,13 @@ def compute_daily_hc_hp(
                 "date": date,
                 "hc_kwh": round(vals["hc_wh"] / 1000, 2),
                 "hp_kwh": round(vals["hp_wh"] / 1000, 2),
-                "talon_w": round(_percentile(vals["watts"], TALON_PCT)),
+                # No night sample (partial boundary day) → None, not a bogus 0;
+                # _compute_talon filters None out.
+                "talon_w": (
+                    round(_percentile(vals["night_watts"], TALON_PCT))
+                    if vals["night_watts"]
+                    else None
+                ),
             }
             for date, vals in daily.items()
         ],

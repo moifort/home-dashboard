@@ -44,6 +44,12 @@ def init_schema():
     cols = [r[1] for r in conn.execute("PRAGMA table_info(daily_consumption)")]
     if "talon_w" not in cols:
         conn.execute("ALTER TABLE daily_consumption ADD COLUMN talon_w REAL")
+    # Migration v1: the talon switched from a 24h percentile to a night-only one
+    # (solar no longer crushes it). Old cached talons are stale — NULL them once
+    # so fetch_and_cache re-fetches the load curve and recomputes them night-only.
+    if conn.execute("PRAGMA user_version").fetchone()[0] < 1:
+        conn.execute("UPDATE daily_consumption SET talon_w = NULL")
+        conn.execute("PRAGMA user_version = 1")
     conn.commit()
     conn.close()
 
