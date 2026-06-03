@@ -1,6 +1,8 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <esp_system.h>
+#include <esp_sleep.h>
 
 #include "nvs_config.h"
 #include "DEV_Config.h"
@@ -9,6 +11,7 @@
 // Survives deep sleep (reset only on power loss), so we can bound how often we
 // wake to retry after a failure instead of pinging every 5 min forever.
 RTC_DATA_ATTR static uint32_t failCount = 0;
+RTC_DATA_ATTR static uint32_t bootCount = 0;
 
 // Deep sleep after a failed cycle: quick 5-min retries for a brief outage
 // (router rebooting…), then back off to the normal interval to save battery.
@@ -147,6 +150,13 @@ void setup() {
     Serial.begin(115200);
     delay(500);
     Serial.println("\n=== Linky Dashboard ===");
+    bootCount++;
+    // Boot diagnostics for a headless deep-sleep device: reset_reason 1=POWERON
+    // (power was cut — e.g. host USB sleeping), 8=DEEPSLEEP (our timer woke us),
+    // 9=BROWNOUT; wakeup_cause 4=TIMER.
+    Serial.printf("Boot #%lu — reset_reason=%d wakeup_cause=%d failCount=%lu\n",
+                  (unsigned long)bootCount, (int)esp_reset_reason(),
+                  (int)esp_sleep_get_wakeup_cause(), (unsigned long)failCount);
 
     if (checkResetCommand()) {
         clearConfig();
