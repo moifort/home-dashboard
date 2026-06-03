@@ -45,37 +45,36 @@ DB table, power integrator and render panel. Tech-specific transport lives in a
 subfolder (`mqtt/`, `proto/`, `graphql/`, `api/`). Removing an integration is
 `rm -rf server/app/integrations/<name>/` + removing its entry from `OPTIONAL`.
 
-## Tests / Anti-régression (golden master) — LIRE AVANT TOUT REFACTO
+## Tests / Anti-regression (golden master) — READ BEFORE ANY REFACTOR
 
-Un filet golden-master (`server/tests/`) protège le pipeline contre les régressions.
-**Lancer pytest depuis `server/`.** **À prendre en compte dans tout plan de
-refacto** : il fige une entrée connue et compare la sortie au bit près à une
-référence commitée.
+A golden-master net (`server/tests/`) guards the pipeline against regressions.
+**Run pytest from `server/`.** **Factor it into any refactor plan**: it freezes a
+known input and compares the output bit-for-bit against a committed reference.
 
-- **Couche 1** `server/tests/test_data_pipeline.py` : DB seedée + temps figé →
-  `build_dashboard_data()` → `server/tests/fixtures/data.golden.json`. Couvre
-  l'orchestrateur, les slices adossées DB (linky core, solar, cumulus, water) et
-  les alertes. **Portable** (byte-exact macOS/Linux, aucun rendu police).
-- **Couche 2** `server/tests/test_render_golden.py` : dict figé complet →
+- **Layer 1** `server/tests/test_data_pipeline.py`: seeded DB + frozen clock →
+  `build_dashboard_data()` → `server/tests/fixtures/data.golden.json`. Covers the
+  orchestrator, the DB-backed slices (linky core, solar, cumulus, water) and the
+  alerts. **Portable** (byte-exact on macOS/Linux, no font rendering).
+- **Layer 2** `server/tests/test_render_golden.py`: full frozen dict →
   `render_dashboard()` → `png_to_epd_buffer()` → `server/tests/fixtures/display.golden.bin`
-  (163 200 o). Sensible à FreeType/Pillow (**`Pillow` épinglé**) ; tolérance
-  `GOLDEN_TOLERANCE` (défaut 0) ; PNG actual/golden/diff écrits dans `/tmp` si écart.
+  (163,200 bytes). Sensitive to FreeType/Pillow (**`Pillow` pinned**); tolerance
+  `GOLDEN_TOLERANCE` (default 0); actual/golden/diff PNGs written to `/tmp` on a mismatch.
 
-Workflow (depuis `server/`) :
-- **Avant/pendant un refacto** : `pytest -q` doit rester **vert** (rien n'a changé
-  visiblement). `pip install -r requirements-dev.txt` si pytest absent.
-- **Changement volontaire** de layout/données : `pytest --update-golden`, inspecter
-  le diff (`/tmp/render_diff.png`), recommiter les goldens **dans le même commit**.
-- Détails : DB déterministe et `FIXED_NOW=2026-06-02` dans `server/tests/fixtures/seed_db.py`.
-- **Garde-fou par plateforme** : la couche 1 (données, sans rendu police) est
-  **byte-exact partout** → garde-fou strict en local **et** en CI. La couche 2
-  (rendu) dépend de **FreeType**, qui diffère macOS↔Linux d'environ **5%** du buffer
-  pour un layout identique → le golden (généré sur le Mac) ne peut pas être
-  byte-exact en CI. Donc : **strict en local Mac** (tolérance 0, c'est là que tu
-  juges le rendu), **smoke test en CI** (`GOLDEN_TOLERANCE=0.10` dans
-  `.github/workflows/tests.yml`, n'attrape que les cassures grossières). Le golden
-  rendu commité est **celui du Mac** — régénère-le en local (`--update-golden`), pas
-  en CI.
+Workflow (from `server/`):
+- **Before/during a refactor**: `pytest -q` must stay **green** (nothing changed
+  visibly). `pip install -r requirements-dev.txt` if pytest is missing.
+- **Intentional** layout/data change: `pytest --update-golden`, inspect the diff
+  (`/tmp/render_diff.png`), re-commit the goldens **in the same commit**.
+- Details: deterministic DB and `FIXED_NOW=2026-06-02` in `server/tests/fixtures/seed_db.py`.
+- **Per-platform guard**: layer 1 (data, no font rendering) is **byte-exact
+  everywhere** → strict guard locally **and** in CI. Layer 2 (rendering) depends on
+  **FreeType**, which differs macOS↔Linux by about **5%** of the buffer for an
+  identical layout → the golden (generated on the Mac) can't be byte-exact in CI.
+  So: **strict on the local Mac** (tolerance 0, that's where you judge the
+  rendering), **smoke test in CI** (`GOLDEN_TOLERANCE=0.10` in
+  `.github/workflows/tests.yml`, only catches gross breakage). The committed
+  rendered golden is **the Mac's** — regenerate it locally (`--update-golden`), not
+  in CI.
 
 ## e-Paper Display
 
@@ -158,6 +157,22 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 - After every template change, **analyze the rendered PNG** before sending to ESP32
 - Check: alignment with separator line, text sharpness, digit spacing
 - **After any UI change, regenerate `server/scripts/preview.png` and open it in the macOS Preview app** (`open -a Preview server/scripts/preview.png`) so the user can review the result
+
+## Documentation language
+
+- **Docs are fully English.** All Markdown (`README.md`, `CHANGELOG.md`,
+  `CLAUDE.md`) reads in English so any developer understands it — prose,
+  headings, examples. When you reference a string the screen shows in French,
+  keep the literal (so the doc still matches the device) **and add an English
+  gloss**: e.g. the `Réseau` (Network) panel, the `Eau` (Water) chart, an alert
+  like *Forte hausse de consommation* (sharp rise in consumption), the
+  `aujourd'hui` (today) tag. Never leave a French word a reader would need French
+  to understand — that's why it's "Talon (baseline power)", not "talon
+  énergétique".
+- **Code keeps its French UI labels — never translate them.** The dashboard
+  renders in French; the on-screen strings in the code (renderer labels, panel
+  titles, alert messages) must stay French. Only the docs that *describe* them
+  are in English. Code identifiers, paths and env-var names stay verbatim.
 
 ## Git Workflow
 
