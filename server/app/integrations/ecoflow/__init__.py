@@ -13,8 +13,8 @@ import os
 import time
 from datetime import datetime, timedelta
 
-from app import db
-from app.config import DAYS_FR, PARIS_TZ
+from app.module import db
+from app.system.config import DAYS_FR, PARIS_TZ
 
 from .mqtt.listener import EcoflowMqttListener
 

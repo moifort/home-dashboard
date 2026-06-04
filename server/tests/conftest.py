@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from app import db
+from app.module import db
 from app.integrations import crypto, ecoflow, power, unifi, water
 from app.integrations.power import Sensor
 from tests.fixtures import seed_db
@@ -27,7 +27,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 # `from datetime import datetime`, so the name lives in the module namespace.
 _TIME_MODULES = [
     "app.dashboard_data",
-    "app.db",
+    "app.module.db",
     "app.integrations.linky",
     "app.integrations.ecoflow",
     "app.integrations.power",

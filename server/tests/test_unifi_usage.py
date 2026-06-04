@@ -7,7 +7,7 @@ here with a fixed `today`.
 """
 from datetime import date, datetime, timedelta
 
-from app.config import PARIS_TZ
+from app.system.config import PARIS_TZ
 from app.integrations.unifi import _pct_change, _usage_from_daily
 
 TODAY = date(2026, 6, 3)

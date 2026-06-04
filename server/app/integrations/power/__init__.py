@@ -23,8 +23,8 @@ import unicodedata
 from collections import Counter, namedtuple
 from datetime import datetime, timedelta
 
-from app import db
-from app.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
+from app.module import db
+from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
 
 from .mqtt.listener import PowerMqttListener
 

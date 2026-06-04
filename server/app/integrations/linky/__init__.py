@@ -8,8 +8,8 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from app import db
-from app.config import DAYS_FR, PARIS_TZ
+from app.module import db
+from app.system.config import DAYS_FR, PARIS_TZ
 
 from .api.transport import fetch_load_curve
 from .client import LinkyApiError, LinkyAuthError, compute_daily_hc_hp, parse_hc_windows

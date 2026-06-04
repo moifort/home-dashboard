@@ -9,7 +9,7 @@ import logging
 import os
 from datetime import datetime
 
-from app.config import PARIS_TZ
+from app.system.config import PARIS_TZ
 
 from .graphql.transport import _grouped, fetch_crypto_grid, fetch_crypto_stats
 

@@ -7,7 +7,7 @@ drift wakes the ESP a minute before a boundary.
 """
 from datetime import datetime
 
-from app.schedule import next_screen_refresh, next_screen_wake
+from app.system.scheduler import next_screen_refresh, next_screen_wake
 
 
 def _at(h, m):

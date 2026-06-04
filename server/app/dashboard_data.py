@@ -6,9 +6,9 @@ every optional integration contributes its own fields via attach().
 from datetime import datetime
 
 from app import alerts as alerts_engine
-from app.config import PARIS_TZ
+from app.system.config import PARIS_TZ
 from app.integrations import OPTIONAL, linky
-from app.schedule import current_screen_refresh, next_screen_refresh
+from app.system.scheduler import current_screen_refresh, next_screen_refresh
 
 
 def build_dashboard_data(days: list[dict]) -> dict:

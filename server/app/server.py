@@ -10,7 +10,7 @@ from io import BytesIO
 from pathlib import Path
 
 from app import dashboard_data as dashboard
-from app.config import (
+from app.system.config import (
     DATA_LEAD_MIN,
     DB_PATH,
     PARIS_TZ,
@@ -21,7 +21,7 @@ from app.config import (
     VERSION,
 )
 from app.integrations import OPTIONAL, crypto, linky
-from app.schedule import next_data_update, next_screen_wake
+from app.system.scheduler import next_data_update, next_screen_wake
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
 

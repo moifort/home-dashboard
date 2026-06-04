@@ -12,7 +12,7 @@ can drive them with a frozen clock.
 """
 from datetime import datetime, timedelta
 
-from app.config import DATA_LEAD_MIN, SCREEN_REFRESH_INTERVAL_MIN, SCREEN_WAKE_SKIP_MIN
+from app.system.config import DATA_LEAD_MIN, SCREEN_REFRESH_INTERVAL_MIN, SCREEN_WAKE_SKIP_MIN
 
 
 def next_screen_refresh(now: datetime) -> datetime:

@@ -8,8 +8,8 @@ import subprocess
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-# Server root (the Python import root): server/app/config.py -> server/app -> server.
-REPO_ROOT = Path(__file__).resolve().parents[1]
+# Server root (the Python import root): server/app/system/config.py -> ... -> server.
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
 DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]

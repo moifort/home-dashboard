@@ -16,7 +16,7 @@ import warnings
 from datetime import timedelta
 from io import BytesIO
 
-from app import db
+from app.module import db
 from app.dashboard_data import build_dashboard_data
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard

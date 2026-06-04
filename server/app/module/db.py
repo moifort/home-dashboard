@@ -8,7 +8,7 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 
-from app.config import DB_PATH, PARIS_TZ
+from app.system.config import DB_PATH, PARIS_TZ
 
 
 def connect() -> sqlite3.Connection:

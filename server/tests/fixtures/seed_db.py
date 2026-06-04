@@ -11,8 +11,8 @@ and `connect()` reads that module global.
 """
 from datetime import date, datetime, timedelta
 
-from app import db
-from app.config import PARIS_TZ
+from app.module import db
+from app.system.config import PARIS_TZ
 from app.integrations import ecoflow, linky, power, water
 
 # Frozen reference instant for the whole test suite. Everything (seeded ranges,

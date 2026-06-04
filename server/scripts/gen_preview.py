@@ -21,8 +21,9 @@ os.environ.setdefault("DB_PATH", str(ROOT / ".data" / "linky.db"))
 
 from datetime import datetime  # noqa: E402
 
-from app import dashboard_data, db  # noqa: E402  (env must be set first)
-from app.config import PARIS_TZ  # noqa: E402
+from app import dashboard_data  # noqa: E402  (env must be set first)
+from app.module import db  # noqa: E402
+from app.system.config import PARIS_TZ  # noqa: E402
 from app.integrations import ecoflow, linky, power  # noqa: E402
 from app.integrations.power import Sensor  # noqa: E402
 from app.rendering.renderer import render_dashboard  # noqa: E402
@@ -62,7 +63,7 @@ data = dashboard_data.build_dashboard_data(days)
 # The dev DB may hold no Linky history; inject a representative EDF stacked
 # HC/HP week so the preview always shows the left-column consumption chart.
 if not data.get("days"):
-    from app.config import DAYS_FR
+    from app.system.config import DAYS_FR
 
     edf = [(4.8, 2.4), (5.1, 2.6), (4.2, 2.0), (5.6, 3.1), (4.9, 2.5),
            (6.0, 3.4), (3.8, 1.9), (5.2, 2.7), (4.5, 2.3)]  # (hc, hp) kWh, ends yesterday
@@ -77,7 +78,7 @@ if not data.get("days"):
 # The dev DB may hold no solar history; inject a representative production week so
 # the preview shows the center-bottom Solaire chart.
 if not data.get("production_days"):
-    from app.config import DAYS_FR
+    from app.system.config import DAYS_FR
 
     pv = [3.1, 5.8, 6.4, 2.2, 7.1, 4.5, 6.9, 5.2, 1.4]  # kWh/day, last = today (partial)
     data["production_days"] = [
@@ -124,7 +125,7 @@ if "unifi" not in data:
 # The water meter needs a live MQTT broker we don't have here; inject a
 # representative 7-day history so the preview shows the top-center Eau chart.
 if "water_days" not in data:
-    from app.config import DAYS_FR
+    from app.system.config import DAYS_FR
 
     sample = [118, 142, 168, 95, 210, 130, None, 155, 64]  # last = today, mid-day partial
     data["water_days"] = [

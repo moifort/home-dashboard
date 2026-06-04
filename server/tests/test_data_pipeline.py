@@ -8,7 +8,7 @@ this golden is fully portable (byte-exact on macOS and the Linux CI alike).
 import difflib
 from datetime import timedelta
 
-from app import db
+from app.module import db
 from app.dashboard_data import build_dashboard_data
 from tests._golden import canonical_json
 from tests.conftest import FIXTURES_DIR

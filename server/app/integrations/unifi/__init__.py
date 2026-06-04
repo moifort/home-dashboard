@@ -11,8 +11,8 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from app import db
-from app.config import PARIS_TZ
+from app.module import db
+from app.system.config import PARIS_TZ
 
 from .client import fetch_unifi
 
