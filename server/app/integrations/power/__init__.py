@@ -8,12 +8,19 @@ report a power -> integrate into daily kWh -> one bottom-table row each.
 Config: POWER_SENSORS = "topic:Display Name;topic2:Other Name" (`;` separates
 sensors, the first `:` of each entry separates the MQTT topic from its label).
 Broker host/port/credentials are shared (app.config); this slice owns the topics.
+
+**Grouping**: several topics that share the same label are summed into one
+bottom-table row (e.g. four plugs all named `Salon` -> a single `Salon` total).
+Each topic keeps its own MQTT listener and integrator (no shared state, no lock);
+the sum is computed at display time over the group's per-topic daily series. A
+lone sensor stores under `_slugify(name)` (unchanged, history preserved); the
+members of a multi-topic group get a per-topic suffix so they never collide.
 """
 import logging
 import os
 import time
 import unicodedata
-from collections import namedtuple
+from collections import Counter, namedtuple
 from datetime import datetime, timedelta
 
 from app import db
@@ -44,9 +51,16 @@ def _slugify(name: str) -> str:
 
 
 def _parse_sensors(raw: str) -> list:
-    """Parse "topic:Name;topic2:Name 2" into a list of Sensor; skip malformed."""
-    sensors = []
-    seen = set()
+    """Parse "topic:Name;topic2:Name 2" into a list of Sensor; skip malformed.
+
+    Topics sharing a name form a group summed under that label. A lone name keeps
+    the bare `_slugify(name)` storage slug (backward compatible); each member of a
+    multi-topic group gets a `_slugify(name)-_slugify(topic)` slug so they don't
+    collide. The group total is the sum of its members, so which member owns which
+    slug is irrelevant to the displayed value.
+    """
+    parsed = []  # (topic, name) in declared order, deduped by topic
+    seen_topics = set()
     for entry in raw.split(";"):
         entry = entry.strip()
         if not entry:
@@ -59,13 +73,34 @@ def _parse_sensors(raw: str) -> list:
         if not topic or not name:
             logger.warning("POWER_SENSORS entry ignored (empty topic or name): %r", entry)
             continue
-        slug = _slugify(name)
-        if slug in seen:
-            logger.warning("POWER_SENSORS duplicate slug %r ignored: %r", slug, entry)
+        if topic in seen_topics:
+            logger.warning("POWER_SENSORS duplicate topic %r ignored: %r", topic, entry)
             continue
-        seen.add(slug)
+        seen_topics.add(topic)
+        parsed.append((topic, name))
+
+    name_counts = Counter(name for _, name in parsed)
+    sensors = []
+    for topic, name in parsed:
+        if name_counts[name] > 1:
+            slug = f"{_slugify(name)}-{_slugify(topic.replace('/', ' '))}"
+        else:
+            slug = _slugify(name)
         sensors.append(Sensor(slug, topic, name))
     return sensors
+
+
+def _groups(sensors: list) -> list:
+    """Group sensors by display name, preserving each name's first-appearance
+    order. Returns an ordered list of (name, [slug, ...])."""
+    by_name: dict = {}
+    order = []
+    for s in sensors:
+        if s.name not in by_name:
+            by_name[s.name] = []
+            order.append(s.name)
+        by_name[s.name].append(s.slug)
+    return [(name, by_name[name]) for name in order]
 
 
 POWER_SENSORS = os.environ.get("POWER_SENSORS", "")
@@ -176,31 +211,42 @@ def start():
     return listeners
 
 
-def _sensor_spark(slug: str, today, today_str: str) -> list:
-    """The last 7 complete days' kWh (oldest→newest, ending yesterday), aligned
-    with the EDF chart axis. `None` for any missing day so the sparkline leaves
-    a gap instead of inventing a zero."""
+def _merged_by_date(slugs: list, start: str, end: str) -> dict:
+    """Sum each day's kWh across all of a group's topics over [start, end).
+
+    A day present for at least one member appears in the result (sum of the
+    present members); a day absent from every member is simply missing, so the
+    caller's `.get(day)` yields `None` and the sparkline keeps its gap."""
+    merged: dict = {}
+    for slug in slugs:
+        for r in db.get_cached_power(slug, start, end):
+            merged[r["date"]] = merged.get(r["date"], 0.0) + r["cons_kwh"]
+    return merged
+
+
+def _group_spark(slugs: list, today, today_str: str) -> list:
+    """The last 7 complete days' summed kWh (oldest→newest, ending yesterday),
+    aligned with the EDF chart axis. `None` for any day no member reported."""
     week_ago = (today - timedelta(days=7)).strftime("%Y-%m-%d")
-    by_date = {r["date"]: r["cons_kwh"] for r in db.get_cached_power(slug, week_ago, today_str)}
+    by_date = _merged_by_date(slugs, week_ago, today_str)
     return [by_date.get((today - timedelta(days=n)).strftime("%Y-%m-%d")) for n in range(7, 0, -1)]
 
 
-def _sensor_stats(slug: str, today, today_str: str) -> dict:
-    """Yesterday's kWh, recent daily average and trend for one sensor."""
+def _group_stats(slugs: list, today, today_str: str) -> dict:
+    """Yesterday's kWh, recent daily average and trend for one group (summed)."""
     yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
     nine_ago = (today - timedelta(days=9)).strftime("%Y-%m-%d")
 
-    yesterday_rows = db.get_cached_power(slug, yesterday_str, today_str)
-    yesterday_kwh = yesterday_rows[0]["cons_kwh"] if yesterday_rows else 0.0
+    yesterday_kwh = _merged_by_date(slugs, yesterday_str, today_str).get(yesterday_str, 0.0)
 
-    past = [r["cons_kwh"] for r in db.get_cached_power(slug, nine_ago, today_str)
-            if r["cons_kwh"] >= NA_THRESHOLD_KWH]
+    past = [v for v in _merged_by_date(slugs, nine_ago, today_str).values()
+            if v >= NA_THRESHOLD_KWH]
     avg = sum(past) / len(past) if past else 0.0
 
     # Trend: last 9 days vs the 28 days before them (mirrors the solar stats).
     prev_start = (today - timedelta(days=37)).strftime("%Y-%m-%d")
-    prev = [r["cons_kwh"] for r in db.get_cached_power(slug, prev_start, nine_ago)
-            if r["cons_kwh"] >= NA_THRESHOLD_KWH]
+    prev = [v for v in _merged_by_date(slugs, prev_start, nine_ago).values()
+            if v >= NA_THRESHOLD_KWH]
     avg_prev = sum(prev) / len(prev) if prev else 0.0
     trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
 
@@ -208,12 +254,13 @@ def _sensor_stats(slug: str, today, today_str: str) -> dict:
         "yesterday_text": f"{yesterday_kwh:.1f}",
         "avg_text": f"{avg:.1f}" if past else "N/A",
         "trend_pct": trend_pct,
-        "spark": _sensor_spark(slug, today, today_str),
+        "spark": _group_spark(slugs, today, today_str),
     }
 
 
 def attach(data: dict):
-    """Attach one bottom-table entry per sensor (yesterday kWh + recent average).
+    """Attach one bottom-table entry per group (label) — topics sharing a label
+    are summed (yesterday kWh + recent average).
 
     Integrated from each device's reported power (no energy counter); history
     starts at first connection (no backfill).
@@ -222,7 +269,8 @@ def attach(data: dict):
     today = now.date()
     today_str = today.strftime("%Y-%m-%d")
     data["power_sensors"] = [
-        {"name": s.name, **_sensor_stats(s.slug, today, today_str)} for s in SENSORS
+        {"name": name, **_group_stats(slugs, today, today_str)}
+        for name, slugs in _groups(SENSORS)
     ]
 
 

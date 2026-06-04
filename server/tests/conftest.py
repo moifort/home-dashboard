@@ -76,6 +76,9 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
     monkeypatch.setattr(power, "SENSORS", [
         Sensor("cumulus", "zigbee2mqtt/cumulus", "Cumulus"),
         Sensor("lave-linge", "zigbee2mqtt/lave-linge", "Lave-linge"),
+        # Two topics sharing the "Salon" label -> one summed bottom-table row.
+        Sensor(seed_db.SALON_1_SLUG, "zigbee2mqtt/prise-1", "Salon"),
+        Sensor(seed_db.SALON_2_SLUG, "zigbee2mqtt/prise-2", "Salon"),
     ])
     monkeypatch.setattr(power, "ENABLED", True)
     monkeypatch.setattr(water, "ENABLED", True)

@@ -63,10 +63,17 @@ def _production_rows():
     return rows
 
 
+# A "Salon" group of two plugs summed into one bottom-table row. prise-2 joins
+# halfway through the window, so early days are prise-1 only — this exercises the
+# "a day with at least one member is summed over the present members" rule.
+SALON_1_SLUG = "salon-zigbee2mqtt-prise-1"
+SALON_2_SLUG = "salon-zigbee2mqtt-prise-2"
+
+
 def _power_rows():
-    """Daily power-sensor Wh ending yesterday, for both seeded slugs (integrated,
-    no same-day flush needed). Mirrors the old cumulus/washer value patterns so the
-    rendered bottom table stays stable."""
+    """Daily power-sensor Wh ending yesterday (integrated, no same-day flush
+    needed). Two lone sensors (cumulus/washer) mirror the old value patterns so
+    those rows stay stable; a two-topic `Salon` group seeds the summation path."""
     start = TODAY - timedelta(days=_SEED_DAYS)
     end = TODAY - timedelta(days=1)
     rows = []
@@ -76,6 +83,11 @@ def _power_rows():
         washer_kwh = 0.5 + (i % 3) * 0.2 + (i % 5) * 0.15
         rows.append(("cumulus", ds, round(cumulus_kwh * 1000, 1), _FETCHED_AT))
         rows.append(("lave-linge", ds, round(washer_kwh * 1000, 1), _FETCHED_AT))
+        salon1_kwh = 0.8 + (i % 3) * 0.3
+        rows.append((SALON_1_SLUG, ds, round(salon1_kwh * 1000, 1), _FETCHED_AT))
+        if i >= _SEED_DAYS // 2:  # prise-2 joins partway through
+            salon2_kwh = 0.6 + (i % 4) * 0.25
+            rows.append((SALON_2_SLUG, ds, round(salon2_kwh * 1000, 1), _FETCHED_AT))
     return rows
 
 
