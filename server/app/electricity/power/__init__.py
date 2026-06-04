@@ -24,6 +24,7 @@ from collections import Counter, namedtuple
 from datetime import datetime, timedelta
 
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
+from app.module.format import format_energy_kwh
 from app.electricity.power.infrastructure import repository
 from app.electricity.power.infrastructure.mqtt import PowerMqttListener
 
@@ -31,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 Sensor = namedtuple("Sensor", "slug topic name")
 
-NA_THRESHOLD_KWH = 0.05
 MAX_SAMPLE_GAP_H = 5 / 60  # cap a sample's time weight at 5 min to avoid overcounting silence
 PERSIST_INTERVAL = 30  # seconds between SQLite writes
 
@@ -189,26 +189,33 @@ def _group_spark(slugs: list, today, today_str: str) -> list:
 
 
 def _group_stats(slugs: list, today, today_str: str) -> dict:
-    """Yesterday's kWh, recent daily average and trend for one group (summed)."""
+    """Yesterday's kWh, recent daily average and trend for one group (summed).
+
+    Unlike the Linky data (whose API can return garbage), a plug's reading is
+    trusted as-is — every recorded day counts toward the average (no near-zero
+    floor), and small values render in Wh rather than collapsing to "0.0 kWh"."""
     yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
     nine_ago = (today - timedelta(days=9)).strftime("%Y-%m-%d")
 
     yesterday_kwh = _merged_by_date(slugs, yesterday_str, today_str).get(yesterday_str, 0.0)
 
-    past = [v for v in _merged_by_date(slugs, nine_ago, today_str).values()
-            if v >= NA_THRESHOLD_KWH]
+    past = list(_merged_by_date(slugs, nine_ago, today_str).values())
     avg = sum(past) / len(past) if past else 0.0
 
     # Trend: last 9 days vs the 28 days before them (mirrors the solar stats).
     prev_start = (today - timedelta(days=37)).strftime("%Y-%m-%d")
-    prev = [v for v in _merged_by_date(slugs, prev_start, nine_ago).values()
-            if v >= NA_THRESHOLD_KWH]
+    prev = list(_merged_by_date(slugs, prev_start, nine_ago).values())
     avg_prev = sum(prev) / len(prev) if prev else 0.0
     trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
 
+    yesterday_text, yesterday_unit = format_energy_kwh(yesterday_kwh, " hier")
+    avg_text, avg_unit = format_energy_kwh(avg, "/j") if past else ("N/A", "kWh/j")
     return {
-        "yesterday_text": f"{yesterday_kwh:.1f}",
-        "avg_text": f"{avg:.1f}" if past else "N/A",
+        "yesterday_text": yesterday_text,
+        "yesterday_unit": yesterday_unit,
+        "avg_text": avg_text,
+        "avg_unit": avg_unit,
+        "avg_kwh": avg if past else None,  # numeric (kWh) for sorting + alert money
         "trend_pct": trend_pct,
         "spark": _group_spark(slugs, today, today_str),
     }

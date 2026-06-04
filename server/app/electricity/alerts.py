@@ -4,7 +4,7 @@ Each rule is a pure function (data) -> (message, figure[, money]) | None. EDF
 covers consumption, heures-creuses and the talon (baseline power); Cumulus covers
 the water-heater power sensor (looked up by display name in data["power_sensors"]).
 """
-from app.module.format import AlertRule, _money, _to_float
+from app.module.format import AlertRule, _money
 
 # Electricity prices for the €/kWh-based money estimates.
 from app.electricity import PRICE_HC, PRICE_HP
@@ -64,7 +64,7 @@ def _cumulus_rise(data):
     cumulus = _power_sensor(data, "Cumulus") or {}
     pct = cumulus.get("trend_pct")
     if pct is not None and pct >= CUMULUS_RISE_PCT:
-        avg = _to_float(cumulus.get("avg_text"))
+        avg = cumulus.get("avg_kwh")
         money = _money(False, avg * pct / 100 * PRICE_HC) if avg else ""
         return ("Forte consommation du cumulus", f"{round(pct)}%", money)
     return None
@@ -106,7 +106,7 @@ def _cumulus_drop(data):
     cumulus = _power_sensor(data, "Cumulus") or {}
     pct = cumulus.get("trend_pct")
     if pct is not None and pct <= -CUMULUS_DROP_PCT:
-        avg = _to_float(cumulus.get("avg_text"))
+        avg = cumulus.get("avg_kwh")
         money = _money(True, avg * abs(pct) / 100 * PRICE_HC) if avg else ""
         return ("Baisse de consommation du cumulus", f"{round(abs(pct))}%", money)
     return None

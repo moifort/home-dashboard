@@ -389,18 +389,16 @@ def _build_bottom_rows(data) -> list:
     tuple (name, yesterday, avg, trend, spark) — a rising value reads as bad (red)
     for these consumption-style metrics; `spark` is the row's 7-day series."""
     def _sensor_avg(sensor):
-        try:
-            return float(sensor.get("avg_text", ""))
-        except ValueError:
-            return float("-inf")  # "N/A" (pas d'historique) → en bas
+        v = sensor.get("avg_kwh")
+        return v if v is not None else float("-inf")  # "N/A" (pas d'historique) → en bas
 
     rows = []
     sensors = sorted(data.get("power_sensors", []), key=_sensor_avg, reverse=True)
     for sensor in sensors:
         rows.append((
             [(_short_name(sensor.get("name", "")), "bold", BLACK)],
-            [(sensor.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],
-            [(sensor.get("avg_text", "0"), "bold", BLACK), ("kWh/j", "regular", BLACK)],
+            [(sensor.get("yesterday_text", "0"), "bold", BLACK), (sensor.get("yesterday_unit", "kWh hier"), "regular", BLACK)],
+            [(sensor.get("avg_text", "0"), "bold", BLACK), (sensor.get("avg_unit", "kWh/j"), "regular", BLACK)],
             [_trend(sensor.get("trend_pct", 0), True)],
             sensor.get("spark"),
         ))
