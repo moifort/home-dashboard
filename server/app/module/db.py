@@ -44,28 +44,6 @@ def upsert_power(slug: str, date: str, cons_wh: float):
     conn.close()
 
 
-def get_cached_water(start: str, end: str) -> list[dict]:
-    conn = connect()
-    cur = conn.execute(
-        "SELECT date, index_m3 FROM daily_water WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
-    )
-    rows = [{"date": r[0], "index_m3": r[1]} for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-
-def upsert_water(date: str, index_m3: float):
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = connect()
-    conn.execute(
-        "INSERT OR REPLACE INTO daily_water (date, index_m3, fetched_at) VALUES (?, ?, ?)",
-        (date, index_m3, now),
-    )
-    conn.commit()
-    conn.close()
-
-
 def get_cached_production(start: str, end: str) -> list[dict]:
     conn = connect()
     cur = conn.execute(

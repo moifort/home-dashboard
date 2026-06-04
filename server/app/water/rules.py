@@ -1,74 +1,14 @@
-"""Water meter consumption slice.
-
-Self-contained vertical slice: the MQTT transport lives in mqtt/, and below the
-orchestration that turns the meter's cumulative index (m³) into a daily-litres
-chart plus a monthly total and cost. Remove the whole folder to drop the water
-reading.
+"""Water domain business rules — pure derivations from the meter index history.
 
 The wM-Bus meter reports a *cumulative* index (m³), not a power, so — unlike the
 Cumulus contactor — daily consumption is a *difference of index* between days
 (like the Linky index), never a time integration.
 """
-import logging
-import os
 from datetime import datetime, timedelta
 
-from app.module import db
-from app.system.config import DAYS_FR, MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
+from app.system.config import DAYS_FR
 
-from .mqtt.listener import WaterMqttListener
-
-logger = logging.getLogger(__name__)
-
-# Broker host/port/credentials are shared (app.config); this slice only owns its topic.
-TOPIC = os.environ.get("WATER_TOPIC", "")
-PRICE_M3 = float(os.environ.get("WATER_PRICE_M3", "0") or 0)
-
-ENABLED = bool(MQTT_HOST) and bool(TOPIC)
 CHART_DAYS = 9  # daily bars shown in the dedicated water chart
-
-_last_water_report = ""
-
-
-def enabled() -> bool:
-    return ENABLED
-
-
-def init_schema():
-    """Create the daily_water table (idempotent). Stores the latest index seen
-    each day; daily consumption is derived as a diff at read time."""
-    conn = db.connect()
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_water (
-            date TEXT PRIMARY KEY,
-            index_m3 REAL NOT NULL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    conn.commit()
-    conn.close()
-
-
-def _on_water_index(m3: float):
-    """MQTT callback: store today's latest cumulative index (m³). INSERT OR
-    REPLACE keeps the last value of the day, which is all the diff needs."""
-    global _last_water_report
-    now = datetime.now(PARIS_TZ)
-    db.upsert_water(now.strftime("%Y-%m-%d"), m3)
-    _last_water_report = now.isoformat()
-
-
-def start():
-    """Start the water MQTT listener if enabled, else log and do nothing."""
-    if not ENABLED:
-        logger.info("Water integration disabled (set MQTT_HOST + WATER_TOPIC to enable)")
-        return None
-    listener = WaterMqttListener(
-        MQTT_HOST, MQTT_PORT, TOPIC, MQTT_USERNAME, MQTT_PASSWORD, _on_water_index,
-    )
-    listener.start()
-    logger.info("Water MQTT listener started on %s:%d (%s)", MQTT_HOST, MQTT_PORT, TOPIC)
-    return listener
 
 
 def _index_asof(rows: list[dict], day: str) -> float | None:
@@ -83,23 +23,26 @@ def _index_asof(rows: list[dict], day: str) -> float | None:
     return found
 
 
-def attach(data: dict):
-    """Attach the water chart + stats from the meter's index history.
+def fetch_window(now: datetime) -> tuple[str, str]:
+    """The (start, end) date range to read so the chart, its trend baseline and
+    the month-to-date total are all covered. +1 day for the diff against the day
+    before the oldest shown."""
+    today = now.date()
+    first_of_month = today.replace(day=1)
+    start = min(today - timedelta(days=2 * CHART_DAYS + 1), first_of_month - timedelta(days=2))
+    end_str = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+    return start.strftime("%Y-%m-%d"), end_str
+
+
+def build_water_panel(rows: list[dict], now: datetime, price_m3: float) -> dict:
+    """Build the water chart + stats from the meter's index history.
 
     Daily litres are index diffs between consecutive days (carry-forward across
     days with no frame, so the jump lands on the next day that reports). History
     starts at first connection (no backfill).
     """
-    now = datetime.now(PARIS_TZ)
     today = now.date()
     first_of_month = today.replace(day=1)
-
-    # Fetch enough history for the chart (CHART_DAYS), its trend baseline (the
-    # CHART_DAYS before) and the month-to-date total, whichever reaches furthest
-    # back. +1 day for the diff against the day before the oldest shown.
-    start = min(today - timedelta(days=2 * CHART_DAYS + 1), first_of_month - timedelta(days=2))
-    end_str = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-    rows = db.get_cached_water(start.strftime("%Y-%m-%d"), end_str)
 
     # No reading recorded yet today → today's bar is N/A, not a carry-forward 0
     # (otherwise the diff against yesterday's carried-forward index reads as zero).
@@ -122,7 +65,7 @@ def attach(data: dict):
         daily.append((d, litres))
 
     shown = daily[-CHART_DAYS:]
-    data["water_days"] = [
+    water_days = [
         {"day": DAYS_FR[d.weekday()], "liters": litres, "today": d == today}
         for d, litres in shown
     ]
@@ -143,14 +86,11 @@ def attach(data: dict):
     else:
         month_total_m3 = None
 
-    data["water_stats"] = {
+    water_stats = {
         "avg_text": f"{avg_recent:.0f}" if avg_recent is not None else "N/A",
         "avg_pct": trend_pct,
         "month_total_text": f"{month_total_m3:.2f}" if month_total_m3 is not None else "N/A",
-        "cost_text": f"{month_total_m3 * PRICE_M3:.2f}"
-        if (month_total_m3 is not None and PRICE_M3 > 0) else None,
+        "cost_text": f"{month_total_m3 * price_m3:.2f}"
+        if (month_total_m3 is not None and price_m3 > 0) else None,
     }
-
-
-def status() -> dict:
-    return {"water_enabled": ENABLED, "last_water": _last_water_report}
+    return {"water_days": water_days, "water_stats": water_stats}

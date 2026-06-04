@@ -31,7 +31,7 @@ _TIME_MODULES = [
     "app.integrations.linky",
     "app.integrations.ecoflow",
     "app.integrations.power",
-    "app.integrations.water",
+    "app.water.query",
 ]
 
 
