@@ -24,13 +24,14 @@ from datetime import datetime  # noqa: E402
 from app import dashboard_data  # noqa: E402  (env must be set first)
 from app.module import db  # noqa: E402
 from app.system.config import PARIS_TZ  # noqa: E402
-from app.integrations import ecoflow, linky, power  # noqa: E402
-from app.integrations.power import Sensor  # noqa: E402
+from app import electricity, solar  # noqa: E402
+from app.electricity import power  # noqa: E402
+from app.electricity.power import Sensor  # noqa: E402
 from app.rendering.renderer import render_dashboard  # noqa: E402
 
 # Apply pending schema migrations (e.g. the talon_w column) as the server does
 # at startup, so reading from an older dev DB doesn't fail.
-linky.init_schema()
+electricity.init_schema()
 
 # Show panels backed by cached DB history even though their live integrations
 # need credentials we don't have here. Only enable those whose table exists in
@@ -43,7 +44,7 @@ _tables = {
         "SELECT name FROM sqlite_master WHERE type='table'"
     )
 }
-ecoflow.ENABLED = "daily_production" in _tables
+solar.ENABLED = "daily_production" in _tables
 # Migrate any legacy single-device tables into daily_power, then drive the
 # bottom power-sensor rows from the recommended Cumulus / Lave-linge config.
 power.init_schema()

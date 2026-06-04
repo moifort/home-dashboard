@@ -11,9 +11,10 @@ and `connect()` reads that module global.
 """
 from datetime import date, datetime, timedelta
 
+from app import electricity, solar, water
+from app.electricity import power
 from app.module import db
 from app.system.config import PARIS_TZ
-from app.integrations import ecoflow, linky, power, water
 
 # Frozen reference instant for the whole test suite. Everything (seeded ranges,
 # build_core's "today", each attach's date math) is computed relative to this.
@@ -107,8 +108,8 @@ def _water_rows():
 def seed():
     """Create every schema and insert the deterministic rows. Assumes
     `app.db.DB_PATH` already points at the (empty) target file."""
-    linky.init_schema()
-    ecoflow.init_schema()
+    electricity.init_schema()
+    solar.init_schema()
     power.init_schema()
     water.init_schema()
 

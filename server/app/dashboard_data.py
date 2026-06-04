@@ -1,18 +1,18 @@
-"""Assemble the render data dict: Linky core + each enabled optional slice.
+"""Assemble the render data dict: the core domain + each enabled optional domain.
 
-Thin orchestrator. The core consumption days/stats come from the Linky slice;
-every optional integration contributes its own fields via attach().
+Thin orchestrator. The core consumption days/stats come from the electricity
+domain; every optional domain contributes its own fields via attach().
 """
 from datetime import datetime
 
 from app import alerts as alerts_engine
 from app.system.config import PARIS_TZ
-from app.integrations import OPTIONAL, linky
+from app.registry import CORE, OPTIONAL
 from app.system.scheduler import current_screen_refresh, next_screen_refresh
 
 
 def build_dashboard_data(days: list[dict]) -> dict:
-    data = linky.build_core(days)
+    data = CORE.build_core(days)
     now = datetime.now(PARIS_TZ)
     data["last_updated"] = now.isoformat()
     # "Home" panel: the screen-refresh schedule (when the ESP shows this image and

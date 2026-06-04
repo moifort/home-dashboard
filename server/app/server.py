@@ -3,12 +3,12 @@
 import json
 import logging
 import threading
-import time
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
 
+from app import crypto
 from app import dashboard_data as dashboard
 from app.system.config import (
     DATA_LEAD_MIN,
@@ -20,8 +20,8 @@ from app.system.config import (
     SCREEN_REFRESH_INTERVAL_MIN,
     VERSION,
 )
-from app.integrations import OPTIONAL, crypto, linky
-from app.system.scheduler import next_data_update, next_screen_wake
+from app.registry import CORE, OPTIONAL
+from app.system.scheduler import next_screen_wake, run_loop
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
 
@@ -181,7 +181,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "data_lead_min": DATA_LEAD_MIN,
             "solar_days_cached": solar_days,
         }
-        status.update(linky.status())
+        status.update(CORE.status())
         for integration in OPTIONAL:
             status.update(integration.status())
         body = json.dumps(status, indent=2).encode()
@@ -222,7 +222,7 @@ def start_http_server(port: int):
 def refresh_cycle():
     global epd_buffer, dashboard_data
     try:
-        days = linky.fetch_and_cache()
+        days = CORE.fetch_and_cache()
         data = dashboard.build_dashboard_data(days)
         with data_lock:
             dashboard_data = data
@@ -234,34 +234,23 @@ def refresh_cycle():
         logger.error("Refresh cycle failed: %s", e, exc_info=True)
 
 
-def schedule_loop():
-    """Regenerate the buffer DATA_LEAD_MIN minutes before each screen-refresh
-    boundary, so the ESP32 always pulls a render that is at most a few minutes old."""
-    while True:
-        refresh_cycle()
-        now = datetime.now(PARIS_TZ)
-        target = next_data_update(now)
-        sleep_s = max(1.0, (target - now).total_seconds())
-        logger.info("Next data update at %s (%ds)", target.strftime("%H:%M"), int(sleep_s))
-        time.sleep(sleep_s)
-
-
 # --- Main ---
 
 def main():
     logger.info("Dashboard v%s", VERSION)
 
-    if not linky.TOKEN:
+    if not CORE.TOKEN:
         logger.critical("LINKY_TOKEN environment variable is required")
         raise SystemExit(1)
 
-    linky.init_schema()
+    CORE.init_schema()
     for integration in OPTIONAL:
         integration.init_schema()
         integration.start()
 
     start_http_server(PORT)
-    schedule_loop()
+    # Drive the refresh cycle on the screen-refresh schedule (system/scheduler).
+    run_loop(refresh_cycle)
 
 
 if __name__ == "__main__":

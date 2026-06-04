@@ -16,10 +16,11 @@ from pathlib import Path
 import pytest
 
 from app.module import db
-from app.integrations import crypto, ecoflow, power, unifi, water
+from app import crypto, network, solar, water
+from app.electricity import power
 from app.electricity.power import Sensor
-from tests.fixtures import seed_db
-from tests.fixtures.seed_db import FIXED_NOW
+from app.system.tests.fixtures import seed_db
+from app.system.tests.fixtures.seed_db import FIXED_NOW
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -72,7 +73,7 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
 
     # Enable the slices the seeded tables back; give water a €/m³ so its cost +
     # the water_drop money path are exercised.
-    monkeypatch.setattr(ecoflow, "ENABLED", True)
+    monkeypatch.setattr(solar, "ENABLED", True)
     monkeypatch.setattr(power, "SENSORS", [
         Sensor("cumulus", "zigbee2mqtt/cumulus", "Cumulus"),
         Sensor("lave-linge", "zigbee2mqtt/lave-linge", "Lave-linge"),
@@ -86,7 +87,7 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
 
     # Hard-disable the network slices so build_dashboard_data never fetches.
     monkeypatch.setattr(crypto, "enabled", lambda: False)
-    monkeypatch.setattr(unifi, "enabled", lambda: False)
+    monkeypatch.setattr(network, "enabled", lambda: False)
 
     seed_db.seed()
     return db_file

@@ -1,0 +1,4 @@
+# Server-side tooling config. The golden test suite lives under the system layer
+# (app/system/tests); `pytest` is still run from server/ (the Python import root).
+[tool.pytest.ini_options]
+testpaths = ["app/system/tests"]

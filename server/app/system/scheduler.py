@@ -7,12 +7,22 @@ pulls `/display`. To serve fresh data the server regenerates the buffer
 `DATA_LEAD_MIN` minutes *before* each of those boundaries (so the ESP always picks
 up a render that is at most a few minutes old). Both numbers live in `config.py`.
 
-All helpers are pure functions of the `now` they are handed, so the golden tests
-can drive them with a frozen clock.
+The boundary helpers are pure functions of the `now` they are handed, so the
+golden tests can drive them with a frozen clock. run_loop() drives the server's
+refresh cycle on that schedule.
 """
+import logging
+import time
 from datetime import datetime, timedelta
 
-from app.system.config import DATA_LEAD_MIN, SCREEN_REFRESH_INTERVAL_MIN, SCREEN_WAKE_SKIP_MIN
+from app.system.config import (
+    DATA_LEAD_MIN,
+    PARIS_TZ,
+    SCREEN_REFRESH_INTERVAL_MIN,
+    SCREEN_WAKE_SKIP_MIN,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def next_screen_refresh(now: datetime) -> datetime:
@@ -64,3 +74,15 @@ def next_data_update(now: datetime) -> datetime:
     if target <= now:
         target = nb + timedelta(minutes=SCREEN_REFRESH_INTERVAL_MIN - DATA_LEAD_MIN)
     return target
+
+
+def run_loop(cycle):
+    """Run `cycle()` now, then DATA_LEAD_MIN before each screen-refresh boundary,
+    so the ESP32 always pulls a render that is at most a few minutes old."""
+    while True:
+        cycle()
+        now = datetime.now(PARIS_TZ)
+        target = next_data_update(now)
+        sleep_s = max(1.0, (target - now).total_seconds())
+        logger.info("Next data update at %s (%ds)", target.strftime("%H:%M"), int(sleep_s))
+        time.sleep(sleep_s)

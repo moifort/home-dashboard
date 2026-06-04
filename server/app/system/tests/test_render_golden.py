@@ -20,10 +20,10 @@ from app.module import db
 from app.dashboard_data import build_dashboard_data
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
-from tests._golden import buffer_diff, canonical_json, diff_image, epd_buffer_to_image
-from tests.conftest import FIXTURES_DIR
-from tests.fixtures.build_fixture import apply_demo_panels
-from tests.fixtures.seed_db import TODAY
+from app.system.tests._golden import buffer_diff, canonical_json, diff_image, epd_buffer_to_image
+from app.system.tests.conftest import FIXTURES_DIR
+from app.system.tests.fixtures.build_fixture import apply_demo_panels
+from app.system.tests.fixtures.seed_db import TODAY
 
 FIXTURE = FIXTURES_DIR / "dashboard_data.json"
 GOLDEN = FIXTURES_DIR / "display.golden.bin"

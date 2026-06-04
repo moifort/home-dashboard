@@ -10,9 +10,9 @@ from datetime import timedelta
 
 from app.dashboard_data import build_dashboard_data
 from app.electricity.infrastructure import repository
-from tests._golden import canonical_json
-from tests.conftest import FIXTURES_DIR
-from tests.fixtures.seed_db import TODAY
+from app.system.tests._golden import canonical_json
+from app.system.tests.conftest import FIXTURES_DIR
+from app.system.tests.fixtures.seed_db import TODAY
 
 GOLDEN = FIXTURES_DIR / "data.golden.json"
 
