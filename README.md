@@ -92,10 +92,10 @@ When a UniFi gateway (UniFi OS) is configured, a `Réseau` (Network) panel is dr
 ### 2. Configure environment variables
 
 ```bash
-cp server/infra/.env.example server/infra/.env
+cp server/.env.example server/.env
 ```
 
-Edit `server/infra/.env` with your values:
+Edit `server/.env` with your values:
 
 ```env
 # Required — your Linky token
@@ -189,7 +189,7 @@ WATER_PRICE_M3=4.30                    # €/m³ for the cost figure (0 = hide c
 ### 3. Run with Docker Compose
 
 ```bash
-curl -O https://raw.githubusercontent.com/moifort/dashboard/main/server/infra/docker-compose.yml
+curl -O https://raw.githubusercontent.com/moifort/dashboard/main/server/docker-compose.yml
 docker compose up -d
 ```
 
@@ -200,7 +200,7 @@ The dashboard will be available at `http://your-server:5000`.
 Import the CasaOS compose file from the CasaOS interface using this URL:
 
 ```
-https://raw.githubusercontent.com/moifort/dashboard/main/server/infra/docker-compose.casaos.yml
+https://raw.githubusercontent.com/moifort/dashboard/main/server/docker-compose.casaos.yml
 ```
 
 ### 5. Flash the ESP32
@@ -253,10 +253,10 @@ A golden-master test suite guards the render pipeline against regressions. It
 freezes a known input (a seeded SQLite DB + a fixed clock) and compares the
 output byte-for-byte to committed references:
 
-- **Data pipeline** — `build_dashboard_data()` → `server/tests/fixtures/data.golden.json`
-  (portable; covers the orchestrator, the DB-backed slices and the alerts engine).
+- **Data pipeline** — `build_dashboard_data()` → `server/app/system/tests/fixtures/data.golden.json`
+  (portable; covers the orchestrator, the DB-backed domains and the alerts aggregator).
 - **Render** — `render_dashboard()` → `png_to_epd_buffer()` →
-  `server/tests/fixtures/display.golden.bin` (the 163,200-byte EPD buffer).
+  `server/app/system/tests/fixtures/display.golden.bin` (the 163,200-byte EPD buffer).
 
 ```bash
 cd server
