@@ -6,7 +6,8 @@ orchestrator and server can iterate them generically. To drop an integration,
 delete its package and remove it from OPTIONAL below.
 """
 from app import crypto, water
-from app.integrations import ecoflow, power, unifi
+from app import network as unifi
+from app.integrations import ecoflow, power
 
 # Order defines the render-attach order and is otherwise irrelevant.
 OPTIONAL = (ecoflow, crypto, power, unifi, water)

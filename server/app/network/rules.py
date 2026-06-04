@@ -1,35 +1,15 @@
-"""UniFi network-quality slice.
+"""Network domain business rules — pure derivations from the gateway payloads.
 
-Self-contained vertical slice: the REST transport lives in client.py, and below
-the orchestration that turns the gateway payloads into the render-ready "Réseau"
-panel (internet/Wi-Fi quality, clients per SSID, top-3 clients per network, data
-usage). Fetched live on the hourly refresh; a tiny daily snapshot table
-(daily_unifi) feeds the ▲▼ trends (7-day average, no backfill — history starts at
-first connection). Remove the whole folder to drop the panel.
+No IO: turns the raw UniFi dashboard/clients/daily-report data into the
+render-ready "Réseau" panel, and computes the data-usage windows + trends.
 """
-import logging
-import os
 from datetime import datetime, timedelta
 
-from app.module import db
 from app.system.config import PARIS_TZ
 
-from .client import fetch_unifi
-
-logger = logging.getLogger(__name__)
-
-HOST = os.environ.get("UNIFI_HOST", "https://192.168.1.1").rstrip("/")
-USERNAME = os.environ.get("UNIFI_USERNAME", "")
-PASSWORD = os.environ.get("UNIFI_PASSWORD", "")
-SITE = os.environ.get("UNIFI_SITE", "default")
-SSID_IOT = os.environ.get("UNIFI_SSID_IOT", "")
-SSID_MAIN = os.environ.get("UNIFI_SSID_MAIN", "")
-
-ENABLED = bool(PASSWORD)
 HEALTH_BAD_PCT = 99  # internet/Wi-Fi quality below this reads as degraded (red)
 TREND_DAYS = 7  # the latest completed day is compared to this many prior days
 ROLLING_DAYS = 30  # data-usage window: this many complete days ending yesterday
-_last_unifi_time = ""
 
 # Snapshot columns that carry a 7-day ▲▼ trend, paired with the panel key they
 # fill. (Data usage is NOT here: its trend compares the last 30 days to the prior
@@ -40,95 +20,6 @@ _TREND_COLUMNS = (
     ("wifi_pct", "wifi_trend"),
 )
 
-
-def enabled() -> bool:
-    return ENABLED
-
-
-def init_schema():
-    """Create the daily_unifi snapshot table (idempotent)."""
-    conn = db.connect()
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_unifi (
-            date TEXT PRIMARY KEY,
-            usage_bytes REAL,
-            speed_dl REAL,
-            latency_ms REAL,
-            isp_pct REAL,
-            wifi_pct REAL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    conn.commit()
-    conn.close()
-
-
-def start():
-    """No background listener for UniFi."""
-    return None
-
-
-def attach(data: dict):
-    """Fetch gateway stats, snapshot today's values, attach the panel + trends.
-
-    On any failure the key is left unset, so the panel is simply omitted.
-    """
-    global _last_unifi_time
-    raw = fetch_unifi(HOST, USERNAME, PASSWORD, SITE)
-    if not raw:
-        return
-    panel = build_unifi_panel(raw, {"iot": SSID_IOT, "main": SSID_MAIN})
-    if not panel:
-        return
-    _snapshot(panel.pop("_snap"))
-    for column, key in _TREND_COLUMNS:
-        panel[key] = _compute_trend(column)
-    data["unifi"] = panel
-    _last_unifi_time = datetime.now(PARIS_TZ).isoformat()
-
-
-# --- Daily snapshot + 7-day trend (no backfill) ----------------------------
-
-def _snapshot(snap: dict):
-    """Store today's reading (one row/day; last refresh of the day wins)."""
-    today = datetime.now(PARIS_TZ).strftime("%Y-%m-%d")
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = db.connect()
-    conn.execute(
-        """INSERT OR REPLACE INTO daily_unifi
-           (date, usage_bytes, latency_ms, isp_pct, wifi_pct, fetched_at)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (today, snap.get("usage_bytes"), snap.get("latency_ms"),
-         snap.get("isp_pct"), snap.get("wifi_pct"), now),
-    )
-    conn.commit()
-    conn.close()
-
-
-def _compute_trend(column: str) -> float | None:
-    """Latest completed day vs the average of up to TREND_DAYS prior days, in %.
-
-    Returns None until at least two completed days exist (column is a fixed
-    internal name, never user input)."""
-    today = datetime.now(PARIS_TZ).strftime("%Y-%m-%d")
-    conn = db.connect()
-    cur = conn.execute(
-        f"SELECT {column} FROM daily_unifi "
-        f"WHERE date < ? AND {column} IS NOT NULL ORDER BY date DESC LIMIT ?",
-        (today, TREND_DAYS + 1),
-    )
-    vals = [r[0] for r in cur.fetchall()]
-    conn.close()
-    if len(vals) < 2:
-        return None
-    latest, prior = vals[0], vals[1:]
-    baseline = sum(prior) / len(prior)
-    if not baseline:
-        return None
-    return round((latest - baseline) / baseline * 100, 1)
-
-
-# --- Raw payload -> render-ready panel --------------------------------------
 
 def _dig(obj, *path, default=None):
     """Safe nested lookup across dicts (str keys) and lists (int indices)."""
@@ -250,6 +141,20 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
     }
 
 
+def compute_trend(vals: list) -> float | None:
+    """Latest completed day vs the average of the prior days, in %.
+
+    `vals` is newest-first (latest, then up to TREND_DAYS prior). Returns None
+    until at least two completed days exist."""
+    if len(vals) < 2:
+        return None
+    latest, prior = vals[0], vals[1:]
+    baseline = sum(prior) / len(prior)
+    if not baseline:
+        return None
+    return round((latest - baseline) / baseline * 100, 1)
+
+
 def _pct_change(new: float, old: float) -> float | None:
     """Percent change of `new` vs `old`, or None when there's no baseline to
     compare against (old is zero/missing — e.g. a fresh install)."""
@@ -292,7 +197,3 @@ def _usage_from_daily(daily, today=None) -> tuple[int | None, int, int]:
         elif prev_start <= day <= prev_end:
             prev_total += day_bytes
     return y_bytes, last_total, prev_total
-
-
-def status() -> dict:
-    return {"unifi_enabled": ENABLED, "last_unifi": _last_unifi_time}
