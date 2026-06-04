@@ -388,8 +388,15 @@ def _build_bottom_rows(data) -> list:
     Lave-linge, …) then Talon (core Linky, always shown). Each row is a 5-column
     tuple (name, yesterday, avg, trend, spark) — a rising value reads as bad (red)
     for these consumption-style metrics; `spark` is the row's 7-day series."""
+    def _sensor_avg(sensor):
+        try:
+            return float(sensor.get("avg_text", ""))
+        except ValueError:
+            return float("-inf")  # "N/A" (pas d'historique) → en bas
+
     rows = []
-    for sensor in data.get("power_sensors", []):
+    sensors = sorted(data.get("power_sensors", []), key=_sensor_avg, reverse=True)
+    for sensor in sensors:
         rows.append((
             [(_short_name(sensor.get("name", "")), "bold", BLACK)],
             [(sensor.get("yesterday_text", "0"), "bold", BLACK), ("kWh hier", "regular", BLACK)],

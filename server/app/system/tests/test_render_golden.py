@@ -16,8 +16,8 @@ import warnings
 from datetime import timedelta
 from io import BytesIO
 
-from app.module import db
 from app.dashboard_data import build_dashboard_data
+from app.electricity.infrastructure import repository
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
 from app.system.tests._golden import buffer_diff, canonical_json, diff_image, epd_buffer_to_image
@@ -41,7 +41,7 @@ def test_render_golden(seeded_db, update_golden):
     if update_golden:
         start = (TODAY - timedelta(days=60)).strftime("%Y-%m-%d")
         end = (TODAY + timedelta(days=1)).strftime("%Y-%m-%d")
-        data = apply_demo_panels(build_dashboard_data(db.get_cached_days(start, end)))
+        data = apply_demo_panels(build_dashboard_data(repository.get_cached_days(start, end)))
         FIXTURE.write_text(canonical_json(data), encoding="utf-8")
     else:
         assert FIXTURE.exists(), "Run `pytest --update-golden` once to create the fixture."
