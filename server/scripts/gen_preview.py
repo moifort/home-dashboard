@@ -22,10 +22,10 @@ os.environ.setdefault("DB_PATH", str(ROOT / ".data" / "linky.db"))
 from datetime import datetime  # noqa: E402
 
 from app import dashboard_data  # noqa: E402  (env must be set first)
-from app.module import db  # noqa: E402
 from app.system.config import PARIS_TZ  # noqa: E402
 from app import electricity, solar  # noqa: E402
 from app.electricity import power  # noqa: E402
+from app.electricity.infrastructure import repository as electricity_repo  # noqa: E402
 from app.electricity.power import Sensor  # noqa: E402
 from app.rendering.renderer import render_dashboard  # noqa: E402
 
@@ -58,7 +58,7 @@ now = datetime.now(PARIS_TZ)
 start = (now - timedelta(days=45)).strftime("%Y-%m-%d")
 end = now.strftime("%Y-%m-%d")
 
-days = db.get_cached_days(start, end)
+days = electricity_repo.get_cached_days(start, end)
 data = dashboard_data.build_dashboard_data(days)
 
 # The dev DB may hold no Linky history; inject a representative EDF stacked

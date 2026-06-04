@@ -5,7 +5,7 @@ power sensors, water) with **fixed, reproducible** rows relative to a frozen "to
 Values come from pure index-based patterns (no randomness, no clock) so the same
 seed always yields the same `data` dict and the same rendered buffer.
 
-The caller must point `app.db.DB_PATH` at the target file *before* calling
+The caller must point `app.module.db.DB_PATH` at the target file *before* calling
 `seed()` (the conftest `seeded_db` fixture does this), since every `init_schema()`
 and `connect()` reads that module global.
 """
@@ -107,7 +107,7 @@ def _water_rows():
 
 def seed():
     """Create every schema and insert the deterministic rows. Assumes
-    `app.db.DB_PATH` already points at the (empty) target file."""
+    `app.module.db.DB_PATH` already points at the (empty) target file."""
     electricity.init_schema()
     solar.init_schema()
     power.init_schema()
