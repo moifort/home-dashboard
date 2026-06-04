@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-04
+
+- **Power sensors: sum several topics under one label** — `POWER_SENSORS` entries that share the same display name are now **grouped into a single bottom-table row whose energy is the sum** of its topics (e.g. four plugs all named `Salon` → one `Salon` total with its own yesterday / daily-average / trend / 7-day sparkline). Each topic keeps its own MQTT listener and integrator (no shared state, no lock); the sum is computed at display time over the group's per-topic daily series. A lone sensor still stores under its slugified label (unchanged, **history preserved, no migration**); members of a multi-topic group get a per-topic-suffixed slug so they never collide. A day reported by **at least one** member is summed over the members present, so adding a plug to a group later doesn't blank its history. Declare a group by simply repeating the label: `POWER_SENSORS="zigbee2mqtt/prise_1:Salon;zigbee2mqtt/prise_2:Salon;zigbee2mqtt/cumulus:Cumulus"`. The `Alertes` `Cumulus` domain still resolves by label. Data golden regenerated (seeded a two-topic `Salon` group); no new environment variable.
+
 ## 2026-06-03
 
 - **Wider name columns in the `EDF` bottom table and `Réseau` clients** — the name column of the table under the `EDF` chart gets more room (its `kWh hier` column starts further right), and the `Réseau` panel's client names are now truncated at **35** characters instead of 15, so longer device names (e.g. `MacBookPro Lamia`) show in full. The `EDF` table's sensor names also gain a 33-character truncation guard. Rendered golden regenerated; no new environment variable.

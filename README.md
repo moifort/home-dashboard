@@ -54,7 +54,7 @@ A **table** below the consumption chart (under a thin separator line) shows the 
 
 ### Power sensors (optional)
 
-Any Zigbee2MQTT / ESPHome device that reports only **instantaneous power** (W) and has no energy counter can be added as a **power sensor**: a row at the top of the bottom table (above the Talon row) showing that device's daily consumption — yesterday's kWh, the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more) and a 7-day sparkline. The server subscribes to each device's topic and **integrates** the reported power into daily kWh (no historical backfill — history starts at first connection). They are all declared in **one variable**, `POWER_SENSORS` (a `;`-separated list of `topic:Display Name`), so adding a sensor is a config line — see the setup section below. Typical examples: a `Cumulus` (water-heater contactor) and a `Lave-linge` (washing-machine smart plug).
+Any Zigbee2MQTT / ESPHome device that reports only **instantaneous power** (W) and has no energy counter can be added as a **power sensor**: a row at the top of the bottom table (above the Talon row) showing that device's daily consumption — yesterday's kWh, the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more) and a 7-day sparkline. The server subscribes to each device's topic and **integrates** the reported power into daily kWh (no historical backfill — history starts at first connection). They are all declared in **one variable**, `POWER_SENSORS` (a `;`-separated list of `topic:Display Name`), so adding a sensor is a config line — see the setup section below. Several topics sharing the **same label** are **summed into a single row** (e.g. every plug in a room named `Salon`). Typical examples: a `Cumulus` (water-heater contactor) and a `Lave-linge` (washing-machine smart plug).
 
 ### Water consumption (optional, center column)
 
@@ -157,8 +157,11 @@ With the broker set above, declare every device that reports only **instantaneou
 
 The label's slug (lowercased, accent-stripped, spaces→`-`) is the storage key. **Keep the labels `Cumulus` and `Lave-linge`** to inherit the history migrated from the previous `CUMULUS_TOPIC` / `WASHER_TOPIC` tables (slugs `cumulus` / `lave-linge`).
 
+**Grouping** — give several topics the **same label** and they are summed into a single row (e.g. every plug in a room named `Salon` → one `Salon` total). Each topic still gets its own listener and integrator; the row is the sum of its members, computed at display time. A day reported by at least one member is summed over the members present, so adding a plug later doesn't blank the group's history.
+
 ```env
-POWER_SENSORS=zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge
+# Two lone sensors + a three-plug "Salon" group (summed into one row):
+POWER_SENSORS=zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge;zigbee2mqtt/prise_1:Salon;zigbee2mqtt/prise_2:Salon;zigbee2mqtt/prise_3:Salon
 ```
 
 #### Optional — UniFi network panel
