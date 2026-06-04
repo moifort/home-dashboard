@@ -4,7 +4,7 @@ import time
 
 import requests
 
-from ..client import LinkyApiError, LinkyAuthError
+from .linky_client import LinkyApiError, LinkyAuthError
 
 logger = logging.getLogger(__name__)
 

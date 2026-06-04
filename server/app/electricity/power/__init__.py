@@ -1,13 +1,13 @@
-"""Generic MQTT power-sensor slice (config-driven, multi-sensor).
+"""Power sub-domain of electricity — generic MQTT power sensors (config-driven).
 
-One self-contained vertical slice that replaces the old per-device Cumulus and
-Lave-linge slices: every Z2M device that exposes only instantaneous power (W) and
-no energy counter is declared in a single env var and integrated the same way —
-report a power -> integrate into daily kWh -> one bottom-table row each.
+Every Z2M device that exposes only instantaneous power (W) and no energy counter
+is declared in a single env var and integrated the same way — report a power ->
+integrate into daily kWh -> one bottom-table row each.
 
 Config: POWER_SENSORS = "topic:Display Name;topic2:Other Name" (`;` separates
 sensors, the first `:` of each entry separates the MQTT topic from its label).
-Broker host/port/credentials are shared (app.config); this slice owns the topics.
+Broker host/port/credentials are shared (system.config); this sub-domain owns the
+topics.
 
 **Grouping**: several topics that share the same label are summed into one
 bottom-table row (e.g. four plugs all named `Salon` -> a single `Salon` total).
@@ -23,19 +23,13 @@ import unicodedata
 from collections import Counter, namedtuple
 from datetime import datetime, timedelta
 
-from app.module import db
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
-
-from .mqtt.listener import PowerMqttListener
+from app.electricity.power.infrastructure import repository
+from app.electricity.power.infrastructure.mqtt import PowerMqttListener
 
 logger = logging.getLogger(__name__)
 
 Sensor = namedtuple("Sensor", "slug topic name")
-
-# Legacy single-device tables migrated into the shared daily_power table once.
-# The target slugs match _slugify() of the recommended display names, so history
-# re-attaches as long as those names are kept in POWER_SENSORS.
-_LEGACY_TABLES = (("daily_cumulus", "cumulus"), ("daily_washer", "lave-linge"))
 
 NA_THRESHOLD_KWH = 0.05
 MAX_SAMPLE_GAP_H = 5 / 60  # cap a sample's time weight at 5 min to avoid overcounting silence
@@ -119,45 +113,7 @@ def enabled() -> bool:
 
 def init_schema():
     """Create the shared daily_power table and migrate legacy tables once."""
-    conn = db.connect()
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_power (
-            slug TEXT NOT NULL,
-            date TEXT NOT NULL,
-            cons_wh REAL NOT NULL,
-            fetched_at TEXT NOT NULL,
-            PRIMARY KEY (slug, date)
-        )"""
-    )
-    for table, slug in _LEGACY_TABLES:
-        _migrate_legacy(conn, table, slug)
-    conn.commit()
-    conn.close()
-
-
-def _migrate_legacy(conn, table: str, slug: str):
-    """One-time copy of a legacy single-device table into daily_power[slug].
-
-    Idempotent: skips if the table is gone or daily_power already holds the slug.
-    """
-    exists = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-    ).fetchone()
-    if not exists:
-        return
-    already = conn.execute(
-        "SELECT 1 FROM daily_power WHERE slug=? LIMIT 1", (slug,)
-    ).fetchone()
-    if already:
-        return
-    rows = conn.execute(f"SELECT date, cons_wh, fetched_at FROM {table}").fetchall()
-    if not rows:
-        return
-    conn.executemany(
-        "INSERT OR IGNORE INTO daily_power (slug, date, cons_wh, fetched_at) VALUES (?, ?, ?, ?)",
-        [(slug, d, wh, at) for d, wh, at in rows],
-    )
-    logger.info("Migrated %d rows from %s into daily_power[%s]", len(rows), table, slug)
+    repository.init_schema()
 
 
 def _make_on_power(slug: str):
@@ -170,9 +126,9 @@ def _make_on_power(slug: str):
 
         if st["date"] != today:
             if st["date"] is not None:
-                db.upsert_power(slug, st["date"], st["wh"])  # flush the finished day
+                repository.upsert_power(slug, st["date"], st["wh"])  # flush the finished day
             tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-            existing = db.get_cached_power(slug, today, tomorrow)
+            existing = repository.get_cached_power(slug, today, tomorrow)
             st["date"] = today
             st["wh"] = existing[0]["cons_kwh"] * 1000 if existing else 0.0
             st["last_ts"] = None
@@ -186,7 +142,7 @@ def _make_on_power(slug: str):
 
         mono = time.monotonic()
         if mono - st["last_persist"] >= PERSIST_INTERVAL:
-            db.upsert_power(slug, today, st["wh"])
+            repository.upsert_power(slug, today, st["wh"])
             st["last_persist"] = mono
         _last_report[slug] = now.isoformat()
 
@@ -219,7 +175,7 @@ def _merged_by_date(slugs: list, start: str, end: str) -> dict:
     caller's `.get(day)` yields `None` and the sparkline keeps its gap."""
     merged: dict = {}
     for slug in slugs:
-        for r in db.get_cached_power(slug, start, end):
+        for r in repository.get_cached_power(slug, start, end):
             merged[r["date"]] = merged.get(r["date"], 0.0) + r["cons_kwh"]
     return merged
 

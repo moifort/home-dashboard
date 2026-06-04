@@ -4,7 +4,7 @@ Pure parsing logic, no DB or font rendering — portable and byte-exact everywhe
 The summed-series behaviour itself is covered by the golden data test, which seeds
 a two-topic "Salon" group.
 """
-from app.integrations.power import _groups, _parse_sensors
+from app.electricity.power import _groups, _parse_sensors
 
 
 def test_lone_sensor_keeps_bare_name_slug():

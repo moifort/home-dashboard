@@ -8,8 +8,8 @@ this golden is fully portable (byte-exact on macOS and the Linux CI alike).
 import difflib
 from datetime import timedelta
 
-from app.module import db
 from app.dashboard_data import build_dashboard_data
+from app.electricity.infrastructure import repository
 from tests._golden import canonical_json
 from tests.conftest import FIXTURES_DIR
 from tests.fixtures.seed_db import TODAY
@@ -20,7 +20,7 @@ GOLDEN = FIXTURES_DIR / "data.golden.json"
 def _read_all_days():
     start = (TODAY - timedelta(days=60)).strftime("%Y-%m-%d")
     end = (TODAY + timedelta(days=1)).strftime("%Y-%m-%d")
-    return db.get_cached_days(start, end)
+    return repository.get_cached_days(start, end)
 
 
 def test_data_pipeline_golden(seeded_db, update_golden):

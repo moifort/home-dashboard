@@ -1,98 +1,16 @@
-"""SQLite storage layer.
+"""SQLite connection primitive (transverse infrastructure).
 
-Single place that opens the database (`connect()`), creates the schema and reads
-/writes the daily tables. Timestamps use the Paris timezone for consistency with
-the rest of the app.
+The single place that opens the database file. Each domain owns its own tables
+and accessors in its `infrastructure/repository.py`; this module only provides the
+shared `connect()` so every repository talks to the same configured DB.
 """
 import os
 import sqlite3
-from datetime import datetime, timedelta
 
-from app.system.config import DB_PATH, PARIS_TZ
+from app.system.config import DB_PATH
 
 
 def connect() -> sqlite3.Connection:
-    """Open a connection to the configured database file.
-
-    Each slice creates its own table via its init_schema(); this module only
-    owns the connection primitive and the daily-table accessors.
-    """
+    """Open a connection to the configured database file."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     return sqlite3.connect(DB_PATH)
-
-
-def get_cached_power(slug: str, start: str, end: str) -> list[dict]:
-    conn = connect()
-    cur = conn.execute(
-        "SELECT date, cons_wh FROM daily_power "
-        "WHERE slug = ? AND date >= ? AND date < ? ORDER BY date",
-        (slug, start, end),
-    )
-    rows = [{"date": r[0], "cons_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-
-def upsert_power(slug: str, date: str, cons_wh: float):
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = connect()
-    conn.execute(
-        "INSERT OR REPLACE INTO daily_power (slug, date, cons_wh, fetched_at) VALUES (?, ?, ?, ?)",
-        (slug, date, cons_wh, now),
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_cached_days(start: str, end: str) -> list[dict]:
-    conn = connect()
-    cur = conn.execute(
-        "SELECT date, hc_kwh, hp_kwh, talon_w FROM daily_consumption WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
-    )
-    rows = [{"date": r[0], "hc_kwh": r[1], "hp_kwh": r[2], "talon_w": r[3]} for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-
-def upsert_days(days: list[dict]):
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = connect()
-    for d in days:
-        conn.execute(
-            "INSERT OR REPLACE INTO daily_consumption (date, hc_kwh, hp_kwh, talon_w, fetched_at) VALUES (?, ?, ?, ?, ?)",
-            (d["date"], d["hc_kwh"], d["hp_kwh"], d.get("talon_w"), now),
-        )
-    conn.commit()
-    conn.close()
-
-
-def needs_refresh(start: str, end: str) -> bool:
-    cached = get_cached_days(start, end)
-    cached_dates = {d["date"] for d in cached}
-    now = datetime.now(PARIS_TZ)
-
-    current = datetime.strptime(start, "%Y-%m-%d")
-    end_dt = datetime.strptime(end, "%Y-%m-%d")
-    while current < end_dt:
-        ds = current.strftime("%Y-%m-%d")
-        if ds not in cached_dates:
-            return True
-        current += timedelta(days=1)
-
-    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-    if yesterday in cached_dates:
-        conn = connect()
-        cur = conn.execute(
-            "SELECT fetched_at FROM daily_consumption WHERE date = ?", (yesterday,)
-        )
-        row = cur.fetchone()
-        conn.close()
-        if row:
-            fetched = datetime.fromisoformat(row[0])
-            if fetched.astimezone(PARIS_TZ).date() < now.date():
-                return True
-            if fetched.astimezone(PARIS_TZ).hour < 10:
-                return True
-
-    return False

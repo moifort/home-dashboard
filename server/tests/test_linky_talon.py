@@ -5,7 +5,7 @@ get crushed by PV injection. The talon must read the solar-free night window
 (23h–05h) only, and P20 must skip the deepest night dip. These are pinned here on
 a synthetic one-day load curve.
 """
-from app.integrations.linky.client import (
+from app.electricity.infrastructure.linky_client import (
     TALON_NIGHT_END,
     TALON_NIGHT_START,
     compute_daily_hc_hp,
