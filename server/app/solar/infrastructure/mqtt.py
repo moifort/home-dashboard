@@ -8,7 +8,7 @@ import time
 import certifi
 import paho.mqtt.client as mqtt
 
-from ..client import (
+from .ecoflow_client import (
     GET_QUOTA_INTERVAL,
     EcoflowAuthError,
     build_get_quota_request,

@@ -29,7 +29,8 @@ _TIME_MODULES = [
     "app.dashboard_data",
     "app.module.db",
     "app.integrations.linky",
-    "app.integrations.ecoflow",
+    "app.solar.query",
+    "app.solar.command",
     "app.integrations.power",
     "app.water.query",
 ]

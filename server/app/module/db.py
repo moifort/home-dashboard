@@ -44,28 +44,6 @@ def upsert_power(slug: str, date: str, cons_wh: float):
     conn.close()
 
 
-def get_cached_production(start: str, end: str) -> list[dict]:
-    conn = connect()
-    cur = conn.execute(
-        "SELECT date, pv_wh FROM daily_production WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
-    )
-    rows = [{"date": r[0], "pv_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
-    conn.close()
-    return rows
-
-
-def upsert_production(date: str, pv_wh: float):
-    now = datetime.now(PARIS_TZ).isoformat()
-    conn = connect()
-    conn.execute(
-        "INSERT OR REPLACE INTO daily_production (date, pv_wh, fetched_at) VALUES (?, ?, ?)",
-        (date, pv_wh, now),
-    )
-    conn.commit()
-    conn.close()
-
-
 def get_cached_days(start: str, end: str) -> list[dict]:
     conn = connect()
     cur = conn.execute(

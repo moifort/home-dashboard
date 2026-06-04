@@ -7,7 +7,8 @@ delete its package and remove it from OPTIONAL below.
 """
 from app import crypto, water
 from app import network as unifi
-from app.integrations import ecoflow, power
+from app import solar as ecoflow
+from app.integrations import power
 
 # Order defines the render-attach order and is otherwise irrelevant.
 OPTIONAL = (ecoflow, crypto, power, unifi, water)
