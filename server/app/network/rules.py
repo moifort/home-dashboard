@@ -152,7 +152,7 @@ def compute_trend(vals: list) -> float | None:
     baseline = sum(prior) / len(prior)
     if not baseline:
         return None
-    return round((latest - baseline) / baseline * 100, 1)
+    return round((latest - baseline) / baseline * 100)
 
 
 def _pct_change(new: float, old: float) -> float | None:
@@ -160,7 +160,7 @@ def _pct_change(new: float, old: float) -> float | None:
     compare against (old is zero/missing — e.g. a fresh install)."""
     if not old:
         return None
-    return round((new - old) / old * 100, 1)
+    return round((new - old) / old * 100)
 
 
 def _usage_from_daily(daily, today=None) -> tuple[int | None, int, int]:

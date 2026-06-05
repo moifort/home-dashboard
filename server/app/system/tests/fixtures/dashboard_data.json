@@ -260,7 +260,7 @@
         0.8,
         1.15
       ],
-      "trend_pct": -4.9,
+      "trend_pct": -5,
       "yesterday_text": "1.1",
       "yesterday_unit": "kWh"
     },
@@ -280,7 +280,7 @@
         1.9000000000000001,
         2.45
       ],
-      "trend_pct": 35.9,
+      "trend_pct": 36,
       "yesterday_text": "2.5",
       "yesterday_unit": "kWh"
     }
@@ -352,7 +352,7 @@
     "avg_kwh": 8.4,
     "avg_kwh_pct": 15,
     "avg_price": 2.08,
-    "avg_price_pct": -2.9,
+    "avg_price_pct": -3,
     "hc_ratio": 42.2,
     "hc_ratio_pct": -14,
     "off_peak_now": false
@@ -369,7 +369,7 @@
       299.0,
       303.0
     ],
-    "trend_pct": -0.5,
+    "trend_pct": -1,
     "yesterday_text": "303"
   },
   "unifi": {
@@ -479,7 +479,7 @@
     }
   ],
   "water_stats": {
-    "avg_pct": -0.9,
+    "avg_pct": -1,
     "avg_text": "120",
     "cost_text": "1.19",
     "month_total_text": "0.30"

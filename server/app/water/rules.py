@@ -76,7 +76,7 @@ def build_water_panel(rows: list[dict], now: datetime, price_m3: float) -> dict:
 
     avg_recent = avg(v for _, v in daily[-CHART_DAYS:])
     avg_prev = avg(v for _, v in daily[-2 * CHART_DAYS:-CHART_DAYS])
-    trend_pct = round((avg_recent - avg_prev) / avg_prev * 100, 1) if avg_recent and avg_prev else 0
+    trend_pct = round((avg_recent - avg_prev) / avg_prev * 100) if avg_recent and avg_prev else 0
 
     # Month-to-date volume: index now minus the index at the end of last month.
     idx_now = _index_asof(rows, today.strftime("%Y-%m-%d"))

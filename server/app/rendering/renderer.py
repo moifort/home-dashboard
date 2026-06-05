@@ -809,6 +809,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
 # Segment = (text, font_key, color). font_key is "bold" (values) or "regular"
 # (labels and trends). Trends are regular weight, red when the trend is bad.
 def _trend(pct, invert_bad):
+    pct = round(pct)  # trends always display whole percents
     if pct == 0:
         return ("—", "regular", BLACK)
     arrow = "▲" if pct > 0 else "▼"

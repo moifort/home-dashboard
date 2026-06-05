@@ -64,7 +64,7 @@ def _compute_production_stats(current: list[dict], previous: list[dict], price_h
     avg_kwh_prev = _avg(previous)
     has_prev = avg_kwh_prev > 0
 
-    pct = round((avg_kwh - avg_kwh_prev) / avg_kwh_prev * 100, 1) if has_prev else 0
+    pct = round((avg_kwh - avg_kwh_prev) / avg_kwh_prev * 100) if has_prev else 0
     total = sum(d["pv_kwh"] for d in current)
     return {
         "avg_kwh": round(avg_kwh, 1),

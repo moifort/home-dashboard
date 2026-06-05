@@ -239,7 +239,7 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
     prev_start = (today - timedelta(days=37)).strftime("%Y-%m-%d")
     prev = list(_merged_by_date(slugs, prev_start, nine_ago).values())
     avg_prev = sum(prev) / len(prev) if prev else 0.0
-    trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
+    trend_pct = round((avg - avg_prev) / avg_prev * 100) if avg_prev > 0 else 0
 
     # "—" with the unit kept = the figure exists but isn't initialised yet.
     yesterday_text, yesterday_unit = (

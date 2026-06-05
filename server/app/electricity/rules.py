@@ -46,7 +46,7 @@ def _compute_talon(current: list[dict], previous: list[dict]) -> dict:
 
     prev = _vals(previous)
     avg_prev = sum(prev) / len(prev) if prev else 0.0
-    trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
+    trend_pct = round((avg - avg_prev) / avg_prev * 100) if avg_prev > 0 else 0
 
     # Sparkline: the last 7 complete days' talon (oldest→newest, ending
     # yesterday), left-padded with None when fewer than 7 days are available.
@@ -92,7 +92,7 @@ def _compute_stats(current: list[dict], previous: list[dict], price_hp: float,
     def _pct(cur, prev):
         if not valid_cur or not has_prev or prev == 0:
             return 0
-        return round((cur - prev) / prev * 100, 1)
+        return round((cur - prev) / prev * 100)
 
     # With no valid day yet the values are None — the renderer shows an em dash
     # with the unit kept (a figure that exists but isn't initialised).
@@ -100,7 +100,7 @@ def _compute_stats(current: list[dict], previous: list[dict], price_hp: float,
         "avg_kwh": round(avg_kwh, 1) if valid_cur else None,
         "avg_kwh_pct": _pct(avg_kwh, avg_kwh_prev),
         "hc_ratio": round(hc_ratio, 1) if valid_cur else None,
-        "hc_ratio_pct": round(hc_ratio - hc_ratio_prev, 1) if (valid_cur and has_prev) else 0,
+        "hc_ratio_pct": round(hc_ratio - hc_ratio_prev) if (valid_cur and has_prev) else 0,
         "avg_price": round(avg_price, 2) if valid_cur else None,
         "avg_price_pct": _pct(avg_price, avg_price_prev),
     }
