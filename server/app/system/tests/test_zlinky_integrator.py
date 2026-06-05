@@ -17,6 +17,24 @@ from app.electricity.infrastructure.zlinky_mqtt import _parse_tic, _to_kwh
 
 # --- Parser ---
 
+def test_parse_real_z2m_payload():
+    # Zigbee2MQTT translates the TIC labels to snake_case property names —
+    # captured from a live ZLinky_TIC (mode historique, HC/HP contract).
+    raw = json.dumps({
+        "active_register_tier_delivered": "HP..",
+        "apparent_power": 319,
+        "available_power": 30,
+        "current_price": "HP..",
+        "current_tarif": "HC..",  # OPTARIF (contract option) — NOT the live period
+        "current_tier1_summ_delivered": 12594.68,
+        "current_tier2_summ_delivered": 1632.55,
+        "linkquality": 99,
+        "tariff_period": "HP..",
+    }).encode()
+    r = _parse_tic(raw)
+    assert r == {"hchc_kwh": 12594.68, "hchp_kwh": 1632.55, "papp_va": 319.0, "period": "HP"}
+
+
 def test_parse_kwh_payload():
     raw = json.dumps({"HCHC": 12594.67, "HCHP": 1632.48, "PAPP": 331, "PTEC": "HC.."}).encode()
     r = _parse_tic(raw)
