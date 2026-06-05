@@ -250,7 +250,7 @@ implementation gotchas per domain.
 
 ### Bottom table rendering (power sensors + Talon)
 - `renderer._draw_bottom_table`; `_build_bottom_rows` iterates `data["power_sensors"]` (one row per group, sorted by descending `avg_kwh`, no-history rows at the bottom), then Talon (always last). The table is its own **section**: a title row (`Hier` / `Moy.` / `HC`, regular weight) sits **above** the 1px separator, in the same band as the Solaire title opposite — `_draw_bottom_table(region_top=WATER_SPLIT)` mirrors `_draw_chart`'s banner math so both separators share the same y, and the EDF chart's baseline aligns with the Eau chart's (`region_height = WATER_SPLIT + DIVIDER_GAP`).
-- 6-column grid anchored at `BOTTOM_COL_*` fractions of the 380px table: name left (truncated at 17 chars, `_short_name`), yesterday left (unit without "hier"), `kWh/j` right-aligned with the trend glued after it, `HC` % left (empty when `hc_pct is None` — always for Talon), 7-day sparkline hugging the right edge. The table's top is fixed; rows grow downward (`BOTTOM_ROW_H`).
+- 6-column grid anchored at `BOTTOM_COL_*` fractions of the 380px table: name left (truncated at 13 chars, `_short_name`), yesterday left (unit without "hier"), `kWh/j` right-aligned with the trend glued after it, `HC` % left (empty when `hc_pct is None` — always for Talon), 7-day sparkline hugging the right edge. The table's top is fixed; rows grow downward (`BOTTOM_ROW_H`).
 
 ### Networking
 - The dashboard runs in `network_mode: bridge`, so it reaches co-located services (crypto bot, MQTT brokers) via their **LAN IP**, not `localhost`.
