@@ -25,6 +25,8 @@ from datetime import datetime, timedelta
 
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
 from app.module.format import format_energy_kwh
+from app.electricity import HC_WINDOWS
+from app.electricity.infrastructure.linky_client import _is_off_peak
 from app.electricity.power.infrastructure import repository
 from app.electricity.power.infrastructure.mqtt import PowerMqttListener
 
@@ -122,27 +124,35 @@ def _make_on_power(slug: str):
     def _on_power(watts: float):
         now = datetime.now(PARIS_TZ)
         today = now.strftime("%Y-%m-%d")
-        st = _states.setdefault(slug, {"date": None, "wh": 0.0, "last_ts": None, "last_persist": 0.0})
+        st = _states.setdefault(slug, {"date": None, "wh": 0.0, "hc_wh": 0.0,
+                                       "last_ts": None, "last_persist": 0.0})
 
         if st["date"] != today:
             if st["date"] is not None:
-                repository.upsert_power(slug, st["date"], st["wh"])  # flush the finished day
+                repository.upsert_power(slug, st["date"], st["wh"], st["hc_wh"])  # flush the finished day
             tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
             existing = repository.get_cached_power(slug, today, tomorrow)
             st["date"] = today
             st["wh"] = existing[0]["cons_kwh"] * 1000 if existing else 0.0
+            hc = existing[0]["hc_kwh"] if existing else None
+            st["hc_wh"] = hc * 1000 if hc is not None else 0.0
             st["last_ts"] = None
             st["last_persist"] = 0.0
 
         if st["last_ts"] is not None:
             dt_h = (now - st["last_ts"]).total_seconds() / 3600
             if dt_h > 0:
-                st["wh"] += watts * min(dt_h, MAX_SAMPLE_GAP_H)
+                inc = watts * min(dt_h, MAX_SAMPLE_GAP_H)
+                st["wh"] += inc
+                # Same Linky off-peak windows as the core: the whole interval is
+                # attributed to `now` (as the day already is).
+                if _is_off_peak(now.hour, now.minute, HC_WINDOWS):
+                    st["hc_wh"] += inc
         st["last_ts"] = now
 
         mono = time.monotonic()
         if mono - st["last_persist"] >= PERSIST_INTERVAL:
-            repository.upsert_power(slug, today, st["wh"])
+            repository.upsert_power(slug, today, st["wh"], st["hc_wh"])
             st["last_persist"] = mono
         _last_report[slug] = now.isoformat()
 
@@ -180,6 +190,27 @@ def _merged_by_date(slugs: list, start: str, end: str) -> dict:
     return merged
 
 
+def _hc_pct(slugs: list, start: str, end: str):
+    """% of the group's [start, end) consumption that fell in off-peak windows.
+
+    Only days whose hc_wh is known (non-NULL) count — numerator and denominator
+    stay on the same day set, so pre-deployment history (no HC split) is simply
+    excluded. None when no day has HC info yet, or nothing was consumed."""
+    cons_sum = 0.0
+    hc_sum = 0.0
+    have_hc = False
+    for slug in slugs:
+        for r in repository.get_cached_power(slug, start, end):
+            if r["hc_kwh"] is None:
+                continue
+            have_hc = True
+            cons_sum += r["cons_kwh"]
+            hc_sum += r["hc_kwh"]
+    if not have_hc or cons_sum <= 0:
+        return None
+    return round(hc_sum / cons_sum * 100)
+
+
 def _group_spark(slugs: list, today, today_str: str) -> list:
     """The last 7 complete days' summed kWh (oldest→newest, ending yesterday),
     aligned with the EDF chart axis. `None` for any day no member reported."""
@@ -208,7 +239,7 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
     avg_prev = sum(prev) / len(prev) if prev else 0.0
     trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
 
-    yesterday_text, yesterday_unit = format_energy_kwh(yesterday_kwh, " hier")
+    yesterday_text, yesterday_unit = format_energy_kwh(yesterday_kwh, "")
     avg_text, avg_unit = format_energy_kwh(avg, "/j") if past else ("N/A", "kWh/j")
     return {
         "yesterday_text": yesterday_text,
@@ -217,6 +248,7 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
         "avg_unit": avg_unit,
         "avg_kwh": avg if past else None,  # numeric (kWh) for sorting + alert money
         "trend_pct": trend_pct,
+        "hc_pct": _hc_pct(slugs, nine_ago, today_str),  # int 0..100 or None (no HC info yet)
         "spark": _group_spark(slugs, today, today_str),
     }
 

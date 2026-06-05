@@ -91,6 +91,7 @@
       "avg_kwh": 2.533333333333333,
       "avg_text": "2.5",
       "avg_unit": "kWh/j",
+      "hc_pct": 49,
       "name": "Cumulus",
       "spark": [
         2.2,
@@ -103,12 +104,13 @@
       ],
       "trend_pct": 3.4,
       "yesterday_text": "3.2",
-      "yesterday_unit": "kWh hier"
+      "yesterday_unit": "kWh"
     },
     {
       "avg_kwh": 0.9666666666666666,
       "avg_text": "967",
       "avg_unit": "Wh/j",
+      "hc_pct": 48,
       "name": "Lave-linge",
       "spark": [
         1.0,
@@ -121,12 +123,13 @@
       ],
       "trend_pct": -4.9,
       "yesterday_text": "1.1",
-      "yesterday_unit": "kWh hier"
+      "yesterday_unit": "kWh"
     },
     {
       "avg_kwh": 2.1166666666666667,
       "avg_text": "2.1",
       "avg_unit": "kWh/j",
+      "hc_pct": 48,
       "name": "Salon",
       "spark": [
         1.9500000000000002,
@@ -139,7 +142,7 @@
       ],
       "trend_pct": 35.9,
       "yesterday_text": "2.5",
-      "yesterday_unit": "kWh hier"
+      "yesterday_unit": "kWh"
     }
   ],
   "production_days": [

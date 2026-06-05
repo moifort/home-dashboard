@@ -34,11 +34,12 @@ LABEL_FONT_SIZE = 12
 NA_THRESHOLD_KWH = 1.0  # EDF consumption chart only; the solar chart has no N/A floor
 MAX_DAYS = 9  # reference column count for the stats banner width
 WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto grid
-# Table under the EDF chart: a 3-column grid (name | yesterday | avg+trend), all
-# columns left-aligned, stacking the Cumulus/Lave-linge/Talon rows under a single
-# top separator line. It is anchored at the center-column mid-height split.
+# Table under the EDF chart: a section-title header row (Hier | Moy. | HC)
+# above the separator line — same band as the Solaire title opposite — then
+# a grid (name | yesterday | avg | trend | HC% | sparkline), stacking the
+# Cumulus/Lave-linge/Talon rows below. Anchored at the center-column mid-height
+# split, mirroring the solar banner geometry.
 BOTTOM_ROW_H = 17  # vertical pitch between table rows
-BOTTOM_TOP_GAP = 8  # gap between the chart's day labels and the top separator
 BOTTOM_TEXT_GAP = 6  # first row below the separator
 # Per-row 7-day sparkline, hugging the table's right edge: 7 thin black bars
 # normalised to that row's own max (we read each metric's shape, not cross-row
@@ -52,11 +53,13 @@ SPARK_W = SPARK_BARS * (SPARK_BAR_W + SPARK_BAR_GAP) - SPARK_BAR_GAP  # = 33
 SPARK_COL_W = SPARK_W + 12  # = 45
 SPARK_MAX_H = 11  # tallest bar (px), grown up from the row's text baseline
 # Bottom-table column anchors as fractions of the table width: name (left),
-# kWh-hier (left), kWh/j (right edge), trend (left); the sparkline owns the right
-# edge. kWh/j right-aligns just before the trend so its values line up per column.
-BOTTOM_COL_HIER = 0.32   # left edge of the "kWh hier" column
-BOTTOM_COL_AVG_R = 0.705  # right edge of the "kWh/j" column (right-aligned)
-BOTTOM_COL_TREND = 0.72   # left edge of the trend column (tight after kWh/j)
+# yesterday kWh (left), kWh/j (right edge), trend (left, glued to kWh/j),
+# HC % (left); the sparkline owns the right edge. The columns are spread out
+# except avg+trend, which read as one glued block.
+BOTTOM_COL_HIER = 0.30   # left edge of the yesterday-kWh column
+BOTTOM_COL_AVG_R = 0.60   # right edge of the "kWh/j" column (right-aligned)
+BOTTOM_COL_TREND = 0.615  # left edge of the trend column (glued after kWh/j)
+BOTTOM_COL_HC = 0.78     # left edge of the HC % column
 SOLAR_HEIGHT = HEIGHT // 2 - 24  # divider for the right column (Crypto top / Réseau bottom)
 WATER_SPLIT = HEIGHT // 2  # center column split: Eau (top half) over Solaire (bottom half)
 
@@ -92,17 +95,13 @@ def render_dashboard(data: dict) -> Image.Image:
     banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     center_left = PANEL_LEFT + banner_width + COL_GAP
 
-    # The bottom table's separator line is aligned with the Solar section title's
-    # separator line opposite it (mid-height split + the solar banner height). The
-    # EDF chart grows down to just above that line (its day labels sit in the gap),
-    # so the table divider and the solar-title divider share the same y.
-    bold_h = draw.textbbox((0, 0), "X", font=fonts["bold"])[3]
-    solar_title_sep = WATER_SPLIT + DIVIDER_GAP + bold_h + 8
-
-    # EDF consumption chart in the left column, with the bottom table directly
-    # beneath it (just under its day labels).
+    # EDF consumption chart in the left column, its baseline aligned with the
+    # Eau chart's to its right (region bottom = WATER_SPLIT + the top-chart
+    # bottom pad). The bottom table opens its own section below, with a title
+    # row + separator mirroring the Solaire banner opposite.
     _draw_chart(draw, fonts, days, data.get("stats", {}),
-                region_top=0, region_height=solar_title_sep, mode="consumption")
+                region_top=0, region_height=WATER_SPLIT + DIVIDER_GAP,
+                mode="consumption")
 
     # Solar production chart in the bottom half of the center column, under the
     # Eau chart — full-black single bars. Sits right at the mid-height split (the
@@ -138,7 +137,7 @@ def render_dashboard(data: dict) -> Image.Image:
                           region_top=0, region_bottom=WATER_SPLIT)
 
     if bottom_rows:
-        _draw_bottom_table(draw, fonts, bottom_rows, solar_title_sep - BOTTOM_TOP_GAP)
+        _draw_bottom_table(draw, fonts, bottom_rows, WATER_SPLIT)
 
     # "Home" panel in the empty top-left gutter (left of the packed columns):
     # a title banner over the last/next refresh times, then the "Alertes" panel
@@ -378,16 +377,17 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
                   val_text, fill=BLACK, font=font_value)
 
 
-def _short_name(name: str, limit: int = 33) -> str:
+def _short_name(name: str, limit: int = 17) -> str:
     name = (name or "").strip()
     return name if len(name) <= limit else name[: limit - 1] + "…"
 
 
 def _build_bottom_rows(data) -> list:
     """Assemble the bottom table rows: each configured power sensor (Cumulus,
-    Lave-linge, …) then Talon (core Linky, always shown). Each row is a 5-column
-    tuple (name, yesterday, avg, trend, spark) — a rising value reads as bad (red)
-    for these consumption-style metrics; `spark` is the row's 7-day series."""
+    Lave-linge, …) then Talon (core Linky, always shown). Each row is a 6-column
+    tuple (name, yesterday, avg, trend, spark, hc_pct) — a rising value reads as
+    bad (red) for these consumption-style metrics; `spark` is the row's 7-day
+    series; `hc_pct` is the off-peak share (None hides the cell, always for Talon)."""
     def _sensor_avg(sensor):
         v = sensor.get("avg_kwh")
         return v if v is not None else float("-inf")  # "N/A" (pas d'historique) → en bas
@@ -397,32 +397,38 @@ def _build_bottom_rows(data) -> list:
     for sensor in sensors:
         rows.append((
             [(_short_name(sensor.get("name", "")), "bold", BLACK)],
-            [(sensor.get("yesterday_text", "0"), "bold", BLACK), (sensor.get("yesterday_unit", "kWh hier"), "regular", BLACK)],
+            [(sensor.get("yesterday_text", "0"), "bold", BLACK), (sensor.get("yesterday_unit", "kWh"), "regular", BLACK)],
             [(sensor.get("avg_text", "0"), "bold", BLACK), (sensor.get("avg_unit", "kWh/j"), "regular", BLACK)],
             [_trend(sensor.get("trend_pct", 0), True)],
             sensor.get("spark"),
+            sensor.get("hc_pct"),
         ))
     talon = data.get("talon")
     if talon:
         rows.append((
             [("Talon", "bold", BLACK)],
-            [(talon.get("yesterday_text", "0"), "bold", BLACK), ("W hier", "regular", BLACK)],
+            [(talon.get("yesterday_text", "0"), "bold", BLACK), ("W", "regular", BLACK)],
             [(talon.get("avg_text", "0"), "bold", BLACK), ("W", "regular", BLACK)],
             [_trend(talon.get("trend_pct", 0), True)],
             talon.get("spark"),
+            None,
         ))
     return rows
 
 
-def _draw_bottom_table(draw, fonts, rows, top) -> None:
-    """Draw the table under the EDF chart (its strip starts at `top`): a 5-column
-    grid with one row per metric — name (left), kWh hier (left), kWh/j (right),
-    trend (left), then a 7-day sparkline hugging the right edge (right-aligned).
-    A single 1px separator line sits above the rows, dividing them from the
-    chart's day labels (no surrounding box)."""
+def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
+    """Draw the table under the EDF chart as its own section: a title row naming
+    the columns (Hier / Moy. / HC) above a 1px separator — same band and
+    separator y as the Solaire banner opposite (`region_top` is the mid-height
+    split) — then a 6-column grid with one row per metric: name (left),
+    yesterday kWh (left), kWh/j (right), trend (left, glued to kWh/j), HC %
+    (left), and a 7-day sparkline hugging the right edge (no surrounding box)."""
     width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
     x = PANEL_LEFT
-    line_y = top + BOTTOM_TOP_GAP
+    # Mirror _draw_chart's bottom-banner geometry so the title row and separator
+    # line up exactly with the Solaire title and its separator.
+    header_y = region_top + DIVIDER_GAP
+    line_y = header_y + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
     y0 = line_y + BOTTOM_TEXT_GAP
     # Sparkline column owns the table's right edge; the bars are centred inside
     # it, leaving a small margin on each side (the column is wider than the graph).
@@ -430,6 +436,7 @@ def _draw_bottom_table(draw, fonts, rows, top) -> None:
     hier_x = x + round(width * BOTTOM_COL_HIER)
     avg_r = x + round(width * BOTTOM_COL_AVG_R)  # right edge of the kWh/j column
     trend_x = x + round(width * BOTTOM_COL_TREND)
+    hc_x = x + round(width * BOTTOM_COL_HC)  # left edge of the HC % column
     text_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
     def seg_w(segments):
@@ -459,14 +466,24 @@ def _draw_bottom_table(draw, fonts, rows, top) -> None:
             h = max(1, round(v / max_v * SPARK_MAX_H)) if max_v > 0 else 1
             draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
 
+    # Title row above the separator (section-title band): abbreviated column
+    # names, capitalised, each sharing its column's anchor and alignment.
+    # Nothing over the name column, the trend or the sparkline.
+    put([("Hier", "regular", BLACK)], hier_x, header_y)
+    moy = [("Moy.", "regular", BLACK)]
+    put(moy, avg_r - seg_w(moy), header_y)
+    put([("HC", "regular", BLACK)], hc_x, header_y)
+
     for i, row in enumerate(rows):
         ry = y0 + i * BOTTOM_ROW_H
-        name, hier, avg, trend, series = row
+        name, hier, avg, trend, series, hc_pct = row
         put(name, x, ry)                      # col 1: name, left
-        put(hier, hier_x, ry)                 # col 2: kWh hier, left
+        put(hier, hier_x, ry)                 # col 2: yesterday kWh, left
         put(avg, avg_r - seg_w(avg), ry)      # col 3: kWh/j, right
-        put(trend, trend_x, ry)               # col 4: trend, left
-        spark(series, ry)                     # col 5: sparkline, right edge
+        put(trend, trend_x, ry)               # col 4: trend, left (glued)
+        if hc_pct is not None:                # col 5: HC %, left (empty if unknown)
+            put([(f"{hc_pct}", "bold", BLACK), ("%", "regular", BLACK)], hc_x, ry)
+        spark(series, ry)                     # col 6: sparkline, right edge
 
     draw.line([(x, line_y), (x + width - 1, line_y)], fill=BLACK, width=1)
 

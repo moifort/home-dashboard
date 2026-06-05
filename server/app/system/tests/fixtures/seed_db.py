@@ -74,21 +74,30 @@ SALON_2_SLUG = "salon-zigbee2mqtt-prise-2"
 def _power_rows():
     """Daily power-sensor Wh ending yesterday (integrated, no same-day flush
     needed). Two lone sensors (cumulus/washer) mirror the old value patterns so
-    those rows stay stable; a two-topic `Salon` group seeds the summation path."""
+    those rows stay stable; a two-topic `Salon` group seeds the summation path.
+    hc_wh is a deterministic per-day fraction of cons_wh; the oldest days stay
+    NULL (pre-deployment history) to exercise the "unknown days excluded" rule."""
     start = TODAY - timedelta(days=_SEED_DAYS)
     end = TODAY - timedelta(days=1)
     rows = []
     for i, d in enumerate(_daterange(start, end)):
         ds = d.strftime("%Y-%m-%d")
-        cumulus_kwh = 1.4 + (i % 4) * 0.5 + (i % 3) * 0.3
-        washer_kwh = 0.5 + (i % 3) * 0.2 + (i % 5) * 0.15
-        rows.append(("cumulus", ds, round(cumulus_kwh * 1000, 1), _FETCHED_AT))
-        rows.append(("lave-linge", ds, round(washer_kwh * 1000, 1), _FETCHED_AT))
-        salon1_kwh = 0.8 + (i % 3) * 0.3
-        rows.append((SALON_1_SLUG, ds, round(salon1_kwh * 1000, 1), _FETCHED_AT))
+
+        def _hc(cons_wh, j=i):
+            # NULL before the HC split existed; then 30..60% varying per day.
+            if j < _SEED_DAYS // 4:
+                return None
+            return round(cons_wh * (0.3 + (j % 4) * 0.1), 1)
+
+        cumulus_wh = round((1.4 + (i % 4) * 0.5 + (i % 3) * 0.3) * 1000, 1)
+        washer_wh = round((0.5 + (i % 3) * 0.2 + (i % 5) * 0.15) * 1000, 1)
+        rows.append(("cumulus", ds, cumulus_wh, _hc(cumulus_wh), _FETCHED_AT))
+        rows.append(("lave-linge", ds, washer_wh, _hc(washer_wh), _FETCHED_AT))
+        salon1_wh = round((0.8 + (i % 3) * 0.3) * 1000, 1)
+        rows.append((SALON_1_SLUG, ds, salon1_wh, _hc(salon1_wh), _FETCHED_AT))
         if i >= _SEED_DAYS // 2:  # prise-2 joins partway through
-            salon2_kwh = 0.6 + (i % 4) * 0.25
-            rows.append((SALON_2_SLUG, ds, round(salon2_kwh * 1000, 1), _FETCHED_AT))
+            salon2_wh = round((0.6 + (i % 4) * 0.25) * 1000, 1)
+            rows.append((SALON_2_SLUG, ds, salon2_wh, _hc(salon2_wh), _FETCHED_AT))
     return rows
 
 
@@ -124,7 +133,7 @@ def seed():
         _production_rows(),
     )
     conn.executemany(
-        "INSERT OR REPLACE INTO daily_power (slug, date, cons_wh, fetched_at) VALUES (?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO daily_power (slug, date, cons_wh, hc_wh, fetched_at) VALUES (?, ?, ?, ?, ?)",
         _power_rows(),
     )
     conn.executemany(

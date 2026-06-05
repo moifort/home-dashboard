@@ -32,7 +32,7 @@ def format_energy_kwh(kwh, period):
     """Adaptive (value, unit) for a daily energy figure on the bottom table:
     whole Wh below 1 kWh, 1-decimal kWh above, so a tiny but real plug
     consumption never collapses to '0.0'. `period` is the unit suffix glued
-    after the value (' hier', '/j') — e.g. 0.028 kWh -> ('28', 'Wh hier')."""
+    after the value ('', '/j') — e.g. 0.028 kWh -> ('28', 'Wh')."""
     if kwh < 1.0:
         return f"{round(kwh * 1000)}", f"Wh{period}"
     return f"{kwh:.1f}", f"kWh{period}"

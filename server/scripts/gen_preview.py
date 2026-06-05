@@ -94,11 +94,38 @@ if not data.get("production_days"):
 # preview still shows the bottom Cumulus / Lave-linge rows the device renders.
 if not data.get("power_sensors"):
     data["power_sensors"] = [
-        {"name": "Cumulus", "yesterday_text": "2.4", "avg_text": "3.1", "trend_pct": 4.5,
+        {"name": "Cumulus", "yesterday_text": "2.4", "yesterday_unit": "kWh", "avg_text": "3.1",
+         "avg_unit": "kWh/j", "trend_pct": 4.5, "hc_pct": 78,
          "spark": [3.4, 2.9, 3.1, 1.8, 3.0, 2.6, 2.4]},
-        {"name": "Lave-linge", "yesterday_text": "0.8", "avg_text": "0.9", "trend_pct": -5.0,
+        {"name": "Lave-linge", "yesterday_text": "0.8", "yesterday_unit": "kWh", "avg_text": "0.9",
+         "avg_unit": "kWh/j", "trend_pct": -5.0, "hc_pct": 31,
          "spark": [0.9, 1.3, 0.7, None, 1.1, 0.6, 0.8]},
     ]
+
+# Extra representative rows (appended, deduped by name) so the preview shows a
+# fuller table: more rows, varied magnitudes (kWh and Wh), HC% spread.
+_extra_sensors = [
+    {"name": "Machine à laver", "yesterday_text": "1.1", "yesterday_unit": "kWh",
+     "avg_text": "0.9", "avg_unit": "kWh/j", "avg_kwh": 0.9, "trend_pct": -5.0, "hc_pct": 72,
+     "spark": [0.9, 1.3, 0.7, None, 1.1, 0.6, 1.1]},
+    {"name": "Serveur", "yesterday_text": "2.9", "yesterday_unit": "kWh",
+     "avg_text": "2.8", "avg_unit": "kWh/j", "avg_kwh": 2.8, "trend_pct": 1.2, "hc_pct": 35,
+     "spark": [2.8, 2.7, 2.9, 2.8, 2.8, 2.9, 2.9]},
+    {"name": "Salon", "yesterday_text": "640", "yesterday_unit": "Wh",
+     "avg_text": "710", "avg_unit": "Wh/j", "avg_kwh": 0.71, "trend_pct": 8.3, "hc_pct": 22,
+     "spark": [0.6, 0.8, 0.7, 0.9, 0.5, 0.8, 0.64]},
+    {"name": "Imprimante 3D", "yesterday_text": "450", "yesterday_unit": "Wh",
+     "avg_text": "380", "avg_unit": "Wh/j", "avg_kwh": 0.38, "trend_pct": -12.0, "hc_pct": 5,
+     "spark": [0.2, None, 0.5, 0.4, 0.3, 0.6, 0.45]},
+]
+_have = {s.get("name") for s in data.get("power_sensors", [])}
+data["power_sensors"] += [s for s in _extra_sensors if s["name"] not in _have]
+
+# Real sensors whose history predates the HC split would leave the HC column
+# empty; give them representative percentages so the preview shows it.
+for _i, _s in enumerate(data.get("power_sensors", [])):
+    if _s.get("hc_pct") is None:
+        _s["hc_pct"] = (78, 31, 52, 45)[_i % 4]
 
 # The talon needs the new talon_w column populated (one fetch cycle). On a dev DB
 # that predates it, inject representative values so the bottom Talon row shows.
