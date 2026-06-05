@@ -20,8 +20,10 @@ services:
         target: /data
     environment:
       TZ: Europe/Paris
-      LINKY_TOKEN: changeme
-      LINKY_PRM: changeme
+      # The Lixee ZLinky_TIC topic in Zigbee2MQTT — the Linky teleinfo source
+      # (needs MQTT_HOST below).
+      LINKY_MQTT_TOPIC: zigbee2mqtt/linky
+      # Off-peak clock windows — fallback when the live PTEC stream goes quiet.
       HC_WINDOWS: "23:32-5:32,15:02-17:02"
       PRICE_HP: "0.2065"
       PRICE_HC: "0.1579"
@@ -41,7 +43,7 @@ services:
       # Optional crypto-bot stats panel (top-right) — leave URL empty to disable.
       CRYPTO_API_URL: ""
       CRYPTO_API_TOKEN: ""
-      # Optional shared local MQTT broker for the Z2M/ESPHome slices (power
+      # Shared local MQTT broker for the Z2M/ESPHome slices (Linky core, power
       # sensors, water) — leave MQTT_HOST empty to disable all of them. Use the
       # broker's LAN IP (bridge network). EcoFlow's cloud broker is separate.
       MQTT_HOST: ""

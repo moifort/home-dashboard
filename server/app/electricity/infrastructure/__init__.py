@@ -1,1 +1,1 @@
-"""Electricity domain infrastructure: repository + Linky REST client/transport."""
+"""Electricity domain infrastructure: repositories + the ZLinky MQTT transport."""

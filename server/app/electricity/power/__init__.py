@@ -25,8 +25,7 @@ from datetime import datetime, timedelta
 
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
 from app.module.format import format_energy_kwh
-from app.electricity import HC_WINDOWS
-from app.electricity.infrastructure.linky_client import _is_off_peak
+from app.electricity import is_off_peak
 from app.electricity.power.infrastructure import repository
 from app.electricity.power.infrastructure.mqtt import PowerMqttListener
 
@@ -144,9 +143,10 @@ def _make_on_power(slug: str):
             if dt_h > 0:
                 inc = watts * min(dt_h, MAX_SAMPLE_GAP_H)
                 st["wh"] += inc
-                # Same Linky off-peak windows as the core: the whole interval is
-                # attributed to `now` (as the day already is).
-                if _is_off_peak(now.hour, now.minute, HC_WINDOWS):
+                # Off-peak as the meter sees it (live PTEC, HC_WINDOWS clock as
+                # fallback): the whole interval is attributed to `now` (as the
+                # day already is).
+                if is_off_peak(now):
                     st["hc_wh"] += inc
         st["last_ts"] = now
 

@@ -4,7 +4,7 @@
   <img src="hardware/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
-Monitor your electricity consumption from a Linky smart meter on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, **configurable power sensors** (any Zigbee2MQTT/ESPHome device reporting only instantaneous power — e.g. a water-heater `Cumulus` or a washing-machine `Lave-linge` — each shown as a daily-kWh row), a **water meter daily consumption** chart (`Eau` — Water, center column above the Solar chart), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right. The empty top-left gutter holds a **`Home`** panel (screen-refresh schedule) and an **`Alertes`** (Alerts) status board that turns the daily trends into plain-language notes per domain, with their financial impact.
+Monitor your electricity consumption from a Linky smart meter — read locally by a **Lixee ZLinky_TIC** Zigbee dongle through Zigbee2MQTT — on an e-paper display. The dashboard shows the last 9 days of consumption with off-peak/peak breakdown and key indicators to track your savings. Optionally, it also shows **daily solar production** from an EcoFlow PowerStream, a **crypto-bot stats banner**, **configurable power sensors** (any Zigbee2MQTT/ESPHome device reporting only instantaneous power — e.g. a water-heater `Cumulus` or a washing-machine `Lave-linge` — each shown as a daily-kWh row), a **water meter daily consumption** chart (`Eau` — Water, center column above the Solar chart), and a **UniFi network panel** (internet/Wi-Fi quality, clients and top consumers) in the bottom-right. The empty top-left gutter holds a **`Home`** panel (screen-refresh schedule) and an **`Alertes`** (Alerts) status board that turns the daily trends into plain-language notes per domain, with their financial impact.
 
 Rendered output:
 
@@ -50,11 +50,11 @@ When a crypto-bot GraphQL endpoint is configured, an inline title-style banner i
 
 ### Talon (baseline power)
 
-A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **20th percentile (P20)** of the 30-min Linky load curve **over the night window (23h–05h)**, in **W**. The Linky curve is grid draw, already net of self-consumed solar, so daytime samples get pushed down by the panels and would understate the baseline — the night window is solar-free. P20 over the dozen night samples captures the true floor without being skewed by the deepest dips (the step where everything, fridge included, happens to be off at once). The table opens with its own **section-title row** above the separator line — abbreviated column names (`Hier` — yesterday, `Moy.` — average, `HC` — off-peak share), sharing the same band as the `Solaire` (Solar) title opposite so the two sections align. Each row is then a six-column grid: **name** (truncated at 13 characters) and **yesterday's** value left-aligned, the recent **daily average** right-aligned with its **trend** glued after it (▲ in red = a rising baseline, i.e. more standby waste), the **off-peak share** (`HC` %, power sensors only — see below), and a **7-day sparkline** hugging the right edge — seven thin bars for the last seven completed days (same axis as the EDF chart), normalised to that row's own max so it reads the metric's recent shape (a missing day leaves a gap). The talon is always shown; when power sensors are configured (see below) their rows are stacked above the Talon row in the same table, **sorted by descending daily average** (the biggest consumer on top, sensors without history at the bottom), with the Talon always last.
+A **table** below the consumption chart (under a thin separator line) shows the house's **talon** — its permanent baseline power draw (fridge, internet box, standby loads). For each day, the talon is the **20th percentile (P20)** of the meter's 30-min mean apparent-power samples (`PAPP` from the ZLinky teleinfo, stored in `tic_samples`) **over the night window (23h–05h)**, in **W**. The meter reads grid draw, already net of self-consumed solar, so daytime samples get pushed down by the panels and would understate the baseline — the night window is solar-free. P20 over the dozen night samples captures the true floor without being skewed by the deepest dips (the step where everything, fridge included, happens to be off at once). The table opens with its own **section-title row** above the separator line — abbreviated column names (`Hier` — yesterday, `Moy.` — average, `HC` — off-peak share), sharing the same band as the `Solaire` (Solar) title opposite so the two sections align. Each row is then a six-column grid: **name** (truncated at 13 characters) and **yesterday's** value left-aligned, the recent **daily average** right-aligned with its **trend** glued after it (▲ in red = a rising baseline, i.e. more standby waste), the **off-peak share** (`HC` %, power sensors only — see below), and a **7-day sparkline** hugging the right edge — seven thin bars for the last seven completed days (same axis as the EDF chart), normalised to that row's own max so it reads the metric's recent shape (a missing day leaves a gap). The talon is always shown; when power sensors are configured (see below) their rows are stacked above the Talon row in the same table, **sorted by descending daily average** (the biggest consumer on top, sensors without history at the bottom), with the Talon always last.
 
 ### Power sensors (optional)
 
-Any Zigbee2MQTT / ESPHome device that reports only **instantaneous power** (W) and has no energy counter can be added as a **power sensor**: a row at the top of the bottom table (above the Talon row) showing that device's daily consumption — yesterday's value, the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more), its **off-peak share** (`HC` column: the % of the last 9 days' consumption that fell inside the Linky `HC_WINDOWS` off-peak windows — useful to check a water heater really runs off-peak) and a 7-day sparkline. The off-peak split is integrated live alongside the daily total, so days recorded before this feature have no HC info and are simply excluded — the `HC` cell shows an **em dash** (`—`) until new days accumulate. The same dash convention runs through the whole table: a missing yesterday report shows `— kWh` (distinct from a real `0 Wh` day) and a missing average `— kWh/j` — the figure exists but isn't initialised yet. Both the yesterday and average figures use an **adaptive unit** — whole **Wh** below 1 kWh (e.g. `28 Wh`, `967 Wh/j`), **kWh** above — so a small but real consumption never collapses to `0.0 kWh`. Like everywhere on the dashboard there is **no energy threshold**: every recorded day counts toward the average (only a day with no report at all is skipped), since a plug reading is trusted as-is. The server subscribes to each device's topic and **integrates** the reported power into daily kWh (no historical backfill — history starts at first connection). They are all declared in **one variable**, `POWER_SENSORS` (a `;`-separated list of `topic:Display Name`), so adding a sensor is a config line — see the setup section below. Several topics sharing the **same label** are **summed into a single row** (e.g. every plug in a room named `Salon`). Rows are ordered **by descending daily average** (biggest consumer on top; sensors still without history fall to the bottom), above the always-last Talon row. Typical examples: a `Cumulus` (water-heater contactor) and a `Lave-linge` (washing-machine smart plug).
+Any Zigbee2MQTT / ESPHome device that reports only **instantaneous power** (W) and has no energy counter can be added as a **power sensor**: a row at the top of the bottom table (above the Talon row) showing that device's daily consumption — yesterday's value, the recent daily average with its trend (last 9 days vs the previous 4 weeks; ▲ in red = consuming more), its **off-peak share** (`HC` column: the % of the last 9 days' consumption that fell during the meter's **live off-peak periods** — the ZLinky's `PTEC` field, with the `HC_WINDOWS` clock as fallback when the teleinfo goes quiet — useful to check a water heater really runs off-peak) and a 7-day sparkline. The off-peak split is integrated live alongside the daily total, so days recorded before this feature have no HC info and are simply excluded — the `HC` cell shows an **em dash** (`—`) until new days accumulate. The same dash convention runs through the whole table: a missing yesterday report shows `— kWh` (distinct from a real `0 Wh` day) and a missing average `— kWh/j` — the figure exists but isn't initialised yet. Both the yesterday and average figures use an **adaptive unit** — whole **Wh** below 1 kWh (e.g. `28 Wh`, `967 Wh/j`), **kWh** above — so a small but real consumption never collapses to `0.0 kWh`. Like everywhere on the dashboard there is **no energy threshold**: every recorded day counts toward the average (only a day with no report at all is skipped), since a plug reading is trusted as-is. The server subscribes to each device's topic and **integrates** the reported power into daily kWh (no historical backfill — history starts at first connection). They are all declared in **one variable**, `POWER_SENSORS` (a `;`-separated list of `topic:Display Name`), so adding a sensor is a config line — see the setup section below. Several topics sharing the **same label** are **summed into a single row** (e.g. every plug in a room named `Salon`). Rows are ordered **by descending daily average** (biggest consumer on top; sensors still without history fall to the bottom), above the always-last Talon row. Typical examples: a `Cumulus` (water-heater contactor) and a `Lave-linge` (washing-machine smart plug).
 
 ### Water consumption (optional, center column)
 
@@ -82,12 +82,15 @@ When a UniFi gateway (UniFi OS) is configured, a `Réseau` (Network) panel is dr
 
 ## Installation
 
-### 1. Get a Linky token
+### 1. Read your Linky meter (Lixee ZLinky_TIC)
 
-1. Go to [conso.boris.sh](https://conso.boris.sh)
-2. Log in with your Enedis account
-3. Authorize data access
-4. Copy the JWT token (valid for 3 years)
+The dashboard reads the meter's teleinfo **locally** over MQTT — no cloud API, no token:
+
+1. Plug a [Lixee ZLinky_TIC](https://lixee.fr/produits/30-zlinky-tic-3770014375070.html) into the Linky's **TIC connector** (the two I1/I2 terminals under the green cover)
+2. Pair it in **Zigbee2MQTT** and note its topic (e.g. `zigbee2mqtt/linky` if you rename the device `linky`)
+3. The dashboard uses the TIC **historique** fields of an HC/HP contract: the `HCHC`/`HCHP` cumulative indexes (daily kWh by exact index delta), `PAPP` (apparent power, for the talon) and `PTEC` (the live off-peak state)
+
+Daily history accumulates from the first connection (**no backfill** — a day the server is down stays blank).
 
 ### 2. Configure environment variables
 
@@ -98,13 +101,17 @@ cp server/.env.example server/.env
 Edit `server/.env` with your values:
 
 ```env
-# Required — your Linky token
-LINKY_TOKEN=eyJhbGci...your_token
+# Required — the local MQTT broker Zigbee2MQTT publishes to (LAN IP, not localhost)
+MQTT_HOST=192.168.1.50
+MQTT_PORT=1883
+MQTT_USERNAME=                       # omit if the broker is anonymous
+MQTT_PASSWORD=
 
-# Your meter PRM (14 digits, visible on your meter or on Enedis)
-LINKY_PRM=your_prm_here
+# The ZLinky_TIC topic in Zigbee2MQTT
+LINKY_MQTT_TOPIC=zigbee2mqtt/linky
 
-# Off-peak hours windows (format: HH:MM-HH:MM, comma-separated)
+# Off-peak hours windows (format: HH:MM-HH:MM, comma-separated) — fallback for
+# the off-peak split when the live PTEC stream goes quiet
 # Check your electricity contract for your specific time slots
 HC_WINDOWS=23:32-5:32,15:02-17:02
 
@@ -140,20 +147,9 @@ CRYPTO_API_URL=http://192.168.1.50:3003/graphql
 CRYPTO_API_TOKEN=your_crypto_bot_api_token   # the bot's NITRO_API_TOKEN; omit if no auth
 ```
 
-#### Optional — Local MQTT broker (power sensors, water)
-
-The power-sensor and water slices all read the **same local MQTT broker** (your mosquitto on the LAN), so the host/port/credentials are configured **once**; each slice then only sets its own topic(s). Setting `MQTT_HOST` enables those slices (an empty host disables them all). Use the broker's **LAN IP** (bridge network). Credentials are optional if the broker allows anonymous connections. (EcoFlow's cloud broker is separate and does not use these.)
-
-```env
-MQTT_HOST=192.168.1.50
-MQTT_PORT=1883
-MQTT_USERNAME=                         # omit if the broker is anonymous
-MQTT_PASSWORD=
-```
-
 #### Optional — Power sensors
 
-With the broker set above, declare every device that reports only **instantaneous power** (W) — a Legrand contactor (`Cumulus`), a washing-machine smart plug (`Lave-linge`), an oven, etc. They all live in **one variable**, `POWER_SENSORS`: a `;`-separated list of `topic:Display Name` entries (the first `:` splits the MQTT topic from the on-screen label). The server subscribes to each topic and **integrates** the reported power into daily kWh — **no backfill**, history starts at the first connection. Each becomes one row in the bottom table (in declaration order, above the Talon row). Leave the variable empty to disable them all.
+The Linky core, the power sensors and the water slice all read the **same local MQTT broker** — the `MQTT_*` block configured in the required section above (EcoFlow's cloud broker is separate and does not use it). With that broker set, declare every device that reports only **instantaneous power** (W) — a Legrand contactor (`Cumulus`), a washing-machine smart plug (`Lave-linge`), an oven, etc. They all live in **one variable**, `POWER_SENSORS`: a `;`-separated list of `topic:Display Name` entries (the first `:` splits the MQTT topic from the on-screen label). The server subscribes to each topic and **integrates** the reported power into daily kWh — **no backfill**, history starts at the first connection. Each becomes one row in the bottom table (in declaration order, above the Talon row). Leave the variable empty to disable them all.
 
 The label's slug (lowercased, accent-stripped, spaces→`-`) is the storage key. **Keep the labels `Cumulus` and `Lave-linge`** to inherit the history migrated from the previous `CUMULUS_TOPIC` / `WASHER_TOPIC` tables (slugs `cumulus` / `lave-linge`).
 

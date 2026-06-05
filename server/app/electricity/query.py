@@ -16,11 +16,15 @@ def build_core(days: list[dict]) -> dict:
 
 def status() -> dict:
     """Status fragment for the /status endpoint."""
-    from app.electricity import HC_WINDOWS_RAW, PRM
+    from app.electricity import HC_WINDOWS_RAW, TOPIC
 
+    period, _ = command._period
     return {
-        "prm": PRM,
+        "linky_topic": TOPIC,
         "hc_windows": HC_WINDOWS_RAW,
-        "last_fetch": command.last_fetch_time,
+        "current_period": period,
+        "last_linky_message": command.last_message_time,
+        "last_hchc": command.last_hchc,
+        "last_hphp": command.last_hphp,
         "last_error": command.last_error,
     }

@@ -222,7 +222,7 @@ def start_http_server(port: int):
 def refresh_cycle():
     global epd_buffer, dashboard_data
     try:
-        days = CORE.fetch_and_cache()
+        days = CORE.load_days()
         data = dashboard.build_dashboard_data(days)
         with data_lock:
             dashboard_data = data
@@ -239,11 +239,8 @@ def refresh_cycle():
 def main():
     logger.info("Dashboard v%s", VERSION)
 
-    if not CORE.TOKEN:
-        logger.critical("LINKY_TOKEN environment variable is required")
-        raise SystemExit(1)
-
     CORE.init_schema()
+    CORE.start()
     for integration in OPTIONAL:
         integration.init_schema()
         integration.start()
