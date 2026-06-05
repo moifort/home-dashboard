@@ -378,7 +378,7 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
                   val_text, fill=BLACK, font=font_value)
 
 
-def _short_name(name: str, limit: int = 13) -> str:
+def _short_name(name: str, limit: int = 15) -> str:
     name = (name or "").strip()
     return name if len(name) <= limit else name[: limit - 1] + "…"
 
