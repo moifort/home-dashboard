@@ -38,7 +38,8 @@ def _daterange(start: date, end_inclusive: date):
 
 
 def _consumption_rows():
-    """40+ complete days ending *yesterday* (Linky has no same-day data)."""
+    """40+ complete days ending *yesterday*, plus today's partial row (the ZLinky
+    integrates live since midnight, rendered as the chart's 'Auj.' bar)."""
     start = TODAY - timedelta(days=_SEED_DAYS)
     end = TODAY - timedelta(days=1)
     rows = []
@@ -47,6 +48,8 @@ def _consumption_rows():
         hp = round(3.6 + (i % 7) * 0.40 + (i % 3) * 0.30, 2)
         talon = round(305 + (i % 6) * 7 - (i % 4) * 3)
         rows.append((d.strftime("%Y-%m-%d"), hc, hp, float(talon), _FETCHED_AT))
+    # Mid-afternoon partial day (FIXED_NOW is 14:30): deliberately small values.
+    rows.append((TODAY.strftime("%Y-%m-%d"), 1.9, 2.3, 312.0, _FETCHED_AT))
     return rows
 
 

@@ -56,21 +56,25 @@ power.ENABLED = bool(power.SENSORS)
 
 now = datetime.now(PARIS_TZ)
 start = (now - timedelta(days=45)).strftime("%Y-%m-%d")
-end = now.strftime("%Y-%m-%d")
+# End is tomorrow (exclusive) so today's partial row feeds the live "Auj." bar,
+# same window as the server's load_days().
+end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 
 days = electricity_repo.get_cached_days(start, end)
 data = dashboard_data.build_dashboard_data(days)
 
-# The dev DB may hold no Linky history; inject a representative EDF stacked
-# HC/HP week so the preview always shows the left-column consumption chart.
-if not data.get("days"):
+# The dev DB may hold no Linky history (build_core always emits at least the
+# live "Auj." bar); inject a representative EDF stacked HC/HP week whenever no
+# complete day exists so the preview always shows a full consumption chart.
+if all(d.get("today") for d in data.get("days", [])):
     from app.system.config import DAYS_FR
 
-    edf = [(4.8, 2.4), (5.1, 2.6), (4.2, 2.0), (5.6, 3.1), (4.9, 2.5),
-           (6.0, 3.4), (3.8, 1.9), (5.2, 2.7), (4.5, 2.3)]  # (hc, hp) kWh, ends yesterday
+    edf = [(5.1, 2.6), (4.2, 2.0), (5.6, 3.1), (4.9, 2.5), (6.0, 3.4),
+           (3.8, 1.9), (5.2, 2.7), (4.5, 2.3),
+           (1.6, 1.1)]  # (hc, hp) kWh; last = today, mid-day partial
     data["days"] = [
-        {"day": DAYS_FR[(now.weekday() - (len(edf) - i)) % 7], "date": "",
-         "hc_kwh": hc, "hp_kwh": hp}
+        {"day": DAYS_FR[(now.weekday() - (len(edf) - 1 - i)) % 7], "date": "",
+         "hc_kwh": hc, "hp_kwh": hp, "today": i == len(edf) - 1}
         for i, (hc, hp) in enumerate(edf)
     ]
     data["stats"] = {"avg_kwh": 7.4, "avg_kwh_pct": 3, "hc_ratio": 64,

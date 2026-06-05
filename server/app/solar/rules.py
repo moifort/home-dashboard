@@ -22,8 +22,8 @@ def build_production_panel(prod_by_date: dict, now: datetime, talon: dict | None
     """Build the solar production history: always the last 9 days, ending today.
 
     Days without accumulated data show as N/A. Today is included so its bar grows
-    as production accumulates through the day (the EDF chart can't do this — it
-    has no same-day data).
+    as production accumulates through the day (the EDF chart does the same since
+    the ZLinky integrates live).
     """
     today = now.date()
     production_days = []

@@ -164,58 +164,67 @@
   },
   "days": [
     {
-      "date": "2026-05-24",
-      "day": "Dim",
-      "hc_kwh": 3.05,
-      "hp_kwh": 4.2
-    },
-    {
       "date": "2026-05-25",
       "day": "Lun",
       "hc_kwh": 3.15,
-      "hp_kwh": 4.0
+      "hp_kwh": 4.0,
+      "today": false
     },
     {
       "date": "2026-05-26",
       "day": "Mar",
       "hc_kwh": 3.75,
-      "hp_kwh": 4.7
+      "hp_kwh": 4.7,
+      "today": false
     },
     {
       "date": "2026-05-27",
       "day": "Mer",
       "hc_kwh": 3.85,
-      "hp_kwh": 5.4
+      "hp_kwh": 5.4,
+      "today": false
     },
     {
       "date": "2026-05-28",
       "day": "Jeu",
       "hc_kwh": 4.45,
-      "hp_kwh": 5.2
+      "hp_kwh": 5.2,
+      "today": false
     },
     {
       "date": "2026-05-29",
       "day": "Ven",
       "hc_kwh": 2.8,
-      "hp_kwh": 5.9
+      "hp_kwh": 5.9,
+      "today": false
     },
     {
       "date": "2026-05-30",
       "day": "Sam",
       "hc_kwh": 3.4,
-      "hp_kwh": 6.6
+      "hp_kwh": 6.6,
+      "today": false
     },
     {
       "date": "2026-05-31",
       "day": "Dim",
       "hc_kwh": 3.5,
-      "hp_kwh": 3.6
+      "hp_kwh": 3.6,
+      "today": false
     },
     {
       "date": "2026-06-01",
       "day": "Lun",
       "hc_kwh": 4.1,
-      "hp_kwh": 4.3
+      "hp_kwh": 4.3,
+      "today": false
+    },
+    {
+      "date": "2026-06-02",
+      "day": "Mar",
+      "hc_kwh": 1.9,
+      "hp_kwh": 2.3,
+      "today": true
     }
   ],
   "home": {

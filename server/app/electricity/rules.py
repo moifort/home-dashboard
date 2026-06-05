@@ -14,17 +14,24 @@ def build_core(days: list[dict], now: datetime, price_hp: float, price_hc: float
     today = now.strftime("%Y-%m-%d")
     complete_days = [d for d in days if d["date"] < today]
 
+    # Stats stay on complete days only — a partial day would drag every average
+    # down. The chart swaps the oldest column for today's live "Auj." bar instead
+    # (the ZLinky integrates since midnight, so today's row grows through the day).
     current_week = complete_days[-9:]
     prev_weeks = complete_days[-37:-9]
 
+    today_row = next((d for d in days if d["date"] == today), None)
+    shown = complete_days[-8:] + [today_row or {"date": today, "hc_kwh": 0.0, "hp_kwh": 0.0}]
+
     result = []
-    for d in current_week:
+    for d in shown:
         dt = datetime.strptime(d["date"], "%Y-%m-%d")
         result.append({
             "day": DAYS_FR[dt.weekday()],
             "date": d["date"],
             "hc_kwh": d["hc_kwh"],
             "hp_kwh": d["hp_kwh"],
+            "today": d["date"] == today,
         })
 
     return {
