@@ -16,7 +16,7 @@ Rendered output:
 
 ### Bar chart
 
-Each bar represents one day of electricity consumption. Bars are stacked:
+Each bar represents one day of electricity consumption: the last 8 complete days plus a live **`Auj.`** (today) bar — the ZLinky integrates the indexes since midnight, so today's bar grows through the day, like the `Eau` (Water) and `Solaire` (Solar) charts. Bars are stacked:
 
 - **Black fill** — peak hours (HP) consumption
 - **Top line separator** — marks the boundary between off-peak and peak
@@ -30,7 +30,7 @@ A **tariff-period dot** sits right after the `EDF` title: **red = peak hours** (
 
 | Indicator | Value | Trend calculation |
 |-----------|-------|-------------------|
-| **kWh/j** | Average daily consumption over the last 9 days | `(current_avg - prev_avg) / prev_avg × 100` — ▼ means you're consuming less |
+| **kWh/j** | Average daily consumption over the last 9 **complete** days (the partial `Auj.` day never enters the averages) | `(current_avg - prev_avg) / prev_avg × 100` — ▼ means you're consuming less |
 | **HC %** | Ratio of off-peak consumption to total | `current_ratio - prev_ratio` (points) — ▲ means more off-peak usage (good) |
 | **€/j** | Average daily cost (HP×price_hp + HC×price_hc + subscription/30.44) | Same % formula as kWh/j — ▼ means you're spending less |
 
@@ -42,7 +42,7 @@ A **tariff-period dot** sits right after the `EDF` title: **red = peak hours** (
 
 ### Solar production (optional, center column)
 
-When an EcoFlow PowerStream is configured, the bottom half of the center column (under the `Eau` chart) shows daily solar production as full-black bars (last 9 completed days; a null day — no production recorded — shows **N/A**, and only those days are excluded from the averages, no energy threshold). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). The talon coverage sits to the left of the `Total` group and falls back to `Talon N/A` until the talon is known. See the setup section below.
+When an EcoFlow PowerStream is configured, the bottom half of the center column (under the `Eau` chart) shows daily solar production as full-black bars (last 9 days, the rightmost labelled `Auj.` — today — growing as production accumulates; a null day — no production recorded — shows **N/A**, and only those days are excluded from the averages, no energy threshold). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). The talon coverage sits to the left of the `Total` group and falls back to `Talon N/A` until the talon is known. See the setup section below.
 
 ### Crypto-bot banner (optional, top-right)
 
@@ -129,7 +129,7 @@ DATA_LEAD_MIN=10
 
 #### Optional — EcoFlow PowerStream solar production
 
-Add your EcoFlow account credentials to display daily solar production above the consumption chart. The server connects to EcoFlow's app MQTT broker, reads the inverter's reported PV power, and integrates it into daily kWh totals (the official Developer API only exposes instantaneous watts, with no historical counter). The chart shows the **last 9 completed days** — today is excluded (a partial day is not a reliable total), and days without data show as **N/A**. There is **no backfill**: the history starts at the first connection and fills in day by day.
+Add your EcoFlow account credentials to display daily solar production above the consumption chart. The server connects to EcoFlow's app MQTT broker, reads the inverter's reported PV power, and integrates it into daily kWh totals (the official Developer API only exposes instantaneous watts, with no historical counter). The chart shows the **last 9 days ending today** (the `Auj.` bar grows as production accumulates), and days without data show as **N/A**. There is **no backfill**: the history starts at the first connection and fills in day by day.
 
 ```env
 ECOFLOW_EMAIL=your_ecoflow_account_email
