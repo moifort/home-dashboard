@@ -121,15 +121,9 @@ _extra_sensors = [
 _have = {s.get("name") for s in data.get("power_sensors", [])}
 data["power_sensors"] += [s for s in _extra_sensors if s["name"] not in _have]
 
-# Real sensors whose history predates the HC split would leave the HC column
-# empty; give them representative percentages so the preview shows it.
-for _i, _s in enumerate(data.get("power_sensors", [])):
-    if _s.get("hc_pct") is None:
-        _s["hc_pct"] = (78, 31, 52, 45)[_i % 4]
-
 # The talon needs the new talon_w column populated (one fetch cycle). On a dev DB
 # that predates it, inject representative values so the bottom Talon row shows.
-if data.get("talon", {}).get("yesterday_text") in (None, "N/A"):
+if data.get("talon", {}).get("yesterday_text") in (None, "N/A", "—"):
     data["talon"] = {"yesterday_text": "318", "avg_text": "305", "avg_w": 305, "trend_pct": -4.0,
                      "spark": [298, 312, 305, 330, 321, 309, 318]}
 

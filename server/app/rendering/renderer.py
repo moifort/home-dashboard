@@ -31,7 +31,8 @@ BAR_GAP = 16
 STATS_FONT_SIZE = 13
 VALUE_FONT_SIZE = 13
 LABEL_FONT_SIZE = 12
-NA_THRESHOLD_KWH = 1.0  # EDF consumption chart only; the solar chart has no N/A floor
+# No energy threshold anywhere: a chart day is N/A only when it carries no data
+# at all (null/zero total — a meter gap, a day the inverter never reported).
 MAX_DAYS = 9  # reference column count for the stats banner width
 WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto grid
 # Table under the EDF chart: a section-title header row (Hier | Moy. | HC)
@@ -395,13 +396,18 @@ def _build_bottom_rows(data) -> list:
     rows = []
     sensors = sorted(data.get("power_sensors", []), key=_sensor_avg, reverse=True)
     for sensor in sensors:
+        hc_pct = sensor.get("hc_pct")
+        # A sensor without HC history yet shows an em dash — the value exists
+        # but isn't initialised; the Talon row (None below) never gets one.
+        hc_seg = ([(f"{hc_pct}", "bold", BLACK), ("%", "regular", BLACK)]
+                  if hc_pct is not None else [("—", "regular", BLACK)])
         rows.append((
             [(_short_name(sensor.get("name", "")), "bold", BLACK)],
             [(sensor.get("yesterday_text", "0"), "bold", BLACK), (sensor.get("yesterday_unit", "kWh"), "regular", BLACK)],
             [(sensor.get("avg_text", "0"), "bold", BLACK), (sensor.get("avg_unit", "kWh/j"), "regular", BLACK)],
             [_trend(sensor.get("trend_pct", 0), True)],
             sensor.get("spark"),
-            sensor.get("hc_pct"),
+            hc_seg,
         ))
     talon = data.get("talon")
     if talon:
@@ -476,13 +482,13 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
 
     for i, row in enumerate(rows):
         ry = y0 + i * BOTTOM_ROW_H
-        name, hier, avg, trend, series, hc_pct = row
+        name, hier, avg, trend, series, hc_seg = row
         put(name, x, ry)                      # col 1: name, left
         put(hier, hier_x, ry)                 # col 2: yesterday kWh, left
         put(avg, avg_r - seg_w(avg), ry)      # col 3: kWh/j, right
         put(trend, trend_x, ry)               # col 4: trend, left (glued)
-        if hc_pct is not None:                # col 5: HC %, left (empty if unknown)
-            put([(f"{hc_pct}", "bold", BLACK), ("%", "regular", BLACK)], hc_x, ry)
+        if hc_seg:                            # col 5: HC %, left (None on Talon)
+            put(hc_seg, hc_x, ry)
         spark(series, ry)                     # col 6: sparkline, right edge
 
     draw.line([(x, line_y), (x + width - 1, line_y)], fill=BLACK, width=1)
@@ -720,11 +726,10 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
 
     font_value = fonts["value"]
     font_label = fonts["label"]
-    # The N/A floor applies only to the EDF consumption chart. The solar chart
-    # shows every value, however small (a 0 just draws a zero-height bar) — small
-    # PV yields must never be hidden behind a threshold.
+    # No energy threshold: every positive value draws its bar, however small —
+    # only a null day (no data) shows the N/A marker.
     for d in days:
-        d["_na"] = mode != "production" and _bar_total(d, mode) < NA_THRESHOLD_KWH
+        d["_na"] = _bar_total(d, mode) <= 0
 
     valid_days = [d for d in days if not d["_na"]]
     max_kwh = max((_bar_total(d, mode) for d in valid_days), default=1) or 1
@@ -812,13 +817,19 @@ def _trend(pct, invert_bad):
 
 
 def _build_consumption_items(stats):
+    # A missing value renders as an em dash with its unit kept — it signals a
+    # figure that exists but isn't initialised yet (no data so far).
+    def _v(key):
+        v = stats.get(key, 0)
+        return "—" if v is None else str(v)
+
     return [
         [("EDF", "bold", BLACK)],
-        [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j ", "regular", BLACK),
+        [(_v('avg_kwh'), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), True)],
-        [("HC ", "regular", BLACK), (str(stats.get('hc_ratio', 0)), "bold", BLACK), ("% ", "regular", BLACK),
+        [("HC ", "regular", BLACK), (_v('hc_ratio'), "bold", BLACK), ("% ", "regular", BLACK),
          _trend(stats.get("hc_ratio_pct", 0), False)],
-        [(str(stats.get('avg_price', 0)), "bold", BLACK), ("€/j ", "regular", BLACK),
+        [(_v('avg_price'), "bold", BLACK), ("€/j ", "regular", BLACK),
          _trend(stats.get("avg_price_pct", 0), True)],
     ]
 

@@ -7,9 +7,6 @@ from datetime import datetime, timedelta
 
 from app.system.config import DAYS_FR
 
-NA_THRESHOLD = 0.1  # a day below this kWh is treated as "no data" for averages
-
-
 def fetch_window(now: datetime) -> tuple[str, str]:
     """The (start, end) date range to read so the 9 shown days and the ~28-day
     trend baseline are covered. End is tomorrow (exclusive) so today's live bar is
@@ -56,7 +53,9 @@ def build_production_panel(prod_by_date: dict, now: datetime, talon: dict | None
 
 def _compute_production_stats(current: list[dict], previous: list[dict], price_hp: float) -> dict:
     def _avg(days):
-        valid = [d for d in days if d["pv_kwh"] >= NA_THRESHOLD]
+        # No energy threshold — a null day means "no data", any real production
+        # counts toward the average, however small.
+        valid = [d for d in days if d["pv_kwh"] > 0]
         if not valid:
             return 0
         return sum(d["pv_kwh"] for d in valid) / len(valid)

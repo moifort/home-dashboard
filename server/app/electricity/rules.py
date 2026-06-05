@@ -53,9 +53,10 @@ def _compute_talon(current: list[dict], previous: list[dict]) -> dict:
     last7 = [d.get("talon_w") for d in current[-7:]]
     spark = [None] * (7 - len(last7)) + last7
 
+    # "—" = the figure exists but isn't initialised yet (no talon recorded).
     return {
-        "yesterday_text": f"{round(yesterday)}" if yesterday is not None else "N/A",
-        "avg_text": f"{round(avg)}" if cur else "N/A",
+        "yesterday_text": f"{round(yesterday)}" if yesterday is not None else "—",
+        "avg_text": f"{round(avg)}" if cur else "—",
         "avg_w": round(avg) if cur else None,
         "trend_pct": trend_pct,
         "spark": spark,
@@ -65,10 +66,11 @@ def _compute_talon(current: list[dict], previous: list[dict]) -> dict:
 def _compute_stats(current: list[dict], previous: list[dict], price_hp: float,
                    price_hc: float, price_abo_monthly: float) -> dict:
     daily_abo = price_abo_monthly / 30.44
-    na_threshold = 1.0
 
     def _filter_valid(days):
-        return [d for d in days if d["hc_kwh"] + d["hp_kwh"] >= na_threshold]
+        # No energy threshold — only a day with no data at all (null total) is
+        # excluded; every real value counts, however small.
+        return [d for d in days if d["hc_kwh"] + d["hp_kwh"] > 0]
 
     def _avg_and_ratios(days):
         if not days:
@@ -82,20 +84,23 @@ def _compute_stats(current: list[dict], previous: list[dict], price_hp: float,
         avg_price = ((total_hp * price_hp + total_hc * price_hc) / n) + daily_abo
         return avg_kwh, hc_ratio, avg_price
 
-    avg_kwh, hc_ratio, avg_price = _avg_and_ratios(_filter_valid(current))
+    valid_cur = _filter_valid(current)
+    avg_kwh, hc_ratio, avg_price = _avg_and_ratios(valid_cur)
     has_prev = len(previous) > 0
     avg_kwh_prev, hc_ratio_prev, avg_price_prev = _avg_and_ratios(_filter_valid(previous))
 
     def _pct(cur, prev):
-        if not has_prev or prev == 0:
+        if not valid_cur or not has_prev or prev == 0:
             return 0
         return round((cur - prev) / prev * 100, 1)
 
+    # With no valid day yet the values are None — the renderer shows an em dash
+    # with the unit kept (a figure that exists but isn't initialised).
     return {
-        "avg_kwh": round(avg_kwh, 1),
+        "avg_kwh": round(avg_kwh, 1) if valid_cur else None,
         "avg_kwh_pct": _pct(avg_kwh, avg_kwh_prev),
-        "hc_ratio": round(hc_ratio, 1),
-        "hc_ratio_pct": round(hc_ratio - hc_ratio_prev, 1) if has_prev else 0,
-        "avg_price": round(avg_price, 2),
+        "hc_ratio": round(hc_ratio, 1) if valid_cur else None,
+        "hc_ratio_pct": round(hc_ratio - hc_ratio_prev, 1) if (valid_cur and has_prev) else 0,
+        "avg_price": round(avg_price, 2) if valid_cur else None,
         "avg_price_pct": _pct(avg_price, avg_price_prev),
     }

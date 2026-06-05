@@ -228,7 +228,9 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
     yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
     nine_ago = (today - timedelta(days=9)).strftime("%Y-%m-%d")
 
-    yesterday_kwh = _merged_by_date(slugs, yesterday_str, today_str).get(yesterday_str, 0.0)
+    # None = no report at all yesterday (listener down, pre-install) — distinct
+    # from a real 0 Wh day (device off but reporting), which renders "0 Wh".
+    yesterday_kwh = _merged_by_date(slugs, yesterday_str, today_str).get(yesterday_str)
 
     past = list(_merged_by_date(slugs, nine_ago, today_str).values())
     avg = sum(past) / len(past) if past else 0.0
@@ -239,8 +241,10 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
     avg_prev = sum(prev) / len(prev) if prev else 0.0
     trend_pct = round((avg - avg_prev) / avg_prev * 100, 1) if avg_prev > 0 else 0
 
-    yesterday_text, yesterday_unit = format_energy_kwh(yesterday_kwh, "")
-    avg_text, avg_unit = format_energy_kwh(avg, "/j") if past else ("N/A", "kWh/j")
+    # "—" with the unit kept = the figure exists but isn't initialised yet.
+    yesterday_text, yesterday_unit = (
+        format_energy_kwh(yesterday_kwh, "") if yesterday_kwh is not None else ("—", "kWh"))
+    avg_text, avg_unit = format_energy_kwh(avg, "/j") if past else ("—", "kWh/j")
     return {
         "yesterday_text": yesterday_text,
         "yesterday_unit": yesterday_unit,
