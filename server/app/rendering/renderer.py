@@ -823,8 +823,12 @@ def _build_consumption_items(stats):
         v = stats.get(key, 0)
         return "—" if v is None else str(v)
 
+    # Live tariff-period dot glued to the title: red = peak hours (expensive),
+    # black = off-peak. A filled glyph survives the e-paper thresholding (like ▲▼).
+    dot = ("●", "bold", BLACK if stats.get("off_peak_now") else RED)
+
     return [
-        [("EDF", "bold", BLACK)],
+        [("EDF ", "bold", BLACK), dot],
         [(_v('avg_kwh'), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), True)],
         [("HC ", "regular", BLACK), (_v('hc_ratio'), "bold", BLACK), ("% ", "regular", BLACK),

@@ -74,7 +74,9 @@ if not data.get("days"):
         for i, (hc, hp) in enumerate(edf)
     ]
     data["stats"] = {"avg_kwh": 7.4, "avg_kwh_pct": 3, "hc_ratio": 64,
-                     "hc_ratio_pct": -2, "avg_price": 2.08, "avg_price_pct": 3}
+                     "hc_ratio_pct": -2, "avg_price": 2.08, "avg_price_pct": 3,
+                     # Keep the live tariff-period dot computed by the build.
+                     "off_peak_now": data["stats"]["off_peak_now"]}
 
 # The dev DB may hold no solar history; inject a representative production week so
 # the preview shows the center-bottom Solaire chart.
