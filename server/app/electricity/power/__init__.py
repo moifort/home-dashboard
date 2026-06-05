@@ -249,6 +249,9 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
         "avg_kwh": avg if past else None,  # numeric (kWh) for sorting + alert money
         "trend_pct": trend_pct,
         "hc_pct": _hc_pct(slugs, nine_ago, today_str),  # int 0..100 or None (no HC info yet)
+        # Prior-period HC share (same window as the trend) for the alert that
+        # spots a plug drifting out of the off-peak hours.
+        "hc_pct_prev": _hc_pct(slugs, prev_start, nine_ago),
         "spark": _group_spark(slugs, today, today_str),
     }
 

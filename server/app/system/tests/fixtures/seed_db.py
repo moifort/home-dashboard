@@ -92,7 +92,11 @@ def _power_rows():
         cumulus_wh = round((1.4 + (i % 4) * 0.5 + (i % 3) * 0.3) * 1000, 1)
         washer_wh = round((0.5 + (i % 3) * 0.2 + (i % 5) * 0.15) * 1000, 1)
         rows.append(("cumulus", ds, cumulus_wh, _hc(cumulus_wh), _FETCHED_AT))
-        rows.append(("lave-linge", ds, washer_wh, _hc(washer_wh), _FETCHED_AT))
+        # The washer drifts out of the off-peak hours over the last 9 days
+        # (70% -> 25% HC), so the golden exercises the prise_hc_drop alert.
+        washer_hc = None if i < _SEED_DAYS // 4 else round(
+            washer_wh * (0.7 if i < _SEED_DAYS - 9 else 0.25), 1)
+        rows.append(("lave-linge", ds, washer_wh, washer_hc, _FETCHED_AT))
         salon1_wh = round((0.8 + (i % 3) * 0.3) * 1000, 1)
         rows.append((SALON_1_SLUG, ds, salon1_wh, _hc(salon1_wh), _FETCHED_AT))
         if i >= _SEED_DAYS // 2:  # prise-2 joins partway through

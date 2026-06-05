@@ -28,7 +28,7 @@ _RULES = [rule for mod in _DOMAIN_ALERTS for rule in mod.RULES]
 _BOARD_PRESENT = {label: fn for mod in _DOMAIN_ALERTS for label, fn in mod.BOARDS}
 
 # Canonical order of the board's rows (the order quiet sections are listed in).
-DOMAINS = ["EDF", "Eau", "Solaire", "Réseau", "Cumulus", "Crypto"]
+DOMAINS = ["EDF", "Eau", "Solaire", "Réseau", "Prises", "Crypto"]
 
 
 def build_alerts(data: dict) -> list[dict]:

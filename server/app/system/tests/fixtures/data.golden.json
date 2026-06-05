@@ -1,6 +1,20 @@
 {
   "alert_board": [
     {
+      "alert": true,
+      "items": [
+        [
+          "Heures creuses Lave-linge en baisse",
+          "45pts",
+          "dépense 0,02€/j",
+          false
+        ]
+      ],
+      "label": "Prises",
+      "n_bad": 1,
+      "severity": 18
+    },
+    {
       "alert": false,
       "label": "EDF",
       "n_bad": 0,
@@ -15,12 +29,6 @@
     {
       "alert": false,
       "label": "Solaire",
-      "n_bad": 0,
-      "severity": -1
-    },
-    {
-      "alert": false,
-      "label": "Cumulus",
       "n_bad": 0,
       "severity": -1
     }
@@ -92,6 +100,7 @@
       "avg_text": "2.5",
       "avg_unit": "kWh/j",
       "hc_pct": 49,
+      "hc_pct_prev": 48,
       "name": "Cumulus",
       "spark": [
         2.2,
@@ -110,7 +119,8 @@
       "avg_kwh": 0.9666666666666666,
       "avg_text": "967",
       "avg_unit": "Wh/j",
-      "hc_pct": 48,
+      "hc_pct": 25,
+      "hc_pct_prev": 70,
       "name": "Lave-linge",
       "spark": [
         1.0,
@@ -130,6 +140,7 @@
       "avg_text": "2.1",
       "avg_unit": "kWh/j",
       "hc_pct": 48,
+      "hc_pct_prev": 46,
       "name": "Salon",
       "spark": [
         1.9500000000000002,
