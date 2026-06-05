@@ -119,6 +119,10 @@ _extra_sensors = [
     {"name": "Imprimante 3D", "yesterday_text": "450", "yesterday_unit": "Wh",
      "avg_text": "380", "avg_unit": "Wh/j", "avg_kwh": 0.38, "trend_pct": -12.0, "hc_pct": 5,
      "spark": [0.2, None, 0.5, 0.4, 0.3, 0.6, 0.45]},
+    # A >15-char name to exercise the bottom-table ellipsis truncation.
+    {"name": "Imp. 3D, chargeurs, lampe", "yesterday_text": "520", "yesterday_unit": "Wh",
+     "avg_text": "460", "avg_unit": "Wh/j", "avg_kwh": 0.46, "trend_pct": 6.0, "hc_pct": 12,
+     "spark": [0.4, 0.5, None, 0.4, 0.6, 0.5, 0.52]},
 ]
 _have = {s.get("name") for s in data.get("power_sensors", [])}
 data["power_sensors"] += [s for s in _extra_sensors if s["name"] not in _have]
