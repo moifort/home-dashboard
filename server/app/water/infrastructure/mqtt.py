@@ -1,8 +1,8 @@
 """Water meter MQTT transport: reads the cumulative index (m³) from the topic
 published by the ESPHome wM-Bus reader.
 
-The meter pushes its index as it transmits (a few frames per day), so — unlike
-the Cumulus contactor — there is nothing to re-request; we just listen.
+The meter pushes its index as it transmits (roughly every ≤30 min), so —
+unlike the Cumulus contactor — there is nothing to re-request; we just listen.
 """
 import json
 import logging

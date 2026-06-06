@@ -107,6 +107,37 @@ def _demo_profile(seed_i, last_slot=48):
     return prof
 
 
+def _demo_solar_profile(seed_i, last_slot=48):
+    """Representative PV daylight bell (mean W per 30-min slot, under 800 W)."""
+    prof = []
+    for slot in range(48):
+        if slot >= last_slot:
+            prof.append(None)
+            continue
+        prof.append(max(0.0, 760 - abs(slot - 27) * 55 - (seed_i % 4) * 40 - (slot % 3) * 12))
+    return prof
+
+
+def _demo_water_profile(seed_i, last_slot=48):
+    """Representative litres per 30-min slot: morning / midday / evening usage."""
+    prof = []
+    for slot in range(48):
+        if slot >= last_slot:
+            prof.append(None)
+            continue
+        hour = slot // 2
+        if 7 <= hour < 9:
+            v = 9 + (slot % 3) * 3 + (seed_i % 4)
+        elif 12 <= hour < 14:
+            v = 4 + (slot % 2) * 3
+        elif 19 <= hour < 22:
+            v = 11 + (slot % 4) * 2 + (seed_i % 3) * 2
+        else:
+            v = 0
+        prof.append(float(v))
+    return prof
+
+
 for i, d in enumerate(data.get("days", [])):
     if not d.get("intraday"):
         last = now.hour * 2 + (1 if now.minute >= 30 else 0) if d.get("today") else 48
@@ -125,6 +156,14 @@ if not data.get("production_days"):
     ]
     data["production_stats"] = {"avg_kwh": 5.3, "avg_kwh_pct": 8, "total_kwh": 67.2,
                                 "savings_eur": 8.4, "talon_cover_pct": 111}
+
+# The Solaire intraday strips need solar_samples history (accumulates going
+# forward only); inject the demo bell on every day that lacks a profile —
+# today's stays partial (cut at the current slot).
+for i, d in enumerate(data.get("production_days", [])):
+    if not d.get("intraday"):
+        last = now.hour * 2 + (1 if now.minute >= 30 else 0) if d.get("today") else 48
+        d["intraday"] = _demo_solar_profile(i, last)
 
 # The dev DB may hold no power-sensor history; inject representative rows so the
 # preview still shows the bottom Cumulus / Lave-linge rows the device renders.
@@ -199,6 +238,14 @@ if "water_days" not in data:
         "avg_text": "153", "avg_pct": -6.5,
         "month_total_text": "4.18", "cost_text": "16.30",
     }
+
+# The Eau intraday strips need water_samples history (accumulates going
+# forward only); inject the demo usage pattern on every day that lacks a
+# profile — today's stays partial (cut at the current slot).
+for i, d in enumerate(data.get("water_days", [])):
+    if not d.get("intraday"):
+        last = now.hour * 2 + (1 if now.minute >= 30 else 0) if d.get("today") else 48
+        d["intraday"] = _demo_water_profile(i, last)
 
 # The crypto bot needs live API credentials (CRYPTO_API_URL/TOKEN) we don't
 # have here; inject a representative banner + grid snapshot so the preview shows

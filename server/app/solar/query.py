@@ -1,5 +1,5 @@
 """Solar domain queries (read side): attach the production panel, report status."""
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.system.config import PARIS_TZ
 from app.solar import command
@@ -14,7 +14,14 @@ def attach(data: dict):
     now = datetime.now(PARIS_TZ)
     start, end = fetch_window(now)
     prod_by_date = {p["date"]: p["pv_kwh"] for p in repository.get_cached_production(start, end)}
-    data.update(build_production_panel(prod_by_date, now, data.get("talon"), PRICE_HP))
+    # Intraday PV profiles over the chart's 9 shown days — feeds the mini
+    # graph under each Solaire bar.
+    profiles = repository.get_pv_profiles(
+        (now - timedelta(days=8)).strftime("%Y-%m-%d"),
+        (now + timedelta(days=1)).strftime("%Y-%m-%d"),
+    )
+    data.update(build_production_panel(prod_by_date, now, data.get("talon"), PRICE_HP,
+                                       pv_profiles=profiles))
 
 
 def status() -> dict:

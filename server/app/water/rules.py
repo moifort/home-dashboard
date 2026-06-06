@@ -34,12 +34,17 @@ def fetch_window(now: datetime) -> tuple[str, str]:
     return start.strftime("%Y-%m-%d"), end_str
 
 
-def build_water_panel(rows: list[dict], now: datetime, price_m3: float) -> dict:
+def build_water_panel(rows: list[dict], now: datetime, price_m3: float,
+                      litre_profiles: dict | None = None) -> dict:
     """Build the water chart + stats from the meter's index history.
 
     Daily litres are index diffs between consecutive days (carry-forward across
     days with no frame, so the jump lands on the next day that reports). History
     starts at first connection (no backfill).
+
+    `litre_profiles` maps a date to its 48-slot intraday litres profile
+    (None-padded); each shown day carries its profile as `intraday` for the
+    mini graph under its bar (None when the date has no sample).
     """
     today = now.date()
     first_of_month = today.replace(day=1)
@@ -66,7 +71,9 @@ def build_water_panel(rows: list[dict], now: datetime, price_m3: float) -> dict:
 
     shown = daily[-CHART_DAYS:]
     water_days = [
-        {"day": DAYS_FR[d.weekday()], "liters": litres, "today": d == today}
+        {"day": DAYS_FR[d.weekday()], "date": d.strftime("%Y-%m-%d"),
+         "liters": litres, "today": d == today,
+         "intraday": (litre_profiles or {}).get(d.strftime("%Y-%m-%d"))}
         for d, litres in shown
     ]
 

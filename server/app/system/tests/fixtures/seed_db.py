@@ -84,6 +84,27 @@ def _tic_sample_rows():
     return rows
 
 
+def _solar_sample_rows():
+    """30-min mean-PV samples over the chart's 9 shown days — the Solaire
+    intraday strip's source. A deterministic daylight bell (peak ~13h30, kept
+    under the 800 W inverter cap), 0 W at night (the inverter heartbeats
+    through the night). Mirrors the TIC seeding quirks: one shown day is
+    sample-less, another has a 2h gap, and today is partial (through 14:00)."""
+    rows = []
+    start = TODAY - timedelta(days=8)
+    for i, d in enumerate(_daterange(start, TODAY)):
+        if i == 2:  # a shown day with no sample at all → empty strip
+            continue
+        last_slot = 29 if d == TODAY else 48  # partial today: through 14:00
+        for slot in range(last_slot):
+            if i == 5 and 20 <= slot < 24:  # a 2h gap on one day
+                continue
+            pv = max(0.0, 760 - abs(slot - 27) * 55 - (i % 4) * 40 - (slot % 3) * 12)
+            ts = datetime(d.year, d.month, d.day, slot // 2, (slot % 2) * 30).isoformat()
+            rows.append((ts, round(pv, 1)))
+    return rows
+
+
 def _production_rows():
     """Daily PV Wh including today (a partial 'Auj.' bar). One 0-kWh day stays in
     the older history; today's value is deliberately small (mid-day partial)."""
@@ -152,6 +173,40 @@ def _water_rows():
     return rows
 
 
+def _water_sample_rows():
+    """Per-slot cumulative index (m³) over the 9 shown days plus the day
+    before (midnight baseline for the first day's deltas) — the Eau intraday
+    strip's source. Usage follows a deterministic morning / midday / evening
+    pattern (litres per 30-min slot); the meter reports every slot, so quiet
+    slots read as 0 L. Mirrors the TIC seeding quirks: one shown day is
+    sample-less (its litres land on the next reporting day), another has a 2h
+    gap, and today is partial (through 14:00)."""
+    rows = []
+    start = TODAY - timedelta(days=9)
+    index_m3 = 2000.0
+    for i, d in enumerate(_daterange(start, TODAY)):
+        if i == 3:  # shown day 2 with no sample at all → empty strip
+            index_m3 += 0.150  # the meter still runs; the jump lands on the next day
+            continue
+        last_slot = 29 if d == TODAY else 48  # partial today: through 14:00
+        for slot in range(last_slot):
+            if i == 6 and 20 <= slot < 24:  # a 2h gap on shown day 5
+                continue
+            hour = slot // 2
+            if 7 <= hour < 9:
+                litres = 9 + (slot % 3) * 3 + (i % 4)
+            elif 12 <= hour < 14:
+                litres = 4 + (slot % 2) * 3
+            elif 19 <= hour < 22:
+                litres = 11 + (slot % 4) * 2 + (i % 3) * 2
+            else:
+                litres = 0
+            index_m3 += litres / 1000.0
+            ts = datetime(d.year, d.month, d.day, hour, (slot % 2) * 30).isoformat()
+            rows.append((ts, round(index_m3, 4)))
+    return rows
+
+
 def seed():
     """Create every schema and insert the deterministic rows. Assumes
     `app.module.db.DB_PATH` already points at the (empty) target file."""
@@ -175,12 +230,20 @@ def seed():
         _production_rows(),
     )
     conn.executemany(
+        "INSERT OR REPLACE INTO solar_samples (ts, pv_w) VALUES (?, ?)",
+        _solar_sample_rows(),
+    )
+    conn.executemany(
         "INSERT OR REPLACE INTO daily_power (slug, date, cons_wh, hc_wh, fetched_at) VALUES (?, ?, ?, ?, ?)",
         _power_rows(),
     )
     conn.executemany(
         "INSERT OR REPLACE INTO daily_water (date, index_m3, fetched_at) VALUES (?, ?, ?)",
         _water_rows(),
+    )
+    conn.executemany(
+        "INSERT OR REPLACE INTO water_samples (ts, index_m3) VALUES (?, ?)",
+        _water_sample_rows(),
     )
     conn.commit()
     conn.close()

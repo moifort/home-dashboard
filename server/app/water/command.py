@@ -12,17 +12,29 @@ logger = logging.getLogger(__name__)
 last_report = ""
 
 
+SLOT_MIN = 30  # water_samples slot width (minutes)
+
+
 def init_schema():
-    """Create the daily_water table (idempotent)."""
+    """Create the daily_water + water_samples tables (idempotent)."""
     repository.init_schema()
 
 
-def _on_water_index(m3: float):
-    """MQTT callback: store today's latest cumulative index (m³). INSERT OR
-    REPLACE keeps the last value of the day, which is all the diff needs."""
+def _slot_start(now: datetime) -> str:
+    """The ISO start of `now`'s 30-min slot (local time)."""
+    return now.replace(minute=now.minute - now.minute % SLOT_MIN,
+                       second=0, microsecond=0).isoformat()
+
+
+def _on_water_index(m3: float, now: datetime | None = None):
+    """MQTT callback: store today's latest cumulative index (m³) and the
+    slot's snapshot for the intraday profile. INSERT OR REPLACE keeps the last
+    value of the day / of the slot, which is all the diffs need (`now`
+    injectable for tests)."""
     global last_report
-    now = datetime.now(PARIS_TZ)
+    now = now or datetime.now(PARIS_TZ)
     repository.upsert_water(now.strftime("%Y-%m-%d"), m3)
+    repository.insert_water_sample(_slot_start(now), m3)
     last_report = now.isoformat()
 
 
