@@ -24,7 +24,7 @@ Each bar represents one day of electricity consumption: the last 8 calendar days
 - **Value above the bar** — total kWh for that day
 - **N/A** — no data at all for that day (null total, typically a meter reporting gap); there is no energy threshold — any positive value, however small, draws its real bar
 
-Under each bar, just above the day label, an **intraday strip** — a bar-wide mini bar-graph — shows *how* that day's power was drawn: the mean apparent power (`PAPP`) of the ZLinky teleinfo's 30-min slots (`tic_samples`), resampled to **6 four-hour bars** in the same sparkline style as the bottom table. Heights are normalised to the 9-day window's global max, so day profiles compare to each other (the night talon reads as a low baseline, the cumulus or oven as spikes). Today's strip fills live through the day; a 4h bucket with no sample leaves a gap, and a day recorded before the ZLinky was connected shows no strip (no backfill).
+Under each bar, just above the day label, an **intraday strip** — a bar-wide mini bar-graph — shows *how* that day's power was drawn: the mean apparent power (`PAPP`) of the ZLinky teleinfo's 30-min slots (`tic_samples`), resampled to **6 four-hour bars** in the same sparkline style as the bottom table. Heights are normalised to a fixed ceiling — `INTRADAY_MAX_W`, default 3000 W of mean `PAPP` at full height, higher peaks clip — so day profiles compare to each other and across refreshes (the night talon reads as a low baseline, the cumulus or oven as spikes). Today's strip fills live through the day; a 4h bucket with no sample leaves a gap, and a day recorded before the ZLinky was connected shows no strip (no backfill).
 
 ### Stats banner
 
@@ -127,6 +127,9 @@ PRICE_ABO_MONTHLY=15.65
 # The server regenerates the buffer DATA_LEAD_MIN minutes before each wake.
 SCREEN_REFRESH_INTERVAL_MIN=120
 DATA_LEAD_MIN=10
+
+# Intraday strip Y scale — W of mean PAPP at full strip height (peaks clip)
+INTRADAY_MAX_W=3000
 ```
 
 #### Optional — EcoFlow PowerStream solar production

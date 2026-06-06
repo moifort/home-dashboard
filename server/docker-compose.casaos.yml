@@ -35,6 +35,8 @@ services:
       SCREEN_REFRESH_INTERVAL_MIN: "120"
       DATA_LEAD_MIN: "10"
       SCREEN_WAKE_SKIP_MIN: "5"
+      # Intraday strip Y scale — W of mean PAPP at full strip height (peaks clip).
+      INTRADAY_MAX_W: "3000"
       # Optional EcoFlow PowerStream solar production — leave empty to disable.
       ECOFLOW_EMAIL: ""
       ECOFLOW_PASSWORD: ""
