@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-06
+
+- **Fix: `EDF` chart window anchored on the calendar** — the chart used to show the last 8 *rows present in the database*, so a missing day (server down, data purged) silently shifted the window one day back (the chart ended on Thursday with no trace of the absent Friday). `build_core` now walks the **8 calendar days before today** and fills holes with an empty row, which renders as the existing **N/A column marker** — a gap now reads as a gap. Goldens byte-identical (the test fixture has no hole); no new environment variable.
+
 ## 2026-06-05
 
 - **`EDF` chart: live `Auj.` (today) bar** — now that the ZLinky integrates the meter indexes since midnight, the consumption chart shows the **last 8 complete days + today's partial bar**, which grows through the day like the `Eau` (Water) and `Solaire` (Solar) charts (the old REST API had no same-day data). The stats banner, the `Talon` and the alerts keep computing over **complete days only** — a partial day would drag the averages down. Goldens and preview regenerated; no new environment variable.

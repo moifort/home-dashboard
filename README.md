@@ -16,7 +16,7 @@ Rendered output:
 
 ### Bar chart
 
-Each bar represents one day of electricity consumption: the last 8 complete days plus a live **`Auj.`** (today) bar — the ZLinky integrates the indexes since midnight, so today's bar grows through the day, like the `Eau` (Water) and `Solaire` (Solar) charts. Bars are stacked:
+Each bar represents one day of electricity consumption: the last 8 calendar days plus a live **`Auj.`** (today) bar (a day with no data — server down, data purged — shows an N/A marker instead of shifting the window) — the ZLinky integrates the indexes since midnight, so today's bar grows through the day, like the `Eau` (Water) and `Solaire` (Solar) charts. Bars are stacked:
 
 - **Black fill** — peak hours (HP) consumption
 - **Top line separator** — marks the boundary between off-peak and peak
