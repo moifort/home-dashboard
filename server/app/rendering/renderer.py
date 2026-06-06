@@ -64,9 +64,10 @@ BOTTOM_COL_HC = 0.78     # left edge of the HC % column
 # Intraday strip under each EDF bar (consumption chart only): a bar-wide
 # (28px) mini bar-graph of the day's mean PAPP per 30-min slot (tic_samples),
 # squeezed between the bars' baseline and the day labels. 48 slots resampled
-# to one 1px column per pixel; missing slots leave gaps. Heights are
+# to 6 sparkline-style bars (4h each); empty buckets leave gaps. Heights are
 # normalised to the window's global max so day profiles compare to each other.
-INTRADAY_H = 14   # tallest intraday column (px)
+INTRADAY_BARS = 6  # 6 × (SPARK_BAR_W + SPARK_BAR_GAP) - SPARK_BAR_GAP = 28 = BAR_WIDTH
+INTRADAY_H = 14   # tallest intraday bar (px)
 INTRADAY_GAP = 4  # gap between the bars' baseline and the strip
 SOLAR_HEIGHT = HEIGHT // 2 - 24  # divider for the right column (Crypto top / Réseau bottom)
 WATER_SPLIT = HEIGHT // 2  # center column split: Eau (top half) over Solaire (bottom half)
@@ -727,23 +728,32 @@ def _bar_total(d: dict, mode: str) -> float:
     return d.get("hc_kwh", 0) + d.get("hp_kwh", 0)
 
 
-def _draw_intraday(draw, cx, strip_baseline, values, max_v):
-    """One day's intraday mini bar-graph: BAR_WIDTH 1px columns grown up from
-    `strip_baseline`, each averaging the 30-min slots it covers (48 slots →
-    28px). Slots with no sample leave a gap; any present value draws at least
-    a 1px tick. Heights are normalised to `max_v`, the window's global max."""
+def _intraday_buckets(values):
+    """Resample a day's 48 half-hour slots to INTRADAY_BARS means (4h each).
+    A bucket with no sample at all yields None (a gap in the strip)."""
     n = len(values)
     if not n:
-        return
-    for i in range(BAR_WIDTH):
+        return []
+    out = []
+    for i in range(INTRADAY_BARS):
         bucket = [v for j, v in enumerate(values)
-                  if j * BAR_WIDTH // n == i and v is not None]
-        if not bucket:
+                  if j * INTRADAY_BARS // n == i and v is not None]
+        out.append(sum(bucket) / len(bucket) if bucket else None)
+    return out
+
+
+def _draw_intraday(draw, cx, strip_baseline, buckets, max_v):
+    """One day's intraday mini bar-graph: INTRADAY_BARS sparkline-style bars
+    (same 3px/2px geometry as the bottom-table sparklines) grown up from
+    `strip_baseline`. None buckets leave a gap; any present value draws at
+    least a 1px tick. Heights are normalised to `max_v`, the window's global
+    max over bucketed values."""
+    for i, v in enumerate(buckets):
+        if v is None:
             continue
-        v = sum(bucket) / len(bucket)
         h = max(1, round(v / max_v * INTRADAY_H)) if max_v > 0 else 1
-        x = cx + i
-        draw.rectangle([x, strip_baseline - h, x, strip_baseline - 1], fill=BLACK)
+        x = cx + i * (SPARK_BAR_W + SPARK_BAR_GAP)
+        draw.rectangle([x, strip_baseline - h, x + SPARK_BAR_W - 1, strip_baseline - 1], fill=BLACK)
 
 
 def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, region_left=PANEL_LEFT):
@@ -782,7 +792,11 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
     intraday_max = 0
     if has_intraday:
         baseline_y -= INTRADAY_H + INTRADAY_GAP
-        intraday_max = max((v for d in days for v in (d.get("intraday") or [])
+        # Normalise on the bucketed means (not the raw slots): the tallest
+        # 4h bar of the window must reach the full INTRADAY_H.
+        for d in days:
+            d["_intraday_buckets"] = _intraday_buckets(d.get("intraday") or [])
+        intraday_max = max((v for d in days for v in d["_intraday_buckets"]
                             if v is not None), default=0)
 
     # Stats banner anchored at top of the region ("titre + bordure").
@@ -802,8 +816,8 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
 
         # The day's intraday profile, bar-wide under the bar (drawn even on an
         # N/A day — a daily-total gap can still have TIC samples).
-        if has_intraday and d.get("intraday"):
-            _draw_intraday(draw, cx, strip_baseline, d["intraday"], intraday_max)
+        if has_intraday and d.get("_intraday_buckets"):
+            _draw_intraday(draw, cx, strip_baseline, d["_intraday_buckets"], intraday_max)
 
         if d["_na"]:
             draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
