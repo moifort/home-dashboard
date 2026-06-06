@@ -9,8 +9,13 @@ from app.system.config import DAYS_FR
 
 
 def build_core(days: list[dict], now: datetime, price_hp: float, price_hc: float,
-               price_abo_monthly: float) -> dict:
-    """Build the base render dict (the consumption days + stats + talon)."""
+               price_abo_monthly: float, papp_profiles: dict | None = None) -> dict:
+    """Build the base render dict (the consumption days + stats + talon).
+
+    `papp_profiles` maps a date to its 48-slot intraday mean-PAPP profile
+    (None-padded); each shown day carries its profile as `intraday` for the
+    mini graph under its EDF bar (None when the date has no TIC sample yet).
+    """
     today = now.strftime("%Y-%m-%d")
     complete_days = [d for d in days if d["date"] < today]
 
@@ -36,6 +41,7 @@ def build_core(days: list[dict], now: datetime, price_hp: float, price_hc: float
             "hc_kwh": d["hc_kwh"],
             "hp_kwh": d["hp_kwh"],
             "today": d["date"] == today,
+            "intraday": (papp_profiles or {}).get(d["date"]),
         })
 
     return {

@@ -97,6 +97,25 @@ def insert_sample(ts: str, hchc_kwh: float, hchp_kwh: float, papp_va: float | No
     conn.close()
 
 
+def get_papp_profiles(start: str, end: str) -> dict[str, list]:
+    """Per-date intraday power profile: 48 half-hour slots of mean PAPP
+    (W-ish VA), None where the slot has no sample. Only dates with at least
+    one sample are returned — feeds the mini intraday graph under each EDF bar.
+    """
+    conn = connect()
+    cur = conn.execute(
+        "SELECT ts, papp_va FROM tic_samples WHERE ts >= ? AND ts < ? AND papp_va IS NOT NULL ORDER BY ts",
+        (start, end),
+    )
+    profiles: dict[str, list] = {}
+    for ts, papp in cur.fetchall():
+        dt = datetime.fromisoformat(ts)
+        slot = dt.hour * 2 + (1 if dt.minute >= 30 else 0)
+        profiles.setdefault(ts[:10], [None] * 48)[slot] = papp
+    conn.close()
+    return profiles
+
+
 def get_night_papp(date: str) -> list[float]:
     """The date's night-window mean PAPP samples (W-ish VA), for the talon.
 

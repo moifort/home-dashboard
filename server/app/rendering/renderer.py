@@ -61,6 +61,13 @@ BOTTOM_COL_HIER = 0.30   # left edge of the yesterday-kWh column
 BOTTOM_COL_AVG_R = 0.60   # right edge of the "kWh/j" column (right-aligned)
 BOTTOM_COL_TREND = 0.615  # left edge of the trend column (glued after kWh/j)
 BOTTOM_COL_HC = 0.78     # left edge of the HC % column
+# Intraday strip under each EDF bar (consumption chart only): a bar-wide
+# (28px) mini bar-graph of the day's mean PAPP per 30-min slot (tic_samples),
+# squeezed between the bars' baseline and the day labels. 48 slots resampled
+# to one 1px column per pixel; missing slots leave gaps. Heights are
+# normalised to the window's global max so day profiles compare to each other.
+INTRADAY_H = 14   # tallest intraday column (px)
+INTRADAY_GAP = 4  # gap between the bars' baseline and the strip
 SOLAR_HEIGHT = HEIGHT // 2 - 24  # divider for the right column (Crypto top / Réseau bottom)
 WATER_SPLIT = HEIGHT // 2  # center column split: Eau (top half) over Solaire (bottom half)
 
@@ -720,6 +727,25 @@ def _bar_total(d: dict, mode: str) -> float:
     return d.get("hc_kwh", 0) + d.get("hp_kwh", 0)
 
 
+def _draw_intraday(draw, cx, strip_baseline, values, max_v):
+    """One day's intraday mini bar-graph: BAR_WIDTH 1px columns grown up from
+    `strip_baseline`, each averaging the 30-min slots it covers (48 slots →
+    28px). Slots with no sample leave a gap; any present value draws at least
+    a 1px tick. Heights are normalised to `max_v`, the window's global max."""
+    n = len(values)
+    if not n:
+        return
+    for i in range(BAR_WIDTH):
+        bucket = [v for j, v in enumerate(values)
+                  if j * BAR_WIDTH // n == i and v is not None]
+        if not bucket:
+            continue
+        v = sum(bucket) / len(bucket)
+        h = max(1, round(v / max_v * INTRADAY_H)) if max_v > 0 else 1
+        x = cx + i
+        draw.rectangle([x, strip_baseline - h, x, strip_baseline - 1], fill=BLACK)
+
+
 def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, region_left=PANEL_LEFT):
     if not days:
         return
@@ -747,6 +773,18 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
     bottom_pad = DIVIDER_GAP if is_top else CHART_BOTTOM
     baseline_y = region_top + region_height - bottom_pad - label_h - 4
 
+    # Intraday strip (consumption only): squeezed between the bars' baseline
+    # and the day labels — the labels keep their y, the bars give up the strip
+    # height. The space is always reserved so the layout never jumps as
+    # profiles accumulate day after day.
+    has_intraday = mode == "consumption"
+    strip_baseline = baseline_y
+    intraday_max = 0
+    if has_intraday:
+        baseline_y -= INTRADAY_H + INTRADAY_GAP
+        intraday_max = max((v for d in days for v in (d.get("intraday") or [])
+                            if v is not None), default=0)
+
     # Stats banner anchored at top of the region ("titre + bordure").
     value_h = draw.textbbox((0, 0), "0", font=font_value)[3]
     stats_top = region_top + (CHART_TOP if is_top else DIVIDER_GAP)
@@ -760,7 +798,12 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
 
         lbox = draw.textbbox((0, 0), label_text, font=font_label)
         lw = lbox[2] - lbox[0]
-        draw.text((cx + (BAR_WIDTH - lw) // 2, baseline_y + 4), label_text, fill=BLACK, font=font_label)
+        draw.text((cx + (BAR_WIDTH - lw) // 2, strip_baseline + 4), label_text, fill=BLACK, font=font_label)
+
+        # The day's intraday profile, bar-wide under the bar (drawn even on an
+        # N/A day — a daily-total gap can still have TIC samples).
+        if has_intraday and d.get("intraday"):
+            _draw_intraday(draw, cx, strip_baseline, d["intraday"], intraday_max)
 
         if d["_na"]:
             draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)

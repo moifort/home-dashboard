@@ -63,10 +63,11 @@ end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 days = electricity_repo.get_cached_days(start, end)
 data = dashboard_data.build_dashboard_data(days)
 
-# The dev DB may hold no Linky history (build_core always emits at least the
-# live "Auj." bar); inject a representative EDF stacked HC/HP week whenever no
-# complete day exists so the preview always shows a full consumption chart.
-if all(d.get("today") for d in data.get("days", [])):
+# The dev DB may hold no Linky history (build_core always emits the 9 calendar
+# days, data or not); inject a representative EDF stacked HC/HP week whenever
+# no complete day carries data so the preview shows a full consumption chart.
+if not any(d["hc_kwh"] + d["hp_kwh"] > 0
+           for d in data.get("days", []) if not d.get("today")):
     from app.system.config import DAYS_FR
 
     edf = [(5.1, 2.6), (4.2, 2.0), (5.6, 3.1), (4.9, 2.5), (6.0, 3.4),
@@ -81,6 +82,35 @@ if all(d.get("today") for d in data.get("days", [])):
                      "hc_ratio_pct": -2, "avg_price": 2.08, "avg_price_pct": 3,
                      # Keep the live tariff-period dot computed by the build.
                      "off_peak_now": data["stats"]["off_peak_now"]}
+
+
+# The intraday strips under the EDF bars need tic_samples history (the Lixee
+# only accumulates going forward); inject a representative 48-slot PAPP profile
+# on every day that lacks one — today's stays partial (cut at the current slot).
+def _demo_profile(seed_i, last_slot=48):
+    prof = []
+    for slot in range(48):
+        if slot >= last_slot:
+            prof.append(None)
+            continue
+        hour = slot // 2
+        base = 280 + (seed_i % 5) * 12
+        if 7 <= hour < 9:
+            v = base + 1500 + (slot % 3) * 250
+        elif 12 <= hour < 14:
+            v = base + 800 + (slot % 2) * 300
+        elif 19 <= hour < 22:
+            v = base + 2000 + (slot % 4) * 200
+        else:
+            v = base + (slot % 4) * 30
+        prof.append(float(v))
+    return prof
+
+
+for i, d in enumerate(data.get("days", [])):
+    if not d.get("intraday"):
+        last = now.hour * 2 + (1 if now.minute >= 30 else 0) if d.get("today") else 48
+        d["intraday"] = _demo_profile(i, last)
 
 # The dev DB may hold no solar history; inject a representative production week so
 # the preview shows the center-bottom Solaire chart.

@@ -53,6 +53,37 @@ def _consumption_rows():
     return rows
 
 
+def _tic_sample_rows():
+    """30-min mean-PAPP samples over the chart's 9 shown days — the intraday
+    strip's source. A synthetic daily curve: night talon, morning / midday /
+    evening bumps, all varying per (day, slot). One shown day stays sample-less
+    (empty strip), another has a 2h slot gap, and today is partial (slots up to
+    FIXED_NOW's 14:00 slot only). The index columns stay NULL (never read by
+    the build path)."""
+    rows = []
+    start = TODAY - timedelta(days=8)
+    for i, d in enumerate(_daterange(start, TODAY)):
+        if i == 2:  # a shown day with no TIC sample at all → empty strip
+            continue
+        last_slot = 29 if d == TODAY else 48  # partial today: through 14:00
+        for slot in range(last_slot):
+            if i == 5 and 20 <= slot < 24:  # a 2h gap on one day
+                continue
+            hour = slot // 2
+            base = 280.0 + (i % 5) * 12
+            if 7 <= hour < 9:
+                papp = base + 1500 + (slot % 3) * 250
+            elif 12 <= hour < 14:
+                papp = base + 800 + (slot % 2) * 300
+            elif 19 <= hour < 22:
+                papp = base + 2000 + (slot % 4) * 200
+            else:
+                papp = base + (slot % 4) * 30
+            ts = datetime(d.year, d.month, d.day, hour, (slot % 2) * 30).isoformat()
+            rows.append((ts, None, None, round(papp, 1)))
+    return rows
+
+
 def _production_rows():
     """Daily PV Wh including today (a partial 'Auj.' bar). One 0-kWh day stays in
     the older history; today's value is deliberately small (mid-day partial)."""
@@ -134,6 +165,10 @@ def seed():
         "INSERT OR REPLACE INTO daily_consumption "
         "(date, hc_kwh, hp_kwh, talon_w, fetched_at) VALUES (?, ?, ?, ?, ?)",
         _consumption_rows(),
+    )
+    conn.executemany(
+        "INSERT OR REPLACE INTO tic_samples (ts, hchc_kwh, hchp_kwh, papp_va) VALUES (?, ?, ?, ?)",
+        _tic_sample_rows(),
     )
     conn.executemany(
         "INSERT OR REPLACE INTO daily_production (date, pv_wh, fetched_at) VALUES (?, ?, ?)",
