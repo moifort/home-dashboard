@@ -24,7 +24,7 @@ Each bar represents one day of electricity consumption: the last 8 calendar days
 - **Value above the bar** — total kWh for that day
 - **N/A** — no data at all for that day (null total, typically a meter reporting gap); there is no energy threshold — any positive value, however small, draws its real bar
 
-Under each bar, just above the day label, an **intraday strip** — a bar-wide mini bar-graph — shows *how* that day's power was drawn: the mean apparent power (`PAPP`) of each 30-min slot from the ZLinky teleinfo (`tic_samples`), resampled to one 1px column per pixel. Heights are normalised to the 9-day window's global max, so day profiles compare to each other (the night talon reads as a thin baseline, the cumulus or oven as spikes). Today's strip fills live through the day; a slot with no sample leaves a gap, and a day recorded before the ZLinky was connected shows no strip (no backfill).
+Under each bar, just above the day label, an **intraday strip** — a bar-wide mini bar-graph — shows *how* that day's power was drawn: the mean apparent power (`PAPP`) of the ZLinky teleinfo's 30-min slots (`tic_samples`), resampled to **6 four-hour bars** in the same sparkline style as the bottom table. Heights are normalised to the 9-day window's global max, so day profiles compare to each other (the night talon reads as a low baseline, the cumulus or oven as spikes). Today's strip fills live through the day; a 4h bucket with no sample leaves a gap, and a day recorded before the ZLinky was connected shows no strip (no backfill).
 
 ### Stats banner
 
