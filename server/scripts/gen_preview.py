@@ -79,9 +79,7 @@ if not any(d["hc_kwh"] + d["hp_kwh"] > 0
         for i, (hc, hp) in enumerate(edf)
     ]
     data["stats"] = {"avg_kwh": 7.4, "avg_kwh_pct": 3, "hc_ratio": 64,
-                     "hc_ratio_pct": -2, "avg_price": 2.08, "avg_price_pct": 3,
-                     # Keep the live tariff-period dot computed by the build.
-                     "off_peak_now": data["stats"]["off_peak_now"]}
+                     "hc_ratio_pct": -2, "avg_price": 2.08, "avg_price_pct": 3}
 
 
 # The intraday strips under the EDF bars need tic_samples history (the Lixee

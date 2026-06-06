@@ -897,13 +897,8 @@ def _build_consumption_items(stats):
         v = stats.get(key, 0)
         return "—" if v is None else str(v)
 
-    # Live tariff-period dot glued to the title: red = peak hours (expensive),
-    # black = off-peak. Drawn as a real circle (font_key "dot") — the Arial "●"
-    # glyph is too small and comes out lumpy after the e-paper thresholding.
-    dot = ("", "dot", BLACK if stats.get("off_peak_now") else RED)
-
     return [
-        [("EDF ", "bold", BLACK), dot],
+        [("EDF", "bold", BLACK)],
         [(_v('avg_kwh'), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), True)],
         [("HC ", "regular", BLACK), (_v('hc_ratio'), "bold", BLACK), ("% ", "regular", BLACK),
@@ -935,22 +930,6 @@ def _build_production_items(stats):
     ]
 
 
-# Tariff-period dot: Pillow's native ellipse is visibly lumpy at small radii,
-# so the circle is rasterised 4x oversize then downscaled and re-thresholded
-# (the EPD has no grey) — that yields the ideal round rasterisation.
-TARIFF_DOT_R = 5
-
-
-def _draw_dot(draw, cx, cy, r, color):
-    scale = 4
-    size = 2 * r * scale
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).ellipse([0, 0, size - 1, size - 1], fill=255)
-    mask = mask.resize((2 * r, 2 * r), Image.LANCZOS)
-    mask = mask.point(lambda v: 255 if v >= 128 else 0)
-    draw.bitmap((cx - r, cy - r), mask, fill=color)
-
-
 def _draw_stats_bar(draw, fonts, items, x, y, width, line_y):
     rendered = []
     total_w = 0
@@ -958,11 +937,6 @@ def _draw_stats_bar(draw, fonts, items, x, y, width, line_y):
         item_parts = []
         item_w = 0
         for text, font_key, color in segments:
-            if font_key == "dot":
-                # A drawn circle, not a glyph; font=None flags it for drawing.
-                item_parts.append((text, None, color, 2 * TARIFF_DOT_R))
-                item_w += 2 * TARIFF_DOT_R
-                continue
             font = fonts[font_key]
             box = draw.textbbox((0, 0), text, font=font)
             w = box[2] - box[0]
@@ -976,17 +950,10 @@ def _draw_stats_bar(draw, fonts, items, x, y, width, line_y):
     else:
         gap = 0
 
-    # Vertical center of the cap height — where the tariff dot is centered.
-    cap = draw.textbbox((0, 0), "X", font=fonts["bold"])
-    dot_cy = y + (cap[1] + cap[3]) // 2
-
     cx = x
     for item_parts, item_w in rendered:
         for text, font, color, w in item_parts:
-            if font is None:
-                _draw_dot(draw, cx + w // 2, dot_cy, TARIFF_DOT_R, color)
-            else:
-                draw.text((cx, y), text, fill=color, font=font)
+            draw.text((cx, y), text, fill=color, font=font)
             cx += w
         cx += gap
 

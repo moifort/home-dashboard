@@ -15,10 +15,6 @@ def build_dashboard_data(days: list[dict]) -> dict:
     data = CORE.build_core(days)
     now = datetime.now(PARIS_TZ)
     data["last_updated"] = now.isoformat()
-    # Live tariff-period dot next to the EDF title (red = peak, black = off-peak)
-    # — the meter's PTEC when fresh, the HC_WINDOWS clock otherwise. Refreshed at
-    # each /display pull (server) so it reads the moment the screen updates.
-    data["stats"]["off_peak_now"] = CORE.is_off_peak(now)
     # "Home" panel: the screen-refresh schedule (when the ESP shows this image and
     # when it will next refresh), rendered on one line. Both derive from the shared
     # boundary math so the displayed times match the firmware's wake schedule.

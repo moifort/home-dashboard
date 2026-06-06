@@ -101,9 +101,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "last_text": f"{now:%H:%M}",
                 "next_text": f"{next_screen_wake(now):%H:%M}",
             }
-            # Tariff-period dot at the actual pull moment (copy: the cached
-            # stats dict is shared across threads).
-            data["stats"] = {**data["stats"], "off_peak_now": CORE.is_off_peak(now)}
             if crypto.enabled():
                 crypto.attach(data)
             return render_to_buffer(data)
@@ -156,7 +153,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "last_text": f"{now:%H:%M}",
             "next_text": f"{next_screen_wake(now):%H:%M}",
         }
-        data["stats"] = {**data["stats"], "off_peak_now": CORE.is_off_peak(now)}
         if crypto.enabled():
             try:
                 crypto.attach(data)

@@ -1036,8 +1036,7 @@
     "avg_price": 2.08,
     "avg_price_pct": -3,
     "hc_ratio": 42.2,
-    "hc_ratio_pct": 0,
-    "off_peak_now": false
+    "hc_ratio_pct": 0
   },
   "talon": {
     "avg_text": "316",
