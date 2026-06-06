@@ -35,8 +35,11 @@ services:
       SCREEN_REFRESH_INTERVAL_MIN: "120"
       DATA_LEAD_MIN: "10"
       SCREEN_WAKE_SKIP_MIN: "5"
-      # Intraday strip Y scale — W of mean PAPP at full strip height (peaks clip).
+      # Intraday strip Y scales — fixed ceilings at full strip height (peaks clip):
+      # EDF (W of mean PAPP), Solaire (W of mean PV), Eau (L per 4h bucket).
       INTRADAY_MAX_W: "3000"
+      INTRADAY_SOLAR_MAX_W: "800"
+      INTRADAY_WATER_MAX_L: "150"
       # Optional EcoFlow PowerStream solar production — leave empty to disable.
       ECOFLOW_EMAIL: ""
       ECOFLOW_PASSWORD: ""

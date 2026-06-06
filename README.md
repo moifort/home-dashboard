@@ -44,7 +44,7 @@ A **tariff-period dot** sits right after the `EDF` title: **red = peak hours** (
 
 ### Solar production (optional, center column)
 
-When an EcoFlow PowerStream is configured, the bottom half of the center column (under the `Eau` chart) shows daily solar production as full-black bars (last 9 days, the rightmost labelled `Auj.` — today — growing as production accumulates; a null day — no production recorded — shows **N/A**, and only those days are excluded from the averages, no energy threshold). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). The talon coverage sits to the left of the `Total` group and falls back to `Talon N/A` until the talon is known. See the setup section below.
+When an EcoFlow PowerStream is configured, the bottom half of the center column (under the `Eau` chart) shows daily solar production as full-black bars (last 9 days, the rightmost labelled `Auj.` — today — growing as production accumulates; a null day — no production recorded — shows **N/A**, and only those days are excluded from the averages, no energy threshold). The stats banner shows the **daily average** (`kWh/j`) with its trend (▲ in black = producing more, good), the **period total** (`Total … kWh`) with the **money saved** over the period (`€`, the total valued at the peak/HP grid price), and the **talon coverage** (`Talon … %`) — the share of the house's baseline-power energy the solar covers, i.e. the average daily production over the talon's daily energy (`avg_w × 24h`). The talon coverage sits to the left of the `Total` group and falls back to `Talon N/A` until the talon is known. Like the EDF chart, each bar carries an **intraday strip** just above its day label — 6 four-hour bars of the day's mean PV watts (30-min slots stored in `solar_samples`, flushed from the inverter heartbeats), normalised to the fixed `INTRADAY_SOLAR_MAX_W` ceiling (default 800 W, the PowerStream cap; higher peaks clip) so the daylight bell reads at a glance and profiles compare across days and refreshes. The strips accumulate from deployment (no backfill); today's fills live. See the setup section below.
 
 ### Crypto-bot banner (optional, top-right)
 
@@ -60,7 +60,7 @@ Any Zigbee2MQTT / ESPHome device that reports only **instantaneous power** (W) a
 
 ### Water consumption (optional, center column)
 
-When an MQTT broker is configured, an `Eau` (Water) chart is drawn in the top half of the center column, above the Solar chart. It shows the last **9 days** of water use as daily-litres bars (the rightmost bar, labelled `Auj.` — Today, is **today** and grows as the day accumulates), with a title showing the average **L/day** (and its trend), the month-to-date volume in **m³** and its **€** cost. An ESPHome wM-Bus reader publishes the meter's **cumulative index (m³)** to the broker; the dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus), so history starts at the first connection (no backfill). A day with no reading shows **N/A** — including today until its first frame arrives. See the setup section below.
+When an MQTT broker is configured, an `Eau` (Water) chart is drawn in the top half of the center column, above the Solar chart. It shows the last **9 days** of water use as daily-litres bars (the rightmost bar, labelled `Auj.` — Today, is **today** and grows as the day accumulates), with a title showing the average **L/day** (and its trend), the month-to-date volume in **m³** and its **€** cost. An ESPHome wM-Bus reader publishes the meter's **cumulative index (m³)** to the broker; the dashboard derives daily litres by **index difference** (not power integration, unlike Cumulus), so history starts at the first connection (no backfill). A day with no reading shows **N/A** — including today until its first frame arrives. Like the EDF chart, each bar carries an **intraday strip** just above its day label — 6 four-hour bars of the day's litres (per-30-min index snapshots stored in `water_samples`, diffed at read time), **summed** per bucket and normalised to the fixed `INTRADAY_WATER_MAX_L` ceiling (default 150 L per 4h bucket; higher peaks clip) so morning showers and evening dishes read as bumps, comparable across days and refreshes. The strips accumulate from deployment (no backfill); today's fills live. See the setup section below.
 
 ### Home & Alertes (top-left gutter)
 
@@ -141,6 +141,7 @@ ECOFLOW_EMAIL=your_ecoflow_account_email
 ECOFLOW_PASSWORD=your_ecoflow_account_password
 ECOFLOW_DEVICE_SN=your_powerstream_serial_number
 ECOFLOW_API_HOST=api-e.ecoflow.com   # EU; use api.ecoflow.com (global) or api-a.ecoflow.com (asia)
+INTRADAY_SOLAR_MAX_W=800             # intraday strip Y scale: W of mean PV at full height (peaks clip)
 ```
 
 #### Optional — Crypto-bot stats panel
@@ -185,6 +186,7 @@ With the broker set above, point a topic at the one where an ESPHome wM-Bus read
 ```env
 WATER_TOPIC=watermeter/index_m3        # cumulative index in m³ (raw float payload)
 WATER_PRICE_M3=4.30                    # €/m³ for the cost figure (0 = hide cost)
+INTRADAY_WATER_MAX_L=150               # intraday strip Y scale: L per 4h bucket at full height (peaks clip)
 ```
 
 ### 3. Run with Docker Compose
