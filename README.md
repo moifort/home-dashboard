@@ -24,6 +24,8 @@ Each bar represents one day of electricity consumption: the last 8 calendar days
 - **Value above the bar** — total kWh for that day
 - **N/A** — no data at all for that day (null total, typically a meter reporting gap); there is no energy threshold — any positive value, however small, draws its real bar
 
+Under each bar, just above the day label, an **intraday strip** — a bar-wide mini bar-graph — shows *how* that day's power was drawn: the mean apparent power (`PAPP`) of each 30-min slot from the ZLinky teleinfo (`tic_samples`), resampled to one 1px column per pixel. Heights are normalised to the 9-day window's global max, so day profiles compare to each other (the night talon reads as a thin baseline, the cumulus or oven as spikes). Today's strip fills live through the day; a slot with no sample leaves a gap, and a day recorded before the ZLinky was connected shows no strip (no backfill).
+
 ### Stats banner
 
 A **tariff-period dot** sits right after the `EDF` title: **red = peak hours** (HP), **black = off-peak** (HC) — the meter's live `PTEC` state at the moment the screen refreshed (`HC_WINDOWS` clock as fallback when the teleinfo is quiet). Then three indicators are displayed above the chart. Each shows a **current value** and a **trend** compared to the previous 4 weeks. All trends on the dashboard display as **whole percents** (a sub-0.5% drift rounds to 0 and shows the em dash).
