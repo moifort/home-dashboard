@@ -3,7 +3,7 @@
 No IO: builds the consumption panel (recent days), the HC/HP + price stats and the
 talon (baseline-power) panel from a list of cached days.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.system.config import DAYS_FR
 
@@ -20,8 +20,12 @@ def build_core(days: list[dict], now: datetime, price_hp: float, price_hc: float
     current_week = complete_days[-9:]
     prev_weeks = complete_days[-37:-9]
 
-    today_row = next((d for d in days if d["date"] == today), None)
-    shown = complete_days[-8:] + [today_row or {"date": today, "hc_kwh": 0.0, "hp_kwh": 0.0}]
+    # The chart window is anchored on the calendar (the 8 days before today +
+    # today), not on the rows present in DB: a missing day (server down, data
+    # purged) must show as an N/A column, not silently shift the window.
+    by_date = {d["date"]: d for d in days}
+    shown_dates = [(now - timedelta(days=offset)).strftime("%Y-%m-%d") for offset in range(8, -1, -1)]
+    shown = [by_date.get(date, {"date": date, "hc_kwh": 0.0, "hp_kwh": 0.0}) for date in shown_dates]
 
     result = []
     for d in shown:
