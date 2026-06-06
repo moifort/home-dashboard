@@ -28,7 +28,7 @@ Under each bar, just above the day label, an **intraday strip** — a bar-wide m
 
 ### Stats banner
 
-A **tariff-period dot** sits right after the `EDF` title: **red = peak hours** (HP), **black = off-peak** (HC) — the meter's live `PTEC` state at the moment the screen refreshed (`HC_WINDOWS` clock as fallback when the teleinfo is quiet). Then three indicators are displayed above the chart. Each shows a **current value** and a **trend** compared to the previous 4 weeks. All trends on the dashboard display as **whole percents** (a sub-0.5% drift rounds to 0 and shows the em dash).
+Three indicators are displayed above the chart. Each shows a **current value** and a **trend** compared to the previous 4 weeks. All trends on the dashboard display as **whole percents** (a sub-0.5% drift rounds to 0 and shows the em dash).
 
 | Indicator | Value | Trend calculation |
 |-----------|-------|-------------------|
