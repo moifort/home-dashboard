@@ -41,6 +41,10 @@ _slot = {"start": None, "papp_sum": 0.0, "papp_n": 0}
 # Last PTEC period seen ("HC"/"HP") and when (monotonic) — read by the power
 # sub-domain threads; a tuple assignment is atomic under the GIL.
 _period = (None, 0.0)
+# Last observed HC<->HP switch: (period, wall-clock datetime). In-memory only —
+# a restart blanks it until the next real transition (the first frame after
+# startup just baselines _period, it is not a switch).
+_tariff_change = (None, None)
 
 
 def init_schema():
@@ -80,7 +84,7 @@ def _reload_today(today: str):
 
 def _on_tic(reading: dict, now: datetime | None = None):
     """Integrate one TIC frame (`now` injectable for tests)."""
-    global last_message_time, last_error, last_hchc, last_hphp, _period
+    global last_message_time, last_error, last_hchc, last_hphp, _period, _tariff_change
     now = now or datetime.now(PARIS_TZ)
     today = now.strftime("%Y-%m-%d")
     hchc, hphp, papp = reading["hchc_kwh"], reading["hchp_kwh"], reading["papp_va"]
@@ -124,6 +128,9 @@ def _on_tic(reading: dict, now: datetime | None = None):
         _slot["papp_n"] += 1
 
     if reading.get("period") is not None:
+        prev = _period[0]
+        if prev is not None and reading["period"] != prev:
+            _tariff_change = (reading["period"], now)
         _period = (reading["period"], time.monotonic())
 
     last_hchc, last_hphp = hchc, hphp
@@ -149,6 +156,16 @@ def is_off_peak(now: datetime | None = None) -> bool:
     if period is not None and time.monotonic() - ts < PTEC_STALE_S:
         return period == "HC"
     return _is_off_peak(now.hour, now.minute, HC_WINDOWS)
+
+
+def current_tariff() -> dict | None:
+    """The last observed HC<->HP switch: {"period": "HC"|"HP", "since": datetime},
+    or None when no live transition has been seen since startup. No freshness
+    check — an observed switch stays true until the next one."""
+    period, since = _tariff_change
+    if period is None:
+        return None
+    return {"period": period, "since": since}
 
 
 def start():

@@ -17,6 +17,7 @@ import pytest
 
 from app.module import db
 from app import crypto, network, solar, water
+from app.electricity import command as electricity_command
 from app.electricity import power
 from app.electricity.power import Sensor
 from app.system.tests.fixtures import seed_db
@@ -88,6 +89,12 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
     # Hard-disable the network slices so build_dashboard_data never fetches.
     monkeypatch.setattr(crypto, "enabled", lambda: False)
     monkeypatch.setattr(network, "enabled", lambda: False)
+
+    # A deterministic live HC<->HP switch so the Home panel's tariff line is
+    # exercised ("HC depuis 13:00").
+    monkeypatch.setattr(electricity_command, "_tariff_change",
+                        ("HC", FIXED_NOW.replace(hour=13, minute=0, second=0,
+                                                 microsecond=0)))
 
     seed_db.seed()
     return db_file

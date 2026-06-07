@@ -32,11 +32,11 @@ def enabled() -> bool:
     return ENABLED
 
 
-from app.electricity.command import init_schema, is_off_peak, load_days, start  # noqa: E402
+from app.electricity.command import current_tariff, init_schema, is_off_peak, load_days, start  # noqa: E402
 from app.electricity.query import build_core, status  # noqa: E402
 
 __all__ = [
     "enabled", "init_schema", "start", "load_days", "build_core", "status",
-    "is_off_peak", "TOPIC", "ENABLED",
+    "is_off_peak", "current_tariff", "TOPIC", "ENABLED",
     "PRICE_HP", "PRICE_HC", "PRICE_ABO_MONTHLY", "HC_WINDOWS", "HC_WINDOWS_RAW",
 ]

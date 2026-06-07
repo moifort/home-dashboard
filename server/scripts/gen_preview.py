@@ -63,6 +63,10 @@ end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 days = electricity_repo.get_cached_days(start, end)
 data = dashboard_data.build_dashboard_data(days)
 
+# No live PTEC stream here; inject a representative HC switch so the Home panel
+# shows its tariff line ("HC depuis 13:00").
+data["home"].setdefault("tariff", {"period": "HC", "since_text": "13:00"})
+
 # The dev DB may hold no Linky history (build_core always emits the 9 calendar
 # days, data or not); inject a representative EDF stacked HC/HP week whenever
 # no complete day carries data so the preview shows a full consumption chart.

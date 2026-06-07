@@ -519,10 +519,11 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
 
 def _draw_home_panel(draw, fonts, home, region_top) -> int:
     """Draw the "Home" panel in the empty top-left gutter (left of the packed
-    Solar/EDF column): a title banner with a 1px separator, then a single line —
-    label (regular) left, the screen-refresh schedule right-aligned as
-    "HH:MM ► HH:MM" (this refresh and the next, bold times, regular arrow).
-    Mirrors the other panels."""
+    Solar/EDF column): a title banner with a 1px separator, then one line per
+    item — label (regular) left, value right-aligned. Line 1: the screen-refresh
+    schedule as "HH:MM ► HH:MM" (this refresh and the next, bold times, regular
+    arrow). Line 2 (when a live HC<->HP switch has been observed): the current
+    tariff period as "HC depuis 13:00" (bold time). Mirrors the other panels."""
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
     right = x + width
@@ -551,6 +552,11 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
         (home.get("next_text", ""), "bold", BLACK),
     ]
     row([("Écran", "regular", BLACK)], schedule, y)
+    tariff = home.get("tariff")
+    if tariff:
+        y += line_h
+        row([(tariff["period"], "regular", BLACK)],
+            [("depuis ", "regular", BLACK), (tariff["since_text"], "bold", BLACK)], y)
     return y + line_h  # bottom of the panel content (for the Alerts panel below)
 
 

@@ -23,6 +23,14 @@ def build_dashboard_data(days: list[dict]) -> dict:
         "last_text": f"{this_refresh:%H:%M}",
         "next_text": f"{next_screen_refresh(this_refresh):%H:%M}",
     }
+    # Current tariff period + when it switched (live PTEC only; absent until the
+    # first HC<->HP transition observed since startup).
+    tariff = CORE.current_tariff()
+    if tariff:
+        data["home"]["tariff"] = {
+            "period": tariff["period"],
+            "since_text": f"{tariff['since']:%H:%M}",
+        }
     for integration in OPTIONAL:
         if integration.enabled():
             integration.attach(data)
