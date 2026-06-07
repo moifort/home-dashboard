@@ -90,6 +90,8 @@ def tic_db(tmp_path, monkeypatch):
                                             "last_persist": 0.0})
     monkeypatch.setattr(command, "_slot", {"start": None, "papp_sum": 0.0, "papp_n": 0})
     monkeypatch.setattr(command, "_period", (None, 0.0))
+    monkeypatch.setattr(command, "_tariff_changes", {"HC": None, "HP": None})
+    monkeypatch.setattr(command, "_tariff_period", None)
     monkeypatch.setattr(command, "last_hchc", None)
     monkeypatch.setattr(command, "last_hphp", None)
 
@@ -209,3 +211,34 @@ def test_is_off_peak_falls_back_to_windows_when_stale(tic_db):
     # No PTEC ever seen → the HC_WINDOWS clock decides (default 23:32-5:32,15:02-17:02).
     assert command.is_off_peak(_now(5, 12, 0)) is False
     assert command.is_off_peak(_now(5, 0, 30)) is True
+
+
+# --- current_tariff (last observed switch per period) ---
+
+def test_current_tariff_none_until_first_transition(tic_db):
+    assert command.current_tariff() is None
+    # The first frame only baselines the period — still not a switch.
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
+    assert command.current_tariff() is None
+
+
+def test_current_tariff_after_one_transition(tic_db):
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 15, 2))
+    tariff = command.current_tariff()
+    assert tariff["period"] == "HC"
+    assert tariff["since"] == _now(5, 15, 2)
+    # The other period's last switch hasn't been observed yet.
+    assert tariff["other_period"] == "HP"
+    assert tariff["other_since"] is None
+
+
+def test_current_tariff_keeps_both_switches(tic_db):
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 15, 2))
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 17, 2))
+    tariff = command.current_tariff()
+    assert tariff["period"] == "HP"
+    assert tariff["since"] == _now(5, 17, 2)
+    assert tariff["other_period"] == "HC"
+    assert tariff["other_since"] == _now(5, 15, 2)

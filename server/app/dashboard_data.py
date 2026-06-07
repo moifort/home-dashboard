@@ -12,14 +12,18 @@ from app.system.scheduler import current_screen_refresh, next_screen_refresh, ne
 
 
 def _attach_tariff(home: dict) -> None:
-    """Current tariff period + when it switched (live PTEC only; absent until
-    the first HC<->HP transition observed since startup)."""
+    """Current tariff period + both periods' last switches (live PTEC only;
+    absent until the first HC<->HP transition observed since startup, the
+    other period's side absent until its own switch has been seen)."""
     tariff = CORE.current_tariff()
     if tariff:
         home["tariff"] = {
             "period": tariff["period"],
             "since_text": f"{tariff['since']:%H:%M}",
         }
+        if tariff["other_since"] is not None:
+            home["tariff"]["other_period"] = tariff["other_period"]
+            home["tariff"]["other_since_text"] = f"{tariff['other_since']:%H:%M}"
 
 
 def build_home_live(now: datetime) -> dict:

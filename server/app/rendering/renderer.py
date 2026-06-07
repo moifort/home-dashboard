@@ -524,7 +524,9 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
     item — label (regular) left, value right-aligned. Line 1: the screen-refresh
     schedule as "HH:MM ► HH:MM" (this refresh and the next, bold times, regular
     arrow). Line 2 (when a live HC<->HP switch has been observed): the current
-    tariff period as "HC depuis 13:00" (bold time). Mirrors the other panels."""
+    tariff period and its switch time left ("HC 15:02", bold time), the other
+    period's last switch right ("HP 05:32") once it has been seen too — the
+    left side is always the period in effect now. Mirrors the other panels."""
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
     right = x + width
@@ -556,8 +558,12 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
     tariff = home.get("tariff")
     if tariff:
         y += line_h
-        row([(tariff["period"], "regular", BLACK)],
-            [("depuis ", "regular", BLACK), (tariff["since_text"], "bold", BLACK)], y)
+        other = []
+        if tariff.get("other_since_text"):
+            other = [(tariff["other_period"] + " ", "regular", BLACK),
+                     (tariff["other_since_text"], "bold", BLACK)]
+        row([(tariff["period"] + " ", "regular", BLACK),
+             (tariff["since_text"], "bold", BLACK)], other, y)
     return y + line_h  # bottom of the panel content (for the Alerts panel below)
 
 
