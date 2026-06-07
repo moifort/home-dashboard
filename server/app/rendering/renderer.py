@@ -379,7 +379,8 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
         # N/A day — a daily-total gap can still have samples).
         buckets = _intraday_buckets(d.get("intraday") or [], agg="sum")
         if buckets:
-            _draw_intraday(draw, cx, strip_baseline, buckets, INTRADAY_WATER_MAX_L)
+            _draw_intraday(draw, cx, strip_baseline, buckets, INTRADAY_WATER_MAX_L,
+                           today=bool(d.get("today")))
 
         litres = d.get("liters")
         if litres is None:
@@ -767,16 +768,22 @@ def _intraday_buckets(values, agg="mean"):
     return out
 
 
-def _draw_intraday(draw, cx, strip_baseline, buckets, ceiling):
+def _draw_intraday(draw, cx, strip_baseline, buckets, ceiling, today=False):
     """One day's intraday mini bar-graph: INTRADAY_BARS sparkline-style bars
     (same 3px/2px geometry as the bottom-table sparklines) grown up from
-    `strip_baseline`. None buckets leave a gap; any present value draws at
-    least a 1px tick. Heights are normalised to the chart's fixed `ceiling`;
-    values above it clip to the full INTRADAY_H."""
+    `strip_baseline`. Any present value draws at least a 1px tick; a None
+    bucket draws the same zero tick (a quiet slot — water meter silent, PV
+    asleep — is a zero, not a hole). Only today's buckets after the last
+    sample (not elapsed yet) keep a gap. Heights are normalised to the
+    chart's fixed `ceiling`; values above it clip to the full INTRADAY_H."""
+    last = max((i for i, v in enumerate(buckets) if v is not None), default=-1)
+    if last < 0:
+        return
+    fill_until = last if today else len(buckets) - 1
     for i, v in enumerate(buckets):
-        if v is None:
+        if v is None and i > fill_until:
             continue
-        h = max(1, round(min(v, ceiling) / ceiling * INTRADAY_H))
+        h = max(1, round(min(v or 0.0, ceiling) / ceiling * INTRADAY_H))
         x = cx + i * (SPARK_BAR_W + SPARK_BAR_GAP)
         draw.rectangle([x, strip_baseline - h, x + SPARK_BAR_W - 1, strip_baseline - 1], fill=BLACK)
 
@@ -839,7 +846,8 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
         # The day's intraday profile, bar-wide under the bar (drawn even on an
         # N/A day — a daily-total gap can still have samples).
         if has_intraday and d.get("_intraday_buckets"):
-            _draw_intraday(draw, cx, strip_baseline, d["_intraday_buckets"], intraday_ceiling)
+            _draw_intraday(draw, cx, strip_baseline, d["_intraday_buckets"], intraday_ceiling,
+                           today=bool(d.get("today")))
 
         if d["_na"]:
             draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
