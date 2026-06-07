@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-07
+
+- **`Home`: tariff-period line** — a second line under `Écran` shows the current pricing period and the exact time the meter switched to it, e.g. `HC depuis 13:00` (off-peak since 13:00). Unlike the removed EDF title dot (stale by design between refreshes), this reads as a fact: the **wall-clock moment of the last HC↔HP transition** observed live on the ZLinky's `PTEC` field. The first frame after a server start only baselines the period (not a switch), so the line stays **absent until a real transition is seen** — no `HC_WINDOWS` clock guess, no DB persistence; a restart blanks it until the next flip (at most a few hours). Goldens and preview regenerated; no new environment variable.
+
 ## 2026-06-06
 
 - **`EDF`: tariff-period dot removed** — the live HC/HP dot after the `EDF` title is gone. The pricing period flips on a sub-hour schedule while the screen only refreshes every few hours, so the dot was stale most of the time and conveyed nothing reliable. Removes the dot rendering plus the `off_peak_now` plumbing (the off-peak detection itself stays — the power sensors' HC split relies on it). Goldens and preview regenerated; no environment variable change.
