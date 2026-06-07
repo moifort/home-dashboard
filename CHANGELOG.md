@@ -2,6 +2,7 @@
 
 ## 2026-06-07
 
+- **Intraday strips: zero ticks for quiet slots** — in the mini bar-graphs under the `EDF`, `Eau` (Water) and `Solaire` (Solar) daily bars, a 4h bucket with no sample now draws the same thin **1px tick** as a real zero instead of leaving a hole: a silent water meter or a PV inverter asleep at night reads as *zero consumption/production*, not missing data. Only today's buckets **after the last sample** (not elapsed yet) keep their gap, so the `Auj.` (today) strip still stops at the current time; a day with no sample at all still shows no strip (no backfill). Render golden byte-identical (the frozen fixture has no quiet slots); preview regenerated; no new environment variable.
 - **`Home`: tariff-period line** — a second line under `Écran` shows the current pricing period and the exact time the meter switched to it, e.g. `HC depuis 13:00` (off-peak since 13:00). Unlike the removed EDF title dot (stale by design between refreshes), this reads as a fact: the **wall-clock moment of the last HC↔HP transition** observed live on the ZLinky's `PTEC` field. The first frame after a server start only baselines the period (not a switch), so the line stays **absent until a real transition is seen** — no `HC_WINDOWS` clock guess, no DB persistence; a restart blanks it until the next flip (at most a few hours). Goldens and preview regenerated; no new environment variable.
 
 ## 2026-06-06
