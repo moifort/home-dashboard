@@ -97,10 +97,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 with buffer_lock:
                     return epd_buffer
             now = datetime.now(PARIS_TZ)
-            data["home"] = {
-                "last_text": f"{now:%H:%M}",
-                "next_text": f"{next_screen_wake(now):%H:%M}",
-            }
+            data["home"] = dashboard.build_home_live(now)
             if crypto.enabled():
                 crypto.attach(data)
             return render_to_buffer(data)
