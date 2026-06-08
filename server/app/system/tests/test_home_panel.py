@@ -14,29 +14,37 @@ from app.electricity import command
 NOW = datetime(2026, 6, 7, 16, 30, tzinfo=PARIS_TZ)
 
 
-def _set_tariff(monkeypatch, period, changes):
+def _set_tariff(monkeypatch, period, windows):
     monkeypatch.setattr(command, "_tariff_period", period)
-    monkeypatch.setattr(command, "_tariff_changes", changes)
+    monkeypatch.setattr(command, "_tariff_windows", windows)
 
 
-def test_build_home_live_includes_tariff(monkeypatch):
-    _set_tariff(monkeypatch, "HP",
-                {"HP": datetime(2026, 6, 7, 17, 2, tzinfo=PARIS_TZ), "HC": None})
+def _dt(h, m):
+    return datetime(2026, 6, 7, h, m, tzinfo=PARIS_TZ)
+
+
+def test_build_home_live_includes_one_window(monkeypatch):
+    # Only HP's window has completed so far → a single tariff line.
+    _set_tariff(monkeypatch, "HC",
+                {"HC": None, "HP": (_dt(5, 32), _dt(13, 0))})
     home = dashboard.build_home_live(NOW)
     assert home["last_text"] == "16:30"
-    assert home["tariff"] == {"period": "HP", "since_text": "17:02"}
+    assert home["tariff"] == [{"period": "HP", "start_text": "05:32",
+                               "end_text": "13:00"}]
 
 
-def test_build_home_live_includes_both_switches(monkeypatch):
+def test_build_home_live_includes_both_windows(monkeypatch):
     _set_tariff(monkeypatch, "HC",
-                {"HC": datetime(2026, 6, 7, 15, 2, tzinfo=PARIS_TZ),
-                 "HP": datetime(2026, 6, 7, 5, 32, tzinfo=PARIS_TZ)})
+                {"HC": (_dt(13, 0), _dt(15, 0)),
+                 "HP": (_dt(5, 32), _dt(13, 0))})
     home = dashboard.build_home_live(NOW)
-    assert home["tariff"] == {"period": "HC", "since_text": "15:02",
-                              "other_period": "HP", "other_since_text": "05:32"}
+    assert home["tariff"] == [
+        {"period": "HC", "start_text": "13:00", "end_text": "15:00"},
+        {"period": "HP", "start_text": "05:32", "end_text": "13:00"},
+    ]
 
 
-def test_build_home_live_without_transition(monkeypatch):
+def test_build_home_live_without_completed_window(monkeypatch):
     _set_tariff(monkeypatch, None, {"HC": None, "HP": None})
     home = dashboard.build_home_live(NOW)
     assert "tariff" not in home

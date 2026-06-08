@@ -90,7 +90,8 @@ def tic_db(tmp_path, monkeypatch):
                                             "last_persist": 0.0})
     monkeypatch.setattr(command, "_slot", {"start": None, "papp_sum": 0.0, "papp_n": 0})
     monkeypatch.setattr(command, "_period", (None, 0.0))
-    monkeypatch.setattr(command, "_tariff_changes", {"HC": None, "HP": None})
+    monkeypatch.setattr(command, "_tariff_windows", {"HC": None, "HP": None})
+    monkeypatch.setattr(command, "_open_window", None)
     monkeypatch.setattr(command, "_tariff_period", None)
     monkeypatch.setattr(command, "last_hchc", None)
     monkeypatch.setattr(command, "last_hphp", None)
@@ -213,32 +214,37 @@ def test_is_off_peak_falls_back_to_windows_when_stale(tic_db):
     assert command.is_off_peak(_now(5, 0, 30)) is True
 
 
-# --- current_tariff (last observed switch per period) ---
+# --- current_tariff (last completed window per period) ---
 
-def test_current_tariff_none_until_first_transition(tic_db):
+def test_current_tariff_none_until_a_window_completes(tic_db):
     assert command.current_tariff() is None
-    # The first frame only baselines the period — still not a switch.
+    # The first frame only baselines the period — not a switch.
     command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
     assert command.current_tariff() is None
+    # The first transition only opens a window (nothing to close yet).
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 15, 2))
+    assert command.current_tariff() is None
 
 
-def test_current_tariff_after_one_transition(tic_db):
+def test_current_tariff_after_first_window_completes(tic_db):
     command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
     command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 15, 2))
-    tariff = command.current_tariff()
-    assert tariff["period"] == "HC"
-    assert tariff["since"] == _now(5, 15, 2)
-    # The other period's last switch hasn't been observed yet.
-    assert tariff["other_period"] == "HP"
-    assert tariff["other_since"] is None
-
-
-def test_current_tariff_keeps_both_switches(tic_db):
-    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
-    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 15, 2))
+    # The second transition closes the HC window (15:02 → 17:02).
     command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 17, 2))
     tariff = command.current_tariff()
     assert tariff["period"] == "HP"
-    assert tariff["since"] == _now(5, 17, 2)
-    assert tariff["other_period"] == "HC"
-    assert tariff["other_since"] == _now(5, 15, 2)
+    assert tariff["hc"] == (_now(5, 15, 2), _now(5, 17, 2))
+    # HP's own window hasn't completed yet.
+    assert tariff["hp"] is None
+
+
+def test_current_tariff_keeps_both_windows(tic_db):
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 15, 2))
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 17, 2))
+    # The third transition closes the HP window (17:02 → 18:00).
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 18, 0))
+    tariff = command.current_tariff()
+    assert tariff["period"] == "HC"
+    assert tariff["hc"] == (_now(5, 15, 2), _now(5, 17, 2))
+    assert tariff["hp"] == (_now(5, 17, 2), _now(5, 18, 0))

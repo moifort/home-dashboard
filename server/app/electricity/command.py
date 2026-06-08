@@ -41,12 +41,15 @@ _slot = {"start": None, "papp_sum": 0.0, "papp_n": 0}
 # Last PTEC period seen ("HC"/"HP") and when (monotonic) — read by the power
 # sub-domain threads; a tuple assignment is atomic under the GIL.
 _period = (None, 0.0)
-# Last observed HC<->HP switch per period (wall-clock datetime) + the period of
-# the most recent switch. In-memory only — a restart blanks them until real
-# transitions occur (the first frame after startup just baselines _period, it
-# is not a switch): the first transition fills the current period's slot, the
-# second completes the other's.
-_tariff_changes = {"HC": None, "HP": None}
+# Last COMPLETED window per period as (start, end) wall-clock, recorded at the
+# transition that ends it. _open_window = (period, start) of the in-progress
+# window; _tariff_period = the period in effect now. In-memory only — a restart
+# blanks them until real transitions complete a window again. It takes 2
+# transitions to fill the first period's window and 3 to fill both (the first
+# frame after startup only baselines _period; the first transition just opens a
+# window with no prior to close).
+_tariff_windows = {"HC": None, "HP": None}
+_open_window = None
 _tariff_period = None
 
 
@@ -87,7 +90,7 @@ def _reload_today(today: str):
 
 def _on_tic(reading: dict, now: datetime | None = None):
     """Integrate one TIC frame (`now` injectable for tests)."""
-    global last_message_time, last_error, last_hchc, last_hphp, _period, _tariff_period
+    global last_message_time, last_error, last_hchc, last_hphp, _period, _tariff_period, _open_window
     now = now or datetime.now(PARIS_TZ)
     today = now.strftime("%Y-%m-%d")
     hchc, hphp, papp = reading["hchc_kwh"], reading["hchp_kwh"], reading["papp_va"]
@@ -132,10 +135,13 @@ def _on_tic(reading: dict, now: datetime | None = None):
 
     if reading.get("period") is not None:
         prev = _period[0]
-        if prev is not None and reading["period"] != prev:
-            _tariff_changes[reading["period"]] = now
-            _tariff_period = reading["period"]
-        _period = (reading["period"], time.monotonic())
+        new = reading["period"]
+        if prev is not None and new != prev:
+            if _open_window is not None and _open_window[0] == prev:
+                _tariff_windows[prev] = (_open_window[1], now)  # close the ended window
+            _open_window = (new, now)                            # open the new one
+            _tariff_period = new
+        _period = (new, time.monotonic())
 
     last_hchc, last_hphp = hchc, hphp
     last_message_time = now.isoformat()
@@ -163,17 +169,15 @@ def is_off_peak(now: datetime | None = None) -> bool:
 
 
 def current_tariff() -> dict | None:
-    """The current tariff period and both periods' last observed switches:
-    {"period", "since", "other_period", "other_since"} — `other_since` is None
-    until the other period's own switch has been seen. None when no live
-    transition has been seen since startup. No freshness check — an observed
-    switch stays true until the next one."""
-    period = _tariff_period
-    if period is None:
+    """The last completed HC and HP windows as (start, end) wall-clock, learned
+    live from the meter's PTEC transitions: {"period", "hc", "hp"}. None until at
+    least one window has completed since startup; a period's side stays None until
+    its own window has completed (each period is independent). No freshness check —
+    an observed window stays true until the next one of that period completes."""
+    if _tariff_windows["HC"] is None and _tariff_windows["HP"] is None:
         return None
-    other = "HP" if period == "HC" else "HC"
-    return {"period": period, "since": _tariff_changes[period],
-            "other_period": other, "other_since": _tariff_changes[other]}
+    return {"period": _tariff_period,
+            "hc": _tariff_windows["HC"], "hp": _tariff_windows["HP"]}
 
 
 def start():

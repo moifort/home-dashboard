@@ -502,12 +502,18 @@
   "home": {
     "last_text": "14:00",
     "next_text": "16:00",
-    "tariff": {
-      "other_period": "HP",
-      "other_since_text": "05:32",
-      "period": "HC",
-      "since_text": "13:00"
-    }
+    "tariff": [
+      {
+        "end_text": "15:00",
+        "period": "HC",
+        "start_text": "13:00"
+      },
+      {
+        "end_text": "13:00",
+        "period": "HP",
+        "start_text": "05:32"
+      }
+    ]
   },
   "last_updated": "2026-06-02T14:30:45+02:00",
   "power_sensors": [
