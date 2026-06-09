@@ -15,15 +15,11 @@ lives here.
 import os
 
 from app.system.config import MQTT_HOST
-from app.electricity.infrastructure.linky_client import parse_hc_windows
 
 TOPIC = os.environ.get("LINKY_MQTT_TOPIC", "zigbee2mqtt/linky")
 PRICE_HP = float(os.environ.get("PRICE_HP", "0.2065"))
 PRICE_HC = float(os.environ.get("PRICE_HC", "0.1579"))
 PRICE_ABO_MONTHLY = float(os.environ.get("PRICE_ABO_MONTHLY", "15.65"))
-# Off-peak clock windows — the fallback when the live PTEC stream goes quiet.
-HC_WINDOWS_RAW = os.environ.get("HC_WINDOWS", "23:32-5:32,15:02-17:02")
-HC_WINDOWS = parse_hc_windows(HC_WINDOWS_RAW)
 
 ENABLED = bool(MQTT_HOST) and bool(TOPIC)
 
@@ -38,5 +34,5 @@ from app.electricity.query import build_core, status  # noqa: E402
 __all__ = [
     "enabled", "init_schema", "start", "load_days", "build_core", "status",
     "is_off_peak", "current_tariff", "TOPIC", "ENABLED",
-    "PRICE_HP", "PRICE_HC", "PRICE_ABO_MONTHLY", "HC_WINDOWS", "HC_WINDOWS_RAW",
+    "PRICE_HP", "PRICE_HC", "PRICE_ABO_MONTHLY",
 ]

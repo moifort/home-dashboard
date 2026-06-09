@@ -143,10 +143,9 @@ def _make_on_power(slug: str):
             if dt_h > 0:
                 inc = watts * min(dt_h, MAX_SAMPLE_GAP_H)
                 st["wh"] += inc
-                # Off-peak as the meter sees it (live PTEC, HC_WINDOWS clock as
-                # fallback): the whole interval is attributed to `now` (as the
-                # day already is).
-                if is_off_peak(now):
+                # Off-peak as the meter sees it (the ZLinky's live PTEC): the
+                # whole interval is attributed to `now` (as the day already is).
+                if is_off_peak():
                     st["hc_wh"] += inc
         st["last_ts"] = now
 

@@ -1,27 +1,8 @@
-"""Linky domain logic: HC/HP window parsing and the talon percentile.
+"""Linky domain logic: the night-talon percentile.
 
 The teleinfo transport lives in zlinky_mqtt.py; this module holds the pure
-helpers shared by the core integrator and the power sub-domain (off-peak
-windows, night-talon math).
+night-talon math shared by the core integrator and the power sub-domain.
 """
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-def parse_hc_windows(windows_str: str) -> list[tuple[int, int, int, int]]:
-    """Parse HC windows string into list of (start_h, start_m, end_h, end_m) tuples.
-
-    Example: "23:32-5:32,15:02-17:02" -> [(23, 32, 5, 32), (15, 2, 17, 2)]
-    """
-    windows = []
-    for part in windows_str.split(","):
-        start_str, end_str = part.strip().split("-")
-        sh, sm = start_str.split(":")
-        eh, em = end_str.split(":")
-        windows.append((int(sh), int(sm), int(eh), int(em)))
-    return windows
-
 
 # Talon (baseline) = a low percentile of the day's NIGHT 30-min power samples, in W.
 # Daytime grid draw is net of self-consumed solar, so daytime samples get
@@ -57,17 +38,3 @@ def compute_talon_w(night_samples: list[float]) -> int | None:
     if not night_samples:
         return None
     return round(_percentile(night_samples, TALON_PCT))
-
-
-def _is_off_peak(hour: int, minute: int, hc_windows: list[tuple[int, int, int, int]]) -> bool:
-    t = hour * 60 + minute
-    for sh, sm, eh, em in hc_windows:
-        start = sh * 60 + sm
-        end = eh * 60 + em
-        if start > end:
-            if t >= start or t < end:
-                return True
-        else:
-            if start <= t < end:
-                return True
-    return False

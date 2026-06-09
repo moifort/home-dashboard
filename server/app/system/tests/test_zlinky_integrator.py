@@ -89,7 +89,7 @@ def tic_db(tmp_path, monkeypatch):
                                             "base_hchc": None, "base_hphp": None,
                                             "last_persist": 0.0})
     monkeypatch.setattr(command, "_slot", {"start": None, "papp_sum": 0.0, "papp_n": 0})
-    monkeypatch.setattr(command, "_period", (None, 0.0))
+    monkeypatch.setattr(command, "_period", None)
     monkeypatch.setattr(command, "_tariff_windows", {"HC": [], "HP": []})
     monkeypatch.setattr(command, "_open_window", None)
     monkeypatch.setattr(command, "_tariff_period", None)
@@ -199,19 +199,19 @@ def test_wh_scale_payload_through_full_path(tic_db):
     assert command._state["hp_kwh"] == pytest.approx(0.1)
 
 
-# --- is_off_peak (PTEC with clock fallback) ---
+# --- is_off_peak (the meter's live PTEC, trusted regardless of age) ---
 
-def test_is_off_peak_trusts_fresh_ptec(tic_db):
+def test_is_off_peak_follows_the_last_ptec(tic_db):
     command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 12, 0))
-    assert command.is_off_peak(_now(5, 12, 0)) is True   # noon, but the meter says HC
+    assert command.is_off_peak() is True   # the meter says HC
     command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 0, 30))
-    assert command.is_off_peak(_now(5, 0, 30)) is False  # night, but the meter says HP
+    assert command.is_off_peak() is False  # the meter then says HP
 
 
-def test_is_off_peak_falls_back_to_windows_when_stale(tic_db):
-    # No PTEC ever seen → the HC_WINDOWS clock decides (default 23:32-5:32,15:02-17:02).
-    assert command.is_off_peak(_now(5, 12, 0)) is False
-    assert command.is_off_peak(_now(5, 0, 30)) is True
+def test_is_off_peak_is_peak_before_any_ptec(tic_db):
+    # No PTEC seen yet → reports peak (False), so the off-peak split never
+    # over-counts on a cold start (no clock guess anymore).
+    assert command.is_off_peak() is False
 
 
 # --- current_tariff (last completed window per period) ---

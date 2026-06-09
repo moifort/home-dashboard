@@ -13,10 +13,7 @@ from datetime import datetime, timedelta
 
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
 from app.electricity.infrastructure import repository
-from app.electricity.infrastructure.linky_client import (
-    _is_off_peak,
-    compute_talon_w,
-)
+from app.electricity.infrastructure.linky_client import compute_talon_w
 from app.electricity.infrastructure.zlinky_mqtt import ZLinkyMqttListener
 
 logger = logging.getLogger(__name__)
@@ -24,7 +21,6 @@ logger = logging.getLogger(__name__)
 PERSIST_INTERVAL = 30   # seconds between daily_consumption writes (mirrors power)
 SLOT_MIN = 30           # tic_samples granularity — one row per 30-min slot
 MAX_INDEX_STEP_KWH = 15  # a single TIC step above this is implausible → re-baseline
-PTEC_STALE_S = 900      # beyond this silence, fall back to the HC_WINDOWS clock
 
 # Runtime state surfaced by query.status().
 last_message_time = ""
@@ -38,9 +34,11 @@ _state = {"date": None, "hc_kwh": 0.0, "hp_kwh": 0.0,
           "base_hchc": None, "base_hphp": None, "last_persist": 0.0}
 # Current 30-min slot accumulator for tic_samples (mean PAPP of the slot).
 _slot = {"start": None, "papp_sum": 0.0, "papp_n": 0}
-# Last PTEC period seen ("HC"/"HP") and when (monotonic) — read by the power
-# sub-domain threads; a tuple assignment is atomic under the GIL.
-_period = (None, 0.0)
+# Last PTEC period seen ("HC"/"HP") — read by the power sub-domain threads and by
+# is_off_peak; an attribute assignment is atomic under the GIL. Trusted regardless
+# of age (an HC/HP period lasts hours); None only before the first frame after a
+# start.
+_period = None
 # Recent COMPLETED windows per period as (start, end) wall-clock, recorded at the
 # transition that ends each. The day has two HC and two HP windows, so we keep the
 # last MAX_TARIFF_WINDOWS of each (oldest first → chronological). _open_window =
@@ -136,7 +134,7 @@ def _on_tic(reading: dict, now: datetime | None = None):
         _slot["papp_n"] += 1
 
     if reading.get("period") is not None:
-        prev = _period[0]
+        prev = _period
         new = reading["period"]
         if prev is not None and new != prev:
             if _open_window is not None and _open_window[0] == prev:
@@ -144,7 +142,7 @@ def _on_tic(reading: dict, now: datetime | None = None):
                 _tariff_windows[prev] = _tariff_windows[prev][-MAX_TARIFF_WINDOWS:]
             _open_window = (new, now)                            # open the new one
             _tariff_period = new
-        _period = (new, time.monotonic())
+        _period = new
 
     last_hchc, last_hphp = hchc, hphp
     last_message_time = now.isoformat()
@@ -156,19 +154,16 @@ def _on_tic(reading: dict, now: datetime | None = None):
         _state["last_persist"] = mono
 
 
-def is_off_peak(now: datetime | None = None) -> bool:
+def is_off_peak() -> bool:
     """Is the meter currently in an off-peak (HC) period?
 
-    Trusts the live PTEC from the ZLinky when fresh; falls back to the
-    HC_WINDOWS clock when the TIC stream has gone quiet (>15 min).
+    Reads the ZLinky's live PTEC: the last period seen, trusted regardless of age
+    (an HC/HP period lasts hours, so a briefly quiet TIC stream's last reading
+    stays the best estimate). Reports peak (False) only before the first frame
+    after a start — the one moment no period is known — so the off-peak split
+    never over-counts on a cold start.
     """
-    from app.electricity import HC_WINDOWS
-
-    now = now or datetime.now(PARIS_TZ)
-    period, ts = _period
-    if period is not None and time.monotonic() - ts < PTEC_STALE_S:
-        return period == "HC"
-    return _is_off_peak(now.hour, now.minute, HC_WINDOWS)
+    return _period == "HC"
 
 
 def current_tariff() -> dict | None:
