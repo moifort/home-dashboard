@@ -4,7 +4,7 @@
   <img src="hardware/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
 
-An always-on e-paper screen for your home. It reads your smart-home data straight from **MQTT** — the broker your **Zigbee2MQTT / Home Assistant** setup already uses — and renders one clean dashboard: electricity, solar, water, plants and network. A small ESP32 wakes on a schedule, pulls the rendered image from a server you self-host, then goes back to sleep — so it sips power and never needs a backlight.
+An always-on e-paper screen for the home. It reads your smart-home data over MQTT (the broker your Zigbee2MQTT / Home Assistant setup already runs) and renders one dashboard: electricity, solar, water, plants and network. A small ESP32 wakes on a timer, pulls the ready-made image from a server you host yourself, then goes back to sleep. No backlight, barely any power.
 
 <p align="center">
   <img src="server/scripts/preview.png" alt="Dashboard preview" width="760">
@@ -12,9 +12,7 @@ An always-on e-paper screen for your home. It reads your smart-home data straigh
 
 ## Architecture
 
-The ESP32 drives the e-paper screen and pulls a freshly rendered image from the
-server; the server gathers everything from your LAN (and the EcoFlow cloud for
-solar). Blue nodes are this project's own repos.
+The ESP32 drives the screen and pulls a ready-made image from the server. The server does the actual work: it talks to your LAN devices and to the EcoFlow cloud for solar.
 
 ```mermaid
 flowchart TD
@@ -41,6 +39,11 @@ flowchart TD
     Z2M --> PLUGS
     Z2M --> PLANTS
 
+    HB["Homebridge"]:::ext
+    HOME["Apple Home<br/>(Maison)"]:::ext
+    MOSQ --> HB
+    HB --> HOME
+
     ECO["EcoFlow cloud<br/>app API + MQTT"]:::ext
     PV["Solar · PowerStream"]:::dev
     SERVER --> ECO
@@ -57,33 +60,26 @@ flowchart TD
     classDef hw   fill:#fff4cc,stroke:#caa300,color:#3a3000;
 ```
 
-**This project's repos** (blue): the **server + ESP32 firmware**
-([moifort/home-dashboard](https://github.com/moifort/home-dashboard)), the
-**water meter** ESPHome config
-([moifort/watermeter](https://github.com/moifort/watermeter)), and the **crypto
-trading bot** (own project). Everything else — Mosquitto, Zigbee2MQTT, EcoFlow,
-UniFi and the physical meters/plugs — is third-party.
+Blue boxes are this repo's code: the server and ESP32 firmware ([moifort/home-dashboard](https://github.com/moifort/home-dashboard)), the water-meter ESPHome config ([moifort/watermeter](https://github.com/moifort/watermeter)), and my crypto bot (private repo). The rest are off-the-shelf Docker containers: [eclipse-mosquitto](https://github.com/eclipse/mosquitto), [Koenkk/zigbee2mqtt](https://github.com/Koenkk/zigbee2mqtt) and [homebridge/homebridge](https://github.com/homebridge/homebridge). Homebridge re-exposes the same Zigbee devices to Apple Home, so they also show up in the Maison app.
 
-> Arrows show who connects to whom. Over MQTT the devices actually *push* their
-> readings to Mosquitto and the server subscribes (power plugs and EcoFlow are
-> also re-polled every 60 s).
+> Arrows show what connects to what. Over MQTT the devices push their readings to Mosquitto and the server subscribes; the power plugs and EcoFlow also get re-polled every 60s.
 
 ## What it shows
 
-Electricity is the core panel; everything else is **optional** and turns on as soon as you set its config.
+Electricity is the core panel. Everything else is optional and turns on once you set its config.
 
 | Panel | What you see |
 |-------|--------------|
-| **Electricity** (core) | Last 9 days of consumption as stacked **off-peak/peak** bars, plus a live `Auj.` (today) bar. Three headline stats — `kWh/j` (daily average), `HC %` (off-peak share), `€/j` (daily cost) — each with a 4-week trend. |
-| **Talon** (baseline power) | A table of the home's permanent standby draw (fridge, internet box…) in watts, with a row per power sensor you add. |
-| **Solaire** (Solar) | Daily solar production from an EcoFlow PowerStream — average, period total and money saved. |
+| **Electricity** (core) | Last 9 days of consumption as stacked off-peak/peak bars, plus a live `Auj.` (today) bar. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
+| **Talon** (baseline power) | A table of the home's permanent standby draw (fridge, internet box, that sort of thing) in watts, with a row per power sensor you add. |
+| **Solaire** (Solar) | Daily solar production from an EcoFlow PowerStream: average, period total and money saved. |
 | **Eau** (Water) | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
-| **Plantes** (Plants) | One card per soil sensor: moisture, temperature, light, a 7-day trend, and a **water-drop** icon when moisture drops below your threshold. |
+| **Plantes** (Plants) | One card per soil sensor: moisture, temperature, light, a 7-day trend, and a water-drop icon when moisture drops below your threshold. |
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot. |
 | **Réseau** (Network) | UniFi internet & Wi-Fi quality, latency, data usage and top clients. |
-| **Alertes** (Alerts) | Plain-language notes (shown in French) flagging a sharp rise, a probable leak, a disconnect… each with its **€/day impact**. |
+| **Alertes** (Alerts) | Plain-language notes (shown in French) flagging a sharp rise, a probable leak, or a disconnect, each with its €/day impact. |
 
-Every chart has an `Auj.` (today) bar that grows through the day, and a mini **intraday strip** under each bar showing *how* the day was spent. There's no minimum threshold — every real reading counts; a day with no data shows `N/A`. History starts the day you connect each source (no backfill).
+Every chart has an `Auj.` (today) bar that grows through the day, plus a small intraday strip under each bar showing how the day was spent. There's no minimum threshold: every real reading counts, and a day with no data shows `N/A`. History starts the day you connect each source (no backfill).
 
 ## Hardware
 
@@ -92,21 +88,21 @@ Every chart has an `Auj.` (today) bar that grows through the day, and a mini **i
 | e-Paper display | [Waveshare 10.85" (G) 4-color](https://www.waveshare.com/10.85inch-e-paper-hat-plus.htm) |
 | Microcontroller | [Seeed XIAO ESP32-S3](https://www.seeedstudio.com/XIAO-ESP32S3-p-5627.html) |
 | Electricity meter reader | [Lixee ZLinky_TIC V2](https://lixee.fr/fr/produits/42-zlinky-tic-v2-3770014375179.html) |
-| Power plugs | [NOUS A7Z](https://amzn.to/4evpkKK) — Zigbee 16 A plug with energy monitoring (Z2M model `TS011F` / `_TZ3008_reatplte`) |
-| Plant soil sensors | [Arteco ZS-304Z](https://fr.aliexpress.com/item/1005010441104606.html?spm=a2g0o.order_list.order_list_main.22.566f5e5bBjWddT&gatewayAdapt=glo2fra) — Zigbee soil sensor (moisture / temp / light) |
-| Server | Any Docker host (CasaOS, Raspberry Pi, NAS…) |
-| 3D printed case | [Dashboard.3mf](hardware/case/Dashboard.3mf) — matte PLA recommended |
+| Power plugs | [NOUS A7Z](https://amzn.to/4evpkKK): Zigbee 16 A plug with energy monitoring (Z2M model `TS011F` / `_TZ3008_reatplte`) |
+| Plant soil sensors | [Arteco ZS-304Z](https://fr.aliexpress.com/item/1005010441104606.html?spm=a2g0o.order_list.order_list_main.22.566f5e5bBjWddT&gatewayAdapt=glo2fra): Zigbee soil sensor (moisture / temp / light) |
+| Server | Any Docker host (CasaOS, Raspberry Pi, a NAS) |
+| 3D printed case | [Dashboard.3mf](hardware/case/Dashboard.3mf), matte PLA recommended |
 
 ## Installation
 
 ### 1. Read your electricity meter
 
-The dashboard reads the meter's teleinfo **locally** over MQTT — no cloud API, no token:
+The dashboard reads the meter's teleinfo locally over MQTT. No cloud API, no token:
 
 1. Plug a [Lixee ZLinky_TIC](https://lixee.fr/produits/30-zlinky-tic-3770014375070.html) into your Linky meter's **TIC connector** (the I1/I2 terminals under the green cover).
 2. Pair it in **Zigbee2MQTT** and note its topic (e.g. `zigbee2mqtt/linky`).
 
-It expects an **HC/HP** (off-peak/peak) contract. History accumulates from the first connection — a day the server is down stays blank.
+It expects an HC/HP (off-peak/peak) contract. History builds up from the first connection, so a day the server is down stays blank.
 
 ### 2. Configure
 
@@ -131,16 +127,16 @@ PRICE_HP=0.2065
 PRICE_HC=0.1579
 PRICE_ABO_MONTHLY=15.65
 
-# Refresh schedule — the ESP32 wakes every N minutes (must match the firmware).
+# Refresh schedule. The ESP32 wakes every N minutes, must match the firmware.
 SCREEN_REFRESH_INTERVAL_MIN=120
 DATA_LEAD_MIN=10
 INTRADAY_MAX_W=3000                  # intraday strip scale (W at full height)
 ```
 
-Then add any **optional panels** below.
+Then add any optional panels below.
 
 <details>
-<summary><b>Solar — EcoFlow PowerStream</b></summary>
+<summary><b>Solar (EcoFlow PowerStream)</b></summary>
 
 Shows daily solar production above the consumption chart. The server reads the inverter's PV power from EcoFlow's app MQTT broker and integrates it into daily kWh.
 
@@ -156,7 +152,7 @@ INTRADAY_SOLAR_MAX_W=800             # intraday strip scale (W at full height)
 <details>
 <summary><b>Water meter</b></summary>
 
-An ESPHome wM-Bus reader publishes the meter's **cumulative index (m³)** to MQTT; the dashboard derives daily litres by index difference. Set the price to show the monthly cost.
+An ESPHome wM-Bus reader publishes the meter's cumulative index (m³) to MQTT, and the dashboard derives daily litres by index difference. Set the price to show the monthly cost.
 
 ```env
 WATER_TOPIC=watermeter/index_m3        # cumulative index in m³ (raw float payload)
@@ -166,9 +162,9 @@ INTRADAY_WATER_MAX_L=150               # intraday strip scale (L per 4h bucket)
 </details>
 
 <details>
-<summary><b>Power sensors (Cumulus, washing machine…)</b></summary>
+<summary><b>Power sensors (Cumulus, washing machine)</b></summary>
 
-Any Zigbee2MQTT / ESPHome device reporting only **instantaneous power** (W). Each becomes a row in the bottom table, integrated into daily kWh. Declare them all in one variable — `topic:Display Name`, `;`-separated. Topics sharing the **same label** are summed into one row (e.g. every plug in a `Salon`).
+Any Zigbee2MQTT / ESPHome device reporting only instantaneous power (W). Each becomes a row in the bottom table, integrated into daily kWh. Declare them all in one variable as `topic:Display Name`, `;`-separated. Topics sharing the same label get summed into one row (e.g. every plug in a `Salon`).
 
 ```env
 POWER_SENSORS=zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge
@@ -178,7 +174,7 @@ POWER_SENSORS=zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge
 <details>
 <summary><b>Plant soil sensors</b></summary>
 
-Any Zigbee2MQTT soil sensor reporting `soil_moisture`, `temperature` and `illuminance`. Each becomes a `Plantes` card. The format is `topic:Display Name:threshold` — the trailing number is the **watering threshold** (soil-moisture %); the water-drop icon shows when moisture drops below it. A plant without its own threshold falls back to `PLANTS_MOISTURE_THRESHOLD`.
+Any Zigbee2MQTT soil sensor reporting `soil_moisture`, `temperature` and `illuminance`. Each becomes a `Plantes` card. The format is `topic:Display Name:threshold`, where the trailing number is the watering threshold (soil-moisture %): the water-drop icon shows when moisture drops below it. A plant without its own threshold falls back to `PLANTS_MOISTURE_THRESHOLD`.
 
 ```env
 PLANTS_SENSORS=zigbee2mqtt/ficus:Ficus:30;zigbee2mqtt/basilic:Basilic:40
@@ -189,7 +185,7 @@ PLANTS_MOISTURE_THRESHOLD=30           # global fallback (%); empty = no drop wi
 <details>
 <summary><b>Crypto-bot stats</b></summary>
 
-Point the dashboard at your crypto-bot's GraphQL endpoint to show its trading stats top-right. Use the bot's **LAN IP** (not `localhost`) when both run on the same host.
+Point the dashboard at your crypto-bot's GraphQL endpoint to show its trading stats top-right. Use the bot's LAN IP (not `localhost`) when both run on the same host.
 
 ```env
 CRYPTO_API_URL=http://192.168.1.50:3003/graphql
@@ -200,7 +196,7 @@ CRYPTO_API_TOKEN=your_crypto_bot_api_token   # omit if no auth
 <details>
 <summary><b>UniFi network panel</b></summary>
 
-Point the dashboard at your local UniFi gateway (UCG/UDM on UniFi OS) for a `Réseau` panel with internet & Wi-Fi quality, per-SSID client counts and top consumers. It logs in with your **local** gateway account. Set your SSID names so the IoT vs main split is correct.
+Point the dashboard at your local UniFi gateway (UCG/UDM on UniFi OS) for a `Réseau` panel with internet & Wi-Fi quality, per-SSID client counts and top consumers. It logs in with your local gateway account. Set your SSID names so the IoT vs main split is correct.
 
 ```env
 UNIFI_HOST=https://192.168.1.1
@@ -221,7 +217,7 @@ curl -O https://raw.githubusercontent.com/moifort/dashboard/main/server/docker-c
 docker compose up -d
 ```
 
-**CasaOS** — import this compose file from the CasaOS interface:
+**CasaOS:** import this compose file from the CasaOS interface:
 
 ```
 https://raw.githubusercontent.com/moifort/dashboard/main/server/docker-compose.casaos.yml
@@ -241,26 +237,26 @@ arduino-cli compile --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" hardware/esp32-d
 arduino-cli upload  --fqbn "esp32:esp32:XIAO_ESP32S3:PSRAM=opi" --port /dev/cu.usbmodem101 hardware/esp32-display/
 ```
 
-On first boot, open the serial monitor and follow the prompts for **Wi-Fi** and the **server URL**:
+On first boot, open the serial monitor and follow the prompts for Wi-Fi and the server URL:
 
 ```bash
 arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 ```
 
-To reconfigure later, type `reset` within 3 seconds of boot. The ESP32 then wakes on a clock-aligned interval (`REFRESH_INTERVAL_MIN`, default **120 min**), refreshes the screen, and deep-sleeps until the next boundary — retrying with backoff on a failed cycle.
+To reconfigure later, type `reset` within 3 seconds of boot. The ESP32 then wakes on a clock-aligned interval (`REFRESH_INTERVAL_MIN`, default 120 min), refreshes the screen, and deep-sleeps until the next boundary. A failed cycle just retries with backoff.
 
 ## Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/display` | EPD binary buffer (163,200 bytes), rendered fresh — for the ESP32 |
+| `GET` | `/display` | EPD binary buffer (163,200 bytes), rendered fresh, for the ESP32 |
 | `GET` | `/` | Auto-refreshing HTML preview in a browser |
 | `GET` | `/preview.png` | The dashboard rendered as a PNG |
 | `GET` | `/status` | Server status as JSON (last render, day count, per-domain config) |
 
 ## Development
 
-A golden-master test suite guards the render pipeline: it freezes a known input (a seeded DB + a fixed clock) and compares the output byte-for-byte to committed references — both the data (`data.golden.json`) and the rendered EPD buffer (`display.golden.bin`).
+A golden-master test suite guards the render pipeline. It freezes a known input (a seeded DB and a fixed clock) and compares the output byte-for-byte against committed references: the data (`data.golden.json`) and the rendered EPD buffer (`display.golden.bin`).
 
 ```bash
 cd server
@@ -269,11 +265,11 @@ pytest -q                  # must stay green: nothing changed
 pytest -q --update-golden  # re-baseline after an intentional layout/data change
 ```
 
-On a render mismatch the actual/golden/diff PNGs are written to `/tmp`. CI runs the suite on every push and PR. The render golden depends on the FreeType/Pillow build (so it's generated locally and checked strictly there, smoke-tested in CI); the data golden is byte-exact everywhere.
+On a render mismatch the actual/golden/diff PNGs land in `/tmp`. CI runs the suite on every push and PR. The render golden depends on the FreeType/Pillow build, so it's generated locally and checked strictly there, and only smoke-tested in CI. The data golden is byte-exact everywhere.
 
 ## 3D printed case
 
-[Dashboard.3mf](hardware/case/Dashboard.3mf) — matte PLA, 15% infill, no supports.
+[Dashboard.3mf](hardware/case/Dashboard.3mf): matte PLA, 15% infill, no supports.
 
 ## License
 
