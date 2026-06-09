@@ -27,8 +27,8 @@ flowchart TD
 
     MOSQ["Mosquitto<br/>local MQTT broker"]:::ext
     Z2M["Zigbee2MQTT"]:::ext
-    LINKY["Linky · ZLinky_TIC"]:::dev
-    PLUGS["Power plugs<br/>Cumulus, washer…"]:::dev
+    LINKY["Linky meter<br/>Lixee ZLinky_TIC"]:::dev
+    PLUGS["Power plugs<br/>NOUS A7Z"]:::dev
     PLANTS["Plant soil sensors"]:::dev
     WATER["Water meter<br/>ESPHome wM-Bus"]:::mine
 
@@ -89,6 +89,9 @@ Every chart has an `Auj.` (today) bar that grows through the day, and a mini **i
 |-----------|-----------|
 | e-Paper display | [Waveshare 10.85" (G) 4-color](https://www.waveshare.com/10.85inch-e-paper-hat-plus.htm) |
 | Microcontroller | [Seeed XIAO ESP32-S3](https://www.seeedstudio.com/XIAO-ESP32S3-p-5627.html) |
+| Electricity meter reader | [Lixee ZLinky_TIC V2](https://lixee.fr/fr/produits/42-zlinky-tic-v2-3770014375179.html) |
+| Power plugs | [NOUS A7Z](https://amzn.to/4evpkKK) — Zigbee 16 A plug with energy monitoring |
+| Plant soil sensors | [Zigbee soil sensor](https://fr.aliexpress.com/item/1005010441104606.html?spm=a2g0o.order_list.order_list_main.22.566f5e5bBjWddT&gatewayAdapt=glo2fra) (moisture / temp / light) |
 | Server | Any Docker host (CasaOS, Raspberry Pi, NAS…) |
 | 3D printed case | [Dashboard.3mf](hardware/case/Dashboard.3mf) — matte PLA recommended |
 
