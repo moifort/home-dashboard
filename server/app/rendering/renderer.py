@@ -634,7 +634,12 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
             h = max(1, round(v / max_v * SPARK_MAX_H)) if max_v > 0 else 1
             draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
 
-    drop_w = max(6, round(line_h * 0.5))
+    # The watering drop matches the name's cap height and sits on its baseline,
+    # rather than spanning the whole line (descender included), which looked big.
+    xbb = draw.textbbox((0, 0), "X", font=fonts["bold"])
+    baseline = xbb[3]
+    drop_h = xbb[3] - xbb[1]
+    drop_w = max(5, round(drop_h * 0.62))
     bat_w = max(9, round(line_h * 0.8))
     bat_h = max(5, round(line_h * 0.5))
 
@@ -644,7 +649,7 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
         # and the 7-day moisture spark at the right edge.
         nx = put([(_short_name(p.get("name", "")), "bold", BLACK)], x, y) + 6
         if p.get("needs_water"):
-            _draw_water_drop(draw, nx + drop_w / 2, y + 1, drop_w, line_h - 2, RED)
+            _draw_water_drop(draw, nx + drop_w / 2, y + baseline - drop_h, drop_w, drop_h, RED)
             nx += drop_w + 6
         if p.get("low_battery"):
             _draw_battery(draw, nx, y + (line_h - bat_h) // 2, bat_w, bat_h, RED)
