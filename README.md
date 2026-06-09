@@ -18,9 +18,11 @@ solar). Blue nodes are this project's own repos.
 
 ```mermaid
 flowchart TD
-    SCREEN["e-Paper screen"]:::hw
-    ESP["ESP32 firmware"]:::mine
-    SERVER["Dashboard server<br/>Docker / CasaOS"]:::mine
+    subgraph repo["this repo"]
+        SCREEN["e-Paper screen"]:::hw
+        ESP["ESP32 firmware"]:::mine
+        SERVER["Dashboard server<br/>Docker / CasaOS"]:::mine
+    end
 
     SCREEN --> ESP
     ESP --> SERVER
