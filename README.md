@@ -32,22 +32,22 @@ flowchart TD
     PLANTS["Plant soil sensors<br/>Arteco ZS-304Z"]:::dev
     WATER["Water meter<br/>ESPHome wM-Bus"]:::mine
 
-    SERVER -->|"subscribe / poll"| MOSQ
-    MOSQ -->|"zigbee2mqtt/#"| Z2M
-    MOSQ -->|"index m³"| WATER
-    Z2M -->|"TIC frames"| LINKY
-    Z2M -->|"power (W)"| PLUGS
-    Z2M -->|"moisture · temp · lux"| PLANTS
+    SERVER --> MOSQ
+    MOSQ --> Z2M
+    MOSQ --> WATER
+    Z2M --> LINKY
+    Z2M --> PLUGS
+    Z2M --> PLANTS
 
     ECO["EcoFlow cloud<br/>app API + MQTT"]:::ext
     PV["Solar · PowerStream"]:::dev
-    SERVER -->|"login + heartbeats (cloud)"| ECO
+    SERVER --> ECO
     ECO --> PV
 
     CRYPTO["Crypto trading bot<br/>GraphQL"]:::mine
     UNIFI["UniFi gateway"]:::ext
-    SERVER -->|"GraphQL · on each pull"| CRYPTO
-    SERVER -->|"HTTPS · hourly"| UNIFI
+    SERVER --> CRYPTO
+    SERVER --> UNIFI
 
     classDef mine fill:#d4ecff,stroke:#0a6ebd,color:#062a44;
     classDef ext  fill:#eeeeee,stroke:#999999,color:#222222;
