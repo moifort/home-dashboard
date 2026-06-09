@@ -160,10 +160,10 @@ def render_dashboard(data: dict) -> Image.Image:
     home = data.get("home")
     if home:
         home_bottom = _draw_home_panel(draw, fonts, home, region_top=0)
-        top = home_bottom + 4
+        top = home_bottom + 2
         plants = data.get("plants")
         if plants:
-            top = _draw_plants_panel(draw, fonts, plants, region_top=top) + 4
+            top = _draw_plants_panel(draw, fonts, plants, region_top=top) + 2
         _draw_alerts_panel(draw, fonts, data.get("alert_board") or [], region_top=top)
 
     # UniFi "Réseau" panel in the empty bottom-right column, directly under the
@@ -550,10 +550,10 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
     stats_top = region_top + CHART_TOP
-    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 5
     _draw_stats_bar(draw, fonts, [[("Home", "bold", BLACK)]], x, stats_top, width, sep_y)
 
-    y = sep_y + 6
+    y = sep_y + 4
     schedule = [
         (home.get("last_text", ""), "bold", BLACK),
         (" ► ", "regular", BLACK),
@@ -605,7 +605,7 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
     stats_top = region_top
-    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 5
     _draw_stats_bar(draw, fonts, [[("Plantes", "bold", BLACK)]], x, stats_top, width, sep_y)
 
     # Sparkline hugs the gutter's right edge, on the name line.
@@ -638,7 +638,7 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
     bat_w = max(9, round(line_h * 0.8))
     bat_h = max(5, round(line_h * 0.5))
 
-    y = sep_y + 6
+    y = sep_y + 4
     for p in plants:
         # Line 1 (card title): name, then red watering/battery icons to its right,
         # and the 7-day moisture spark at the right edge.
@@ -689,9 +689,9 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     def section_title(label, y):
         """Draw a domain title + its 1px separator; return the y of the first row."""
         draw.text((x, y), label, fill=BLACK, font=fonts["bold"])
-        sep = y + title_h + 4
+        sep = y + title_h + 3
         draw.line([(x, sep), (x + width - 1, sep)], fill=BLACK, width=1)
-        return sep + 5
+        return sep + 4
 
     def num_atom(word):
         """Split a word into a bold numeric part + its glued regular unit, e.g.
@@ -752,7 +752,7 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
                 y = wrap_atoms(atoms, color, y)
         else:
             y = wrap_atoms([[(w, "regular")] for w in "Rien à signaler".split()], BLACK, y)
-        y += 6  # gap before the next domain section
+        y += 2  # gap before the next domain section
 
 
 def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
