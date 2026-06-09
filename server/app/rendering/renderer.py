@@ -154,12 +154,17 @@ def render_dashboard(data: dict) -> Image.Image:
         _draw_bottom_table(draw, fonts, bottom_rows, WATER_SPLIT)
 
     # "Home" panel in the empty top-left gutter (left of the packed columns):
-    # a title banner over the last/next refresh times, then the "Alertes" panel
-    # stacked just below it (same gutter).
+    # a title banner over the last/next refresh times, then the "Plantes" panel
+    # (when any soil sensor is configured) and the "Alertes" panel stacked below
+    # it, in that order (same gutter, Home → Plantes → Alertes).
     home = data.get("home")
     if home:
         home_bottom = _draw_home_panel(draw, fonts, home, region_top=0)
-        _draw_alerts_panel(draw, fonts, data.get("alert_board") or [], region_top=home_bottom + 10)
+        top = home_bottom + 4
+        plants = data.get("plants")
+        if plants:
+            top = _draw_plants_panel(draw, fonts, plants, region_top=top) + 4
+        _draw_alerts_panel(draw, fonts, data.get("alert_board") or [], region_top=top)
 
     # UniFi "Réseau" panel in the empty bottom-right column, directly under the
     # crypto grid (same right column), down to the screen bottom.
@@ -562,6 +567,105 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
                (line["end_text"], "bold", BLACK)]
         row([(line["period"], "regular", BLACK)], rng, y)
     return y + line_h  # bottom of the panel content (for the Alerts panel below)
+
+
+def _draw_water_drop(draw, cx, top, w, h, fill):
+    """A small filled teardrop (round bottom, pointed top) centred on x=cx,
+    spanning [top, top+h]. Solid fill so it survives 4-color thresholding."""
+    r = w / 2
+    # Round bottom bulb (a circle of diameter w) + a triangle apex up to `top`.
+    draw.ellipse([cx - r, top + h - w, cx + r, top + h], fill=fill)
+    draw.polygon([(cx, top), (cx - r, top + h - r), (cx + r, top + h - r)], fill=fill)
+
+
+def _draw_battery(draw, x, top, w, h, fill):
+    """A small filled battery (body + right-hand terminal nub) at (x, top),
+    body width w-2, total width w. Solid fill so it survives 4-color
+    thresholding — drawn in red to flag a battery that needs replacing."""
+    body_w = w - 2
+    draw.rectangle([x, top, x + body_w, top + h], fill=fill)
+    nub_h = max(2, round(h * 0.5))
+    nub_top = top + (h - nub_h) // 2
+    draw.rectangle([x + body_w, nub_top, x + w, nub_top + nub_h], fill=fill)
+
+
+def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
+    """Draw the "Plantes" panel in the left gutter, stacked under Home: a title
+    banner with a 1px separator, then a two-line card per plant. Line 1 (the
+    card's title): name (bold, left, truncated), then — right of the name — a red
+    water-drop icon when the plant needs watering and a red battery icon when its
+    battery is low, with the 7-day moisture sparkline hugging the gutter's right
+    edge. Line 2: three uniform label/value pairs "hum 45%  temp 27°  lum 76"
+    (labels regular, numbers bold, all black). Returns the y below the last card
+    (for the Alerts panel stacked beneath)."""
+    width = PANEL_LEFT - CHART_LEFT - COL_GAP
+    x = CHART_LEFT
+    right = x + width
+
+    line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
+
+    stats_top = region_top
+    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    _draw_stats_bar(draw, fonts, [[("Plantes", "bold", BLACK)]], x, stats_top, width, sep_y)
+
+    # Sparkline hugs the gutter's right edge, on the name line.
+    spark_w = SPARK_BARS * (SPARK_BAR_W + SPARK_BAR_GAP) - SPARK_BAR_GAP
+    spark_left = right - spark_w
+
+    def put(segments, sx, sy):
+        cx = sx
+        for text, fk, color in segments:
+            draw.text((round(cx), sy), text, fill=color, font=fonts[fk])
+            cx += draw.textlength(text, font=fonts[fk])
+        return cx
+
+    def spark(values, sy):
+        """7 thin bars normalised to this plant's own max, grown up from the text
+        baseline. Missing days leave a gap; present days draw at least a 1px tick."""
+        if not values:
+            return
+        present = [v for v in values if v is not None]
+        max_v = max(present) if present else 0
+        baseline = sy + line_h
+        for j, v in enumerate(values):
+            if v is None:
+                continue
+            bx = spark_left + j * (SPARK_BAR_W + SPARK_BAR_GAP)
+            h = max(1, round(v / max_v * SPARK_MAX_H)) if max_v > 0 else 1
+            draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
+
+    drop_w = max(6, round(line_h * 0.5))
+    bat_w = max(9, round(line_h * 0.8))
+    bat_h = max(5, round(line_h * 0.5))
+
+    y = sep_y + 6
+    for p in plants:
+        # Line 1 (card title): name, then red watering/battery icons to its right,
+        # and the 7-day moisture spark at the right edge.
+        nx = put([(_short_name(p.get("name", "")), "bold", BLACK)], x, y) + 6
+        if p.get("needs_water"):
+            _draw_water_drop(draw, nx + drop_w / 2, y + 1, drop_w, line_h - 2, RED)
+            nx += drop_w + 6
+        if p.get("low_battery"):
+            _draw_battery(draw, nx, y + (line_h - bat_h) // 2, bat_w, bat_h, RED)
+            nx += bat_w + 6
+        spark(p.get("spark"), y)
+        # Line 2: uniform hum / temp / lum pairs (labels regular, numbers bold).
+        y2 = y + line_h + 1
+        segs = [("hum ", "regular", BLACK)]
+        if p.get("moisture_pct") is not None:
+            segs += [(p.get("moisture_text", "—"), "bold", BLACK), ("%", "regular", BLACK)]
+        else:
+            segs += [("—", "regular", BLACK)]
+        segs += [("  temp ", "regular", BLACK)]
+        if p.get("temperature") is not None:
+            segs += [(p.get("temperature_text", "—"), "bold", BLACK), ("°", "regular", BLACK)]
+        else:
+            segs += [("—", "regular", BLACK)]
+        segs += [("  lum ", "regular", BLACK), (p.get("illuminance_text", "—"), "bold", BLACK)]
+        put(segs, x, y2)
+        y = y2 + line_h + 3
+    return y
 
 
 def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:

@@ -11,7 +11,7 @@ and `connect()` reads that module global.
 """
 from datetime import date, datetime, timedelta
 
-from app import electricity, solar, water
+from app import electricity, plants, solar, water
 from app.electricity import power
 from app.module import db
 from app.system.config import PARIS_TZ
@@ -160,6 +160,28 @@ def _power_rows():
     return rows
 
 
+def _plant_rows():
+    """Daily soil-sensor readings (the day's latest of each metric) for two
+    plants over the spark window, including today (the on-screen current value).
+    Ficus reports every day; Basilic skips two early days to exercise the spark's
+    gap. The status enums are only meaningful on today's live row (NULL on
+    history): Ficus is "warning"/"low" → both red icons; Basilic "none"/"middle"
+    → neither. Values are deterministic per (plant, day index)."""
+    start = TODAY - timedelta(days=9)
+    rows = []
+    for i, d in enumerate(_daterange(start, TODAY)):
+        ds = d.strftime("%Y-%m-%d")
+        today = d == TODAY
+        rows.append(("ficus", ds, float(30 + (i % 6) * 5), 20.0 + (i % 3),
+                     800.0 + (i % 4) * 150, 18.0 + (i % 5),
+                     "warning" if today else None, "low" if today else None, _FETCHED_AT))
+        if i not in (1, 4):  # two missing days early -> a gap in Basilic's spark
+            rows.append(("basilic", ds, float(45 + (i % 5) * 4), 22.0 + (i % 2),
+                         600.0 + (i % 3) * 200, 22.0 + (i % 4),
+                         "none" if today else None, "middle" if today else None, _FETCHED_AT))
+    return rows
+
+
 def _water_rows():
     """Cumulative water index (m³) including today. Daily litres follow a fixed
     pattern; the index is their running sum from a fixed base."""
@@ -214,6 +236,7 @@ def seed():
     solar.init_schema()
     power.init_schema()
     water.init_schema()
+    plants.init_schema()
 
     conn = db.connect()
     conn.executemany(
@@ -244,6 +267,12 @@ def seed():
     conn.executemany(
         "INSERT OR REPLACE INTO water_samples (ts, index_m3) VALUES (?, ?)",
         _water_sample_rows(),
+    )
+    conn.executemany(
+        "INSERT OR REPLACE INTO daily_plants "
+        "(slug, date, moisture, temperature, illuminance, fertility, "
+        "water_warning, battery_state, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        _plant_rows(),
     )
     conn.commit()
     conn.close()

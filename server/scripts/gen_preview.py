@@ -274,6 +274,21 @@ if "crypto_grid" not in data:
         "skips": [{"price": 97000.0, "side": "buy", "kind": "insufficient_funds"}],
     }
 
+# The Zigbee soil sensors need a live MQTT broker we don't have here; inject two
+# representative plants (matching the golden seed) so the preview shows the
+# left-gutter "Plantes" panel — Basilic's spark carries a gap (a missing day).
+if "plants" not in data:
+    data["plants"] = [
+        {"name": "Ficus", "moisture_pct": 45, "moisture_text": "45",
+         "temperature": 27.0, "temperature_text": "27", "illuminance_text": "76",
+         "needs_water": True, "low_battery": True,
+         "spark": [40, 45, 50, 55, 30, 35, 40]},
+        {"name": "Basilic", "moisture_pct": 61, "moisture_text": "61",
+         "temperature": 24.0, "temperature_text": "24", "illuminance_text": "850",
+         "needs_water": False, "low_battery": False,
+         "spark": [53, 57, None, 45, 49, 53, 57]},
+    ]
+
 # Preview only: force a representative set of triggering values so the
 # top-left "Alertes" panel renders populated, then recompute the alerts (the
 # build above ran before the unifi/water injections below). Set ALERTS_DEMO

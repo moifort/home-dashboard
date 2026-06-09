@@ -655,6 +655,52 @@
     ]
   },
   "last_updated": "2026-06-02T14:30:45+02:00",
+  "plants": [
+    {
+      "fertility": 22.0,
+      "fertility_text": "22",
+      "illuminance": 950.0,
+      "illuminance_text": "950",
+      "low_battery": true,
+      "moisture_pct": 45,
+      "moisture_text": "45",
+      "name": "Ficus",
+      "needs_water": true,
+      "spark": [
+        40.0,
+        45.0,
+        50.0,
+        55.0,
+        30.0,
+        35.0,
+        40.0
+      ],
+      "temperature": 20.0,
+      "temperature_text": "20"
+    },
+    {
+      "fertility": 23.0,
+      "fertility_text": "23",
+      "illuminance": 600.0,
+      "illuminance_text": "600",
+      "low_battery": false,
+      "moisture_pct": 61,
+      "moisture_text": "61",
+      "name": "Basilic",
+      "needs_water": false,
+      "spark": [
+        53.0,
+        57.0,
+        null,
+        45.0,
+        49.0,
+        53.0,
+        57.0
+      ],
+      "temperature": 23.0,
+      "temperature_text": "23"
+    }
+  ],
   "power_sensors": [
     {
       "avg_kwh": 2.533333333333333,

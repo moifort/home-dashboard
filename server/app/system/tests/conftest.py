@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from app.module import db
-from app import crypto, network, solar, water
+from app import crypto, network, plants, solar, water
 from app.electricity import command as electricity_command
 from app.electricity import power
 from app.electricity.power import Sensor
@@ -34,6 +34,7 @@ _TIME_MODULES = [
     "app.solar.query",
     "app.solar.command",
     "app.water.query",
+    "app.plants.query",
 ]
 
 
@@ -85,6 +86,15 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
     monkeypatch.setattr(power, "ENABLED", True)
     monkeypatch.setattr(water, "ENABLED", True)
     monkeypatch.setattr(water, "PRICE_M3", 3.9)
+    # Two soil sensors -> the "Plantes" gutter panel (Ficus reports daily,
+    # Basilic skips two early days so its moisture spark shows a gap). Both carry
+    # a 50% moisture floor: Ficus (45% today) is under it -> red drop; Basilic
+    # (61%) is above -> no drop. Exercises both threshold branches.
+    monkeypatch.setattr(plants, "SENSORS", [
+        plants.Sensor("ficus", "zigbee2mqtt/ficus", "Ficus", 50),
+        plants.Sensor("basilic", "zigbee2mqtt/basilic", "Basilic", 50),
+    ])
+    monkeypatch.setattr(plants, "ENABLED", True)
 
     # Hard-disable the network slices so build_dashboard_data never fetches.
     monkeypatch.setattr(crypto, "enabled", lambda: False)
