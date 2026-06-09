@@ -22,8 +22,8 @@ flowchart TD
     ESP["ESP32 firmware"]:::mine
     SERVER["Dashboard server<br/>Docker / CasaOS"]:::mine
 
-    SCREEN -->|"SPI · e-paper HAT"| ESP
-    ESP -->|"GET /display · every 120 min"| SERVER
+    SCREEN --> ESP
+    ESP --> SERVER
 
     MOSQ["Mosquitto<br/>local MQTT broker"]:::ext
     Z2M["Zigbee2MQTT"]:::ext
@@ -42,7 +42,7 @@ flowchart TD
     ECO["EcoFlow cloud<br/>app API + MQTT"]:::ext
     PV["Solar · PowerStream"]:::dev
     SERVER -->|"login + heartbeats (cloud)"| ECO
-    ECO -->|"PV watts"| PV
+    ECO --> PV
 
     CRYPTO["Crypto trading bot<br/>GraphQL"]:::mine
     UNIFI["UniFi gateway"]:::ext
