@@ -47,6 +47,19 @@ def init_schema():
             papp_va REAL
         )"""
     )
+    # Persisted tariff windows so the Home panel survives a restart/redeploy
+    # (otherwise the live-PTEC windows live in RAM only and blank out for ~24h).
+    # One row per window — a day has two HC + two HP windows — plus the open
+    # (in-progress) window with a NULL end. Reloaded on startup, rewritten at each
+    # PTEC transition.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS tariff_windows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period TEXT NOT NULL,
+            start TEXT NOT NULL,
+            end TEXT
+        )"""
+    )
     conn.commit()
     conn.close()
 
@@ -114,6 +127,50 @@ def get_papp_profiles(start: str, end: str) -> dict[str, list]:
         profiles.setdefault(ts[:10], [None] * 48)[slot] = papp
     conn.close()
     return profiles
+
+
+def save_tariff_windows(open_window, windows: dict):
+    """Replace the persisted tariff state: every completed window (end set) for
+    each period plus the open (in-progress) window with a NULL end. `windows` is
+    {"HC": [(start, end), ...], "HP": [...]} of datetimes; `open_window` is
+    (period, start) or None. Insertion order is HC then HP then open, preserved on
+    reload via the autoincrement id."""
+    conn = connect()
+    conn.execute("DELETE FROM tariff_windows")
+    for period in ("HC", "HP"):
+        for start, end in windows.get(period, []):
+            conn.execute(
+                "INSERT INTO tariff_windows (period, start, end) VALUES (?, ?, ?)",
+                (period, start.isoformat(), end.isoformat()),
+            )
+    if open_window is not None:
+        period, start = open_window
+        conn.execute(
+            "INSERT INTO tariff_windows (period, start, end) VALUES (?, ?, NULL)",
+            (period, start.isoformat()),
+        )
+    conn.commit()
+    conn.close()
+
+
+def load_tariff_windows():
+    """Reload the persisted tariff state, chronological per period. Returns
+    (windows, open_window): windows = {"HC": [(start, end), ...], "HP": [...]} of
+    datetimes (rows with a non-NULL end), open_window = (period, start) for the
+    single NULL-end row, or None."""
+    conn = connect()
+    cur = conn.execute("SELECT period, start, end FROM tariff_windows ORDER BY id")
+    windows = {"HC": [], "HP": []}
+    open_window = None
+    for period, start, end in cur.fetchall():
+        if end is None:
+            open_window = (period, datetime.fromisoformat(start))
+        else:
+            windows.setdefault(period, []).append(
+                (datetime.fromisoformat(start), datetime.fromisoformat(end))
+            )
+    conn.close()
+    return windows, open_window
 
 
 def get_night_papp(date: str) -> list[float]:

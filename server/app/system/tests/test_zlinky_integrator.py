@@ -264,3 +264,43 @@ def test_current_tariff_keeps_last_two_windows_per_period(tic_db):
     tariff = command.current_tariff()
     assert tariff["hc"] == [(_now(5, 3, 0), _now(5, 4, 0)),
                             (_now(5, 5, 0), _now(5, 6, 0))]
+
+
+# --- Tariff-window persistence (survive a restart/redeploy) ---
+
+def test_tariff_windows_round_trip(tic_db):
+    # Both periods, two windows each (a full day), plus an open window.
+    windows = {"HC": [(_now(5, 1, 0), _now(5, 2, 0)), (_now(5, 5, 0), _now(5, 6, 0))],
+               "HP": [(_now(5, 2, 0), _now(5, 3, 0)), (_now(5, 6, 0), _now(5, 7, 0))]}
+    open_window = ("HC", _now(5, 7, 0))
+    repository.save_tariff_windows(open_window, windows)
+    loaded_windows, loaded_open = repository.load_tariff_windows()
+    assert loaded_windows == windows
+    assert loaded_open == open_window
+
+
+def test_save_replaces_previous_windows(tic_db):
+    repository.save_tariff_windows(None, {"HC": [(_now(5, 1, 0), _now(5, 2, 0))], "HP": []})
+    repository.save_tariff_windows(None, {"HC": [(_now(5, 3, 0), _now(5, 4, 0))], "HP": []})
+    loaded_windows, loaded_open = repository.load_tariff_windows()
+    assert loaded_windows == {"HC": [(_now(5, 3, 0), _now(5, 4, 0))], "HP": []}
+    assert loaded_open is None
+
+
+def test_tariff_windows_survive_restart(tic_db, monkeypatch):
+    # Complete an HC window (15:02 → 17:02), leaving an open HP window.
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 15, 2))
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 17, 2))
+    # Restart: blank the in-RAM state (DB keeps it).
+    monkeypatch.setattr(command, "_tariff_windows", {"HC": [], "HP": []})
+    monkeypatch.setattr(command, "_open_window", None)
+    monkeypatch.setattr(command, "_tariff_period", None)
+    monkeypatch.setattr(command, "_period", None)
+    assert command.current_tariff() is None
+    # Reload from DB → the completed HC window and the open HP window come back.
+    command._reload_tariff()
+    tariff = command.current_tariff()
+    assert tariff["hc"] == [(_now(5, 15, 2), _now(5, 17, 2))]
+    assert command._open_window == ("HP", _now(5, 17, 2))
+    assert command.is_off_peak() is False  # the open window's period (HP) resumes

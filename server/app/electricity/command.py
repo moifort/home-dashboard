@@ -43,10 +43,9 @@ _period = None
 # transition that ends each. The day has two HC and two HP windows, so we keep the
 # last MAX_TARIFF_WINDOWS of each (oldest first → chronological). _open_window =
 # (period, start) of the in-progress window; _tariff_period = the period in effect
-# now. In-memory only — a restart blanks them until real transitions complete
-# windows again, so the panel fills up over the day (the first frame after startup
-# only baselines _period; the first transition just opens a window with no prior to
-# close).
+# now. Persisted to DB at each transition and reloaded on startup (_reload_tariff),
+# so the panel survives a restart/redeploy and shows yesterday's windows right
+# away — it no longer blanks out for ~24h while live transitions re-learn them.
 MAX_TARIFF_WINDOWS = 2
 _tariff_windows = {"HC": [], "HP": []}
 _open_window = None
@@ -86,6 +85,17 @@ def _reload_today(today: str):
     rows = repository.get_cached_days(today, tomorrow)
     _state["hc_kwh"] = rows[0]["hc_kwh"] if rows else 0.0
     _state["hp_kwh"] = rows[0]["hp_kwh"] if rows else 0.0
+
+
+def _reload_tariff():
+    """Restart resilience: reload the persisted HC/HP windows so the Home panel
+    shows them immediately instead of blanking out until live transitions re-learn
+    them. Restores the open window's period as the current one so is_off_peak is
+    right from the first moment too."""
+    global _tariff_windows, _open_window, _tariff_period, _period
+    _tariff_windows, _open_window = repository.load_tariff_windows()
+    if _open_window is not None:
+        _tariff_period = _period = _open_window[0]
 
 
 def _on_tic(reading: dict, now: datetime | None = None):
@@ -142,6 +152,7 @@ def _on_tic(reading: dict, now: datetime | None = None):
                 _tariff_windows[prev] = _tariff_windows[prev][-MAX_TARIFF_WINDOWS:]
             _open_window = (new, now)                            # open the new one
             _tariff_period = new
+            repository.save_tariff_windows(_open_window, _tariff_windows)  # survive restart
         _period = new
 
     last_hchc, last_hphp = hchc, hphp
@@ -169,10 +180,11 @@ def is_off_peak() -> bool:
 def current_tariff() -> dict | None:
     """The recent completed HC and HP windows (up to MAX_TARIFF_WINDOWS each) as
     lists of (start, end) wall-clock, learned live from the meter's PTEC
-    transitions: {"period", "hc", "hp"}. None until at least one window has
-    completed since startup; a period's list stays empty until one of its own
-    windows has completed (each period is independent). No freshness check — an
-    observed window stays listed until trimmed out by newer ones of that period."""
+    transitions and persisted across restarts: {"period", "hc", "hp"}. None until
+    at least one window has completed (then reloaded on every later restart); a
+    period's list stays empty until one of its own windows has completed (each
+    period is independent). No freshness check — an observed window stays listed
+    until trimmed out by newer ones of that period."""
     if not _tariff_windows["HC"] and not _tariff_windows["HP"]:
         return None
     return {"period": _tariff_period,
@@ -186,6 +198,7 @@ def start():
     if not ENABLED:
         logger.info("Linky MQTT disabled (set MQTT_HOST + LINKY_MQTT_TOPIC to enable)")
         return None
+    _reload_tariff()  # resume the HC/HP windows persisted before the last restart
     listener = ZLinkyMqttListener(MQTT_HOST, MQTT_PORT, TOPIC,
                                   MQTT_USERNAME, MQTT_PASSWORD, _on_tic)
     listener.start()
