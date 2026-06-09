@@ -10,6 +10,62 @@ An always-on e-paper screen for your home. It reads your smart-home data straigh
   <img src="server/scripts/preview.png" alt="Dashboard preview" width="760">
 </p>
 
+## Architecture
+
+The ESP32 drives the e-paper screen and pulls a freshly rendered image from the
+server; the server gathers everything from your LAN (and the EcoFlow cloud for
+solar). Blue nodes are this project's own repos.
+
+```mermaid
+flowchart TD
+    ESP["ESP32 firmware"]:::mine
+    SCREEN["e-Paper screen"]:::hw
+    SERVER["Dashboard server<br/>Docker / CasaOS"]:::mine
+
+    ESP -->|drives e-ink| SCREEN
+    ESP -->|"GET /display · every 120 min"| SERVER
+
+    MOSQ["Mosquitto<br/>local MQTT broker"]:::ext
+    Z2M["Zigbee2MQTT"]:::ext
+    LINKY["Linky · ZLinky_TIC"]:::dev
+    PLUGS["Power plugs<br/>Cumulus, washer…"]:::dev
+    PLANTS["Plant soil sensors"]:::dev
+    WATER["Water meter<br/>ESPHome wM-Bus"]:::mine
+
+    SERVER -->|subscribe / poll| MOSQ
+    MOSQ --> Z2M
+    MOSQ --> WATER
+    Z2M --> LINKY
+    Z2M --> PLUGS
+    Z2M --> PLANTS
+
+    ECO["EcoFlow cloud<br/>app API + MQTT"]:::ext
+    PV["Solar · PowerStream"]:::dev
+    SERVER -->|"login + heartbeats (cloud)"| ECO
+    ECO --> PV
+
+    CRYPTO["Crypto trading bot<br/>GraphQL"]:::mine
+    UNIFI["UniFi gateway"]:::ext
+    SERVER -->|"GraphQL · on each pull"| CRYPTO
+    SERVER -->|"HTTPS · hourly"| UNIFI
+
+    classDef mine fill:#d4ecff,stroke:#0a6ebd,color:#062a44;
+    classDef ext  fill:#eeeeee,stroke:#999999,color:#222222;
+    classDef dev  fill:#ffffff,stroke:#bbbbbb,color:#222222;
+    classDef hw   fill:#fff4cc,stroke:#caa300,color:#3a3000;
+```
+
+**This project's repos** (blue): the **server + ESP32 firmware**
+([moifort/home-dashboard](https://github.com/moifort/home-dashboard)), the
+**water meter** ESPHome config
+([moifort/watermeter](https://github.com/moifort/watermeter)), and the **crypto
+trading bot** (own project). Everything else — Mosquitto, Zigbee2MQTT, EcoFlow,
+UniFi and the physical meters/plugs — is third-party.
+
+> Arrows show who connects to whom. Over MQTT the devices actually *push* their
+> readings to Mosquitto and the server subscribes (power plugs and EcoFlow are
+> also re-polled every 60 s).
+
 ## What it shows
 
 Electricity is the core panel; everything else is **optional** and turns on as soon as you set its config.
