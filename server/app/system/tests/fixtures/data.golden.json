@@ -13,24 +13,6 @@
       "label": "Prises",
       "n_bad": 1,
       "severity": 18
-    },
-    {
-      "alert": false,
-      "label": "EDF",
-      "n_bad": 0,
-      "severity": -1
-    },
-    {
-      "alert": false,
-      "label": "Eau",
-      "n_bad": 0,
-      "severity": -1
-    },
-    {
-      "alert": false,
-      "label": "Solaire",
-      "n_bad": 0,
-      "severity": -1
     }
   ],
   "days": [

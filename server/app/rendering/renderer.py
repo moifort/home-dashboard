@@ -737,21 +737,19 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
         if y > max_y:
             break
         y = section_title(r["label"], y)
-        if r.get("alert"):
-            for message, figure, money, good in r["items"]:
-                if y > max_y:
-                    break
-                # A negative alert is written entirely in red; a positive note is
-                # all black. Figures follow the house rule (bold number, regular
-                # glued unit) via num_atom.
-                color = BLACK if good else RED
-                atoms = [[(w, "regular")] for w in message.split()]
-                if figure:
-                    atoms.append(num_atom(figure))
-                atoms += [num_atom(w) for w in money.split()]
-                y = wrap_atoms(atoms, color, y)
-        else:
-            y = wrap_atoms([[(w, "regular")] for w in "Rien à signaler".split()], BLACK, y)
+        # Only domains with active items reach here (quiet ones were dropped by
+        # build_board). A negative alert is written entirely in red, a positive
+        # note all black; figures follow the house rule (bold number, regular
+        # glued unit) via num_atom.
+        for message, figure, money, good in r["items"]:
+            if y > max_y:
+                break
+            color = BLACK if good else RED
+            atoms = [[(w, "regular")] for w in message.split()]
+            if figure:
+                atoms.append(num_atom(figure))
+            atoms += [num_atom(w) for w in money.split()]
+            y = wrap_atoms(atoms, color, y)
         y += 2  # gap before the next domain section
 
 

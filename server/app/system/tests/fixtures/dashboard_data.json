@@ -81,12 +81,6 @@
       "label": "Crypto",
       "n_bad": 0,
       "severity": 3
-    },
-    {
-      "alert": false,
-      "label": "Réseau",
-      "n_bad": 0,
-      "severity": -1
     }
   ],
   "crypto": {

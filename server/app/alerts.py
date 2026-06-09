@@ -58,12 +58,12 @@ def build_alerts(data: dict) -> list[dict]:
 def build_board(data: dict) -> list[dict]:
     """Build the always-on status board rows the renderer draws.
 
-    One row per *monitored* domain (its data present). A domain with active items
-    carries them, most severe first (problems above positives):
+    One row per *monitored* domain that has active items (quiet domains are
+    omitted entirely), most severe first (problems above positives):
         {"label": dom, "alert": True, "severity": int,
          "items": [(message, figure, money, good), ...]}
-    A quiet domain is {"label": dom, "alert": False, "severity": -1}. Domains with
-    items come first (most severe on top), then the quiet rows in canonical order.
+    The board is empty when no monitored domain has anything to report (the
+    renderer then shows a single "Tout va bien" section).
     """
     by_domain = {}
     for a in build_alerts(data):
@@ -75,17 +75,20 @@ def build_board(data: dict) -> list[dict]:
         if not present or not present(data):
             continue
         items = by_domain.get(dom)
-        if items:
-            items.sort(key=lambda a: a["severity"], reverse=True)
-            n_bad = sum(1 for a in items if not a["good"])
-            rows.append({
-                "label": dom, "alert": True, "severity": items[0]["severity"], "n_bad": n_bad,
-                "items": [(a["message"], a["figure"], a["money"], a["good"]) for a in items],
-            })
-        else:
-            rows.append({"label": dom, "alert": False, "severity": -1, "n_bad": 0})
+        # Quiet domains (nothing to report) are dropped — only domains with active
+        # items get a section, so the panel never shows a "Rien à signaler" row.
+        # When every domain is quiet the board is empty and the renderer falls
+        # back to a single "Tout va bien" section.
+        if not items:
+            continue
+        items.sort(key=lambda a: a["severity"], reverse=True)
+        n_bad = sum(1 for a in items if not a["good"])
+        rows.append({
+            "label": dom, "alert": True, "severity": items[0]["severity"], "n_bad": n_bad,
+            "items": [(a["message"], a["figure"], a["money"], a["good"]) for a in items],
+        })
 
-    # Vertical space is limited, so list the domains with the most problems first
-    # (then by severity); domains with only positive notes next; quiet rows last.
-    rows.sort(key=lambda r: (not r["alert"], -r["n_bad"], -r["severity"]))
+    # Vertical space is limited, so list the domains with the most problems first,
+    # then by severity (domains with only positive notes naturally come last).
+    rows.sort(key=lambda r: (-r["n_bad"], -r["severity"]))
     return rows
