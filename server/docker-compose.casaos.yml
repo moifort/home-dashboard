@@ -23,15 +23,13 @@ services:
       # The Lixee ZLinky_TIC topic in Zigbee2MQTT — the Linky teleinfo source
       # (needs MQTT_HOST below).
       LINKY_MQTT_TOPIC: zigbee2mqtt/linky
-      # Off-peak clock windows — fallback when the live PTEC stream goes quiet.
-      HC_WINDOWS: "23:32-5:32,15:02-17:02"
       PRICE_HP: "0.2065"
       PRICE_HC: "0.1579"
       PRICE_ABO_MONTHLY: "15.65"
       # Screen-refresh schedule — SCREEN_REFRESH_INTERVAL_MIN must match the
-      # firmware's REFRESH_INTERVAL_MIN; server renders DATA_LEAD_MIN before each wake.
-      # SCREEN_WAKE_SKIP_MIN mirrors the firmware's "skip a boundary within N min"
-      # guard so the Home panel's next-refresh time matches the real next wake.
+      # firmware's REFRESH_INTERVAL_MIN; the server renders fresh on each /display
+      # pull (no cache). SCREEN_WAKE_SKIP_MIN mirrors the firmware's "skip a boundary
+      # within N min" guard so the Home panel's next-refresh time matches the real wake.
       SCREEN_REFRESH_INTERVAL_MIN: "120"
       DATA_LEAD_MIN: "10"
       SCREEN_WAKE_SKIP_MIN: "5"
