@@ -1,28 +1,19 @@
-"""Screen-refresh schedule — the single source of truth shared by the server loop
-and the Home panel.
+"""Screen-refresh schedule — the single source of truth for the Home panel.
 
 The ESP32 wakes on a clock-aligned interval (`SCREEN_REFRESH_INTERVAL_MIN`, e.g.
 every 2 h at 00:00, 02:00 … 22:00 — see `hardware/esp32-display/esp32-display.ino`) and
-pulls `/display`. To serve fresh data the server regenerates the buffer
-`DATA_LEAD_MIN` minutes *before* each of those boundaries (so the ESP always picks
-up a render that is at most a few minutes old). Both numbers live in `config.py`.
-
-The boundary helpers are pure functions of the `now` they are handed, so the
-golden tests can drive them with a frozen clock. run_loop() drives the server's
-refresh cycle on that schedule.
+pulls `/display`, which the server renders fresh on demand. These helpers compute
+that schedule for the Home panel (when the image was pulled, the device's next
+wake) and mirror the firmware's wake math. They are pure functions of the `now`
+they are handed, so the golden tests can drive them with a frozen clock.
 """
-import logging
-import time
 from datetime import datetime, timedelta
 
 from app.system.config import (
     DATA_LEAD_MIN,
-    PARIS_TZ,
     SCREEN_REFRESH_INTERVAL_MIN,
     SCREEN_WAKE_SKIP_MIN,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def next_screen_refresh(now: datetime) -> datetime:
@@ -63,26 +54,3 @@ def current_screen_refresh(now: datetime) -> datetime:
     if nb - now <= timedelta(minutes=DATA_LEAD_MIN):
         return nb
     return nb - timedelta(minutes=SCREEN_REFRESH_INTERVAL_MIN)
-
-
-def next_data_update(now: datetime) -> datetime:
-    """The next moment the server should regenerate data: `DATA_LEAD_MIN` before a
-    screen boundary. Skips to the following boundary's lead point if `now` is
-    already inside (or past) the current one."""
-    nb = next_screen_refresh(now)
-    target = nb - timedelta(minutes=DATA_LEAD_MIN)
-    if target <= now:
-        target = nb + timedelta(minutes=SCREEN_REFRESH_INTERVAL_MIN - DATA_LEAD_MIN)
-    return target
-
-
-def run_loop(cycle):
-    """Run `cycle()` now, then DATA_LEAD_MIN before each screen-refresh boundary,
-    so the ESP32 always pulls a render that is at most a few minutes old."""
-    while True:
-        cycle()
-        now = datetime.now(PARIS_TZ)
-        target = next_data_update(now)
-        sleep_s = max(1.0, (target - now).total_seconds())
-        logger.info("Next data update at %s (%ds)", target.strftime("%H:%M"), int(sleep_s))
-        time.sleep(sleep_s)

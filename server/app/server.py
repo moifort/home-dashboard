@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Dashboard server for CasaOS — orchestrates the slices and serves the EPD buffer."""
+"""Dashboard server for CasaOS — orchestrates the slices and serves the EPD buffer.
+
+No render cache: every request builds the dashboard fresh from the local SQLite
+store (the MQTT integrators' single source of truth), so the screen always shows
+the current data. Reads are local and instantaneous, so there is nothing to cache;
+a build/render failure simply returns 503 and the ESP32 retries at its next wake.
+"""
 import json
 import logging
-import threading
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
 
-from app import crypto
 from app import dashboard_data as dashboard
 from app.system.config import (
     DATA_LEAD_MIN,
@@ -21,28 +25,30 @@ from app.system.config import (
     VERSION,
 )
 from app.registry import CORE, OPTIONAL
-from app.system.scheduler import next_screen_wake, run_loop
 from app.rendering.converter import png_to_epd_buffer
 from app.rendering.renderer import render_dashboard
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-epd_buffer: bytes = b""
-buffer_lock = threading.Lock()
-dashboard_data: dict = {}
-data_lock = threading.Lock()
 last_render_time: str = ""
 
 
 # --- Rendering (Pillow) ---
 
-def render_to_buffer(data: dict | None = None) -> bytes:
-    global last_render_time
-    if data is None:
-        with data_lock:
-            data = dashboard_data
+def build_fresh(now: datetime) -> dict:
+    """Build the full render dict from the local store, current as of `now`.
 
+    `build_dashboard_data` reads each domain's table (and live-fetches the
+    resilient crypto/UniFi panels, which omit themselves on failure), then the
+    Home panel is overridden with the real pull moment + the device's next wake."""
+    data = dashboard.build_dashboard_data(CORE.load_days())
+    data["home"] = dashboard.build_home_live(now)
+    return data
+
+
+def render_to_buffer(data: dict) -> bytes:
+    global last_render_time
     img = render_dashboard(data)
 
     if SAVE_PNG:
@@ -75,41 +81,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404)
 
-    def do_POST(self):
-        if self.path == "/refresh":
-            self._handle_refresh()
-        else:
-            self.send_error(404)
-
-    def _fresh_or_cached_buffer(self) -> bytes:
-        """Buffer for /display: re-render at the ESP32's pull so the Home panel's
-        time is the actual GET moment, with fresh crypto.
-
-        The Home "displayed at" time and "next refresh" boundary are recomputed
-        from the real wall clock here (not the build-time estimate); Linky/solar
-        data stay on the hourly cache; the crypto panel is refreshed. Any failure
-        falls back to the cached hourly buffer (whose Home time is the build-time
-        boundary estimate)."""
-        try:
-            with data_lock:
-                data = dict(dashboard_data)
-            if not data:
-                with buffer_lock:
-                    return epd_buffer
-            now = datetime.now(PARIS_TZ)
-            data["home"] = dashboard.build_home_live(now)
-            if crypto.enabled():
-                crypto.attach(data)
-            return render_to_buffer(data)
-        except Exception as e:
-            logger.warning("Live pull render failed, serving cached buffer: %s", e)
-        with buffer_lock:
-            return epd_buffer
-
     def _serve_display(self):
-        buf = self._fresh_or_cached_buffer()
-        if not buf:
-            self.send_error(503, "No render available yet")
+        """GET /display — the EPD buffer, rendered fresh from the current data.
+
+        The Home panel's "displayed at" time is the real GET moment and "next
+        refresh" the device's next wake. A build/render failure returns 503; the
+        ESP32 keeps its current image and retries at its next scheduled wake."""
+        try:
+            buf = render_to_buffer(build_fresh(datetime.now(PARIS_TZ)))
+        except Exception as e:
+            logger.error("Display render failed: %s", e, exc_info=True)
+            self.send_error(503, "Render failed")
             return
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
@@ -138,26 +120,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def _serve_preview_png(self):
         """GET /preview.png — the dashboard rendered to a PNG (the RGB image that
-        feeds the EPD converter), for the browser preview. Mirrors the live pull:
-        Home time + crypto are refreshed; falls back to 503 until the first build."""
-        with data_lock:
-            data = dict(dashboard_data)
-        if not data:
-            self.send_error(503, "No render available yet")
+        feeds the EPD converter), for the browser preview. Built fresh like
+        /display; a build/render failure returns 503."""
+        try:
+            img = render_dashboard(build_fresh(datetime.now(PARIS_TZ)))
+            buf_io = BytesIO()
+            img.save(buf_io, format="PNG")
+            body = buf_io.getvalue()
+        except Exception as e:
+            logger.error("Preview render failed: %s", e, exc_info=True)
+            self.send_error(503, "Render failed")
             return
-        now = datetime.now(PARIS_TZ)
-        data["home"] = {
-            "last_text": f"{now:%H:%M}",
-            "next_text": f"{next_screen_wake(now):%H:%M}",
-        }
-        if crypto.enabled():
-            try:
-                crypto.attach(data)
-            except Exception as e:
-                logger.warning("Preview crypto attach failed: %s", e)
-        buf_io = BytesIO()
-        render_dashboard(data).save(buf_io, format="PNG")
-        body = buf_io.getvalue()
         self.send_response(200)
         self.send_header("Content-Type", "image/png")
         self.send_header("Content-Length", str(len(body)))
@@ -165,18 +138,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _serve_status(self):
-        with data_lock:
-            days_count = len(dashboard_data.get("days", []))
-            solar_days = len(dashboard_data.get("production_days", []))
+        """GET /status — lightweight health/diagnostics (no render, no network):
+        version, last /display render, the day count and each domain's status."""
         status = {
             "version": VERSION,
             "last_render": last_render_time,
-            "days_cached": days_count,
-            "buffer_ready": len(epd_buffer) > 0,
-            "buffer_size": len(epd_buffer),
+            "days_cached": len(CORE.load_days()),
             "screen_refresh_interval_min": SCREEN_REFRESH_INTERVAL_MIN,
             "data_lead_min": DATA_LEAD_MIN,
-            "solar_days_cached": solar_days,
         }
         status.update(CORE.status())
         for integration in OPTIONAL:
@@ -188,47 +157,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _serve_data(self):
-        with data_lock:
-            body = json.dumps(dashboard_data, indent=2).encode()
+        """GET /api/data — the full render dict, built fresh (debug introspection)."""
+        try:
+            body = json.dumps(build_fresh(datetime.now(PARIS_TZ)), indent=2).encode()
+        except Exception as e:
+            logger.error("Data build failed: %s", e, exc_info=True)
+            self.send_error(503, "Build failed")
+            return
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(body)
 
-    def _handle_refresh(self):
-        threading.Thread(target=refresh_cycle, daemon=True).start()
-        self.send_response(202)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"Refresh triggered")
-
     def log_message(self, format, *args):
         logger.debug("HTTP %s", format % args)
-
-
-def start_http_server(port: int):
-    server = HTTPServer(("0.0.0.0", port), DashboardHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    logger.info("HTTP server on http://0.0.0.0:%d", port)
-    return server
-
-
-# --- Refresh Cycle ---
-
-def refresh_cycle():
-    global epd_buffer, dashboard_data
-    try:
-        days = CORE.load_days()
-        data = dashboard.build_dashboard_data(days)
-        with data_lock:
-            dashboard_data = data
-        buf = render_to_buffer()
-        with buffer_lock:
-            epd_buffer = buf
-        logger.info("Refresh cycle complete — %d days, %d bytes", len(data.get("days", [])), len(buf))
-    except Exception as e:
-        logger.error("Refresh cycle failed: %s", e, exc_info=True)
 
 
 # --- Main ---
@@ -242,9 +184,9 @@ def main():
         integration.init_schema()
         integration.start()
 
-    start_http_server(PORT)
-    # Drive the refresh cycle on the screen-refresh schedule (system/scheduler).
-    run_loop(refresh_cycle)
+    server = HTTPServer(("0.0.0.0", PORT), DashboardHandler)
+    logger.info("HTTP server on http://0.0.0.0:%d", PORT)
+    server.serve_forever()
 
 
 if __name__ == "__main__":
