@@ -523,10 +523,10 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
     Solar/EDF column): a title banner with a 1px separator, then one line per
     item — label (regular) left, value right-aligned. Line 1: the screen-refresh
     schedule as "HH:MM ► HH:MM" (this refresh and the next, bold times, regular
-    arrow). Then one line per tariff period (once its window has completed live):
-    the period label left ("HC"/"HP"), its last completed window as "HH:MM ► HH:MM"
-    right (bold times, regular arrow — same style as the schedule line). Mirrors
-    the other panels."""
+    arrow). Then one line per completed tariff window (grouped HC lines then HP, as
+    each completes live): the period label left ("HC"/"HP"), the window as
+    "HH:MM ► HH:MM" right (bold times, regular arrow — same style as the schedule
+    line). Mirrors the other panels."""
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
     right = x + width

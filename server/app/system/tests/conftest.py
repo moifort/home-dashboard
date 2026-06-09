@@ -91,13 +91,15 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
     monkeypatch.setattr(network, "enabled", lambda: False)
 
     # Deterministic live HC/HP windows so the Home panel's tariff lines are
-    # exercised on both sides ("HC 13:00 ► 15:00" / "HP 05:32 ► 13:00").
-    monkeypatch.setattr(electricity_command, "_tariff_period", "HC")
+    # exercised with the full day on both sides — two HC then two HP windows.
+    def _w(sh, sm, eh, em):
+        return (FIXED_NOW.replace(hour=sh, minute=sm, second=0, microsecond=0),
+                FIXED_NOW.replace(hour=eh, minute=em, second=0, microsecond=0))
+
+    monkeypatch.setattr(electricity_command, "_tariff_period", "HP")
     monkeypatch.setattr(electricity_command, "_tariff_windows", {
-        "HC": (FIXED_NOW.replace(hour=13, minute=0, second=0, microsecond=0),
-               FIXED_NOW.replace(hour=15, minute=0, second=0, microsecond=0)),
-        "HP": (FIXED_NOW.replace(hour=5, minute=32, second=0, microsecond=0),
-               FIXED_NOW.replace(hour=13, minute=0, second=0, microsecond=0)),
+        "HC": [_w(23, 32, 5, 32), _w(13, 0, 15, 0)],
+        "HP": [_w(5, 32, 13, 0), _w(17, 2, 23, 32)],
     })
 
     seed_db.seed()

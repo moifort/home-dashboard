@@ -633,14 +633,24 @@
     "next_text": "16:00",
     "tariff": [
       {
-        "end_text": "15:00",
+        "end_text": "05:32",
         "period": "HC",
+        "start_text": "23:32"
+      },
+      {
+        "end_text": "15:00",
+        "period": "",
         "start_text": "13:00"
       },
       {
         "end_text": "13:00",
         "period": "HP",
         "start_text": "05:32"
+      },
+      {
+        "end_text": "23:32",
+        "period": "",
+        "start_text": "17:02"
       }
     ]
   },

@@ -63,11 +63,14 @@ end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 days = electricity_repo.get_cached_days(start, end)
 data = dashboard_data.build_dashboard_data(days)
 
-# No live PTEC stream here; inject representative HC/HP windows so the Home
-# panel shows its two tariff lines ("HC 13:00 ► 15:00" / "HP 05:32 ► 13:00").
+# No live PTEC stream here; inject the full day's HC/HP windows so the Home
+# panel shows all four tariff lines, grouped HC then HP (label once per group,
+# blank on the second window — same as _attach_tariff).
 data["home"].setdefault("tariff", [
-    {"period": "HC", "start_text": "13:00", "end_text": "15:00"},
+    {"period": "HC", "start_text": "23:32", "end_text": "05:32"},
+    {"period": "", "start_text": "13:00", "end_text": "15:00"},
     {"period": "HP", "start_text": "05:32", "end_text": "13:00"},
+    {"period": "", "start_text": "17:02", "end_text": "23:32"},
 ])
 
 # The dev DB may hold no Linky history (build_core always emits the 9 calendar

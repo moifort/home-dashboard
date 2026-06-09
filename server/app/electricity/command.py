@@ -41,14 +41,16 @@ _slot = {"start": None, "papp_sum": 0.0, "papp_n": 0}
 # Last PTEC period seen ("HC"/"HP") and when (monotonic) — read by the power
 # sub-domain threads; a tuple assignment is atomic under the GIL.
 _period = (None, 0.0)
-# Last COMPLETED window per period as (start, end) wall-clock, recorded at the
-# transition that ends it. _open_window = (period, start) of the in-progress
-# window; _tariff_period = the period in effect now. In-memory only — a restart
-# blanks them until real transitions complete a window again. It takes 2
-# transitions to fill the first period's window and 3 to fill both (the first
-# frame after startup only baselines _period; the first transition just opens a
-# window with no prior to close).
-_tariff_windows = {"HC": None, "HP": None}
+# Recent COMPLETED windows per period as (start, end) wall-clock, recorded at the
+# transition that ends each. The day has two HC and two HP windows, so we keep the
+# last MAX_TARIFF_WINDOWS of each (oldest first → chronological). _open_window =
+# (period, start) of the in-progress window; _tariff_period = the period in effect
+# now. In-memory only — a restart blanks them until real transitions complete
+# windows again, so the panel fills up over the day (the first frame after startup
+# only baselines _period; the first transition just opens a window with no prior to
+# close).
+MAX_TARIFF_WINDOWS = 2
+_tariff_windows = {"HC": [], "HP": []}
 _open_window = None
 _tariff_period = None
 
@@ -138,7 +140,8 @@ def _on_tic(reading: dict, now: datetime | None = None):
         new = reading["period"]
         if prev is not None and new != prev:
             if _open_window is not None and _open_window[0] == prev:
-                _tariff_windows[prev] = (_open_window[1], now)  # close the ended window
+                _tariff_windows[prev].append((_open_window[1], now))  # close the ended window
+                _tariff_windows[prev] = _tariff_windows[prev][-MAX_TARIFF_WINDOWS:]
             _open_window = (new, now)                            # open the new one
             _tariff_period = new
         _period = (new, time.monotonic())
@@ -169,12 +172,13 @@ def is_off_peak(now: datetime | None = None) -> bool:
 
 
 def current_tariff() -> dict | None:
-    """The last completed HC and HP windows as (start, end) wall-clock, learned
-    live from the meter's PTEC transitions: {"period", "hc", "hp"}. None until at
-    least one window has completed since startup; a period's side stays None until
-    its own window has completed (each period is independent). No freshness check —
-    an observed window stays true until the next one of that period completes."""
-    if _tariff_windows["HC"] is None and _tariff_windows["HP"] is None:
+    """The recent completed HC and HP windows (up to MAX_TARIFF_WINDOWS each) as
+    lists of (start, end) wall-clock, learned live from the meter's PTEC
+    transitions: {"period", "hc", "hp"}. None until at least one window has
+    completed since startup; a period's list stays empty until one of its own
+    windows has completed (each period is independent). No freshness check — an
+    observed window stays listed until trimmed out by newer ones of that period."""
+    if not _tariff_windows["HC"] and not _tariff_windows["HP"]:
         return None
     return {"period": _tariff_period,
             "hc": _tariff_windows["HC"], "hp": _tariff_windows["HP"]}

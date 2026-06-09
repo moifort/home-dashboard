@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-09
+
+- **`Home`: tariff lines show every HC/HP window, grouped** — the panel kept only the *last* completed window per period (one `HC` + one `HP` line); it now keeps the **last two windows of each period** and renders them all, **grouped HC lines then HP**, with the period label (`HC`/`HP`) printed **once per group** (the second window of a group is left unlabeled) — e.g. `HC 23:32 ► 05:32` / `   13:00 ► 15:00` / `HP 05:32 ► 13:00` / `   17:02 ► 23:32`. The day has two off-peak and two peak windows, so once all four have been observed live (via the ZLinky's `PTEC` transitions, same as before) the full day is shown; after a restart the panel fills up window by window over the day. Goldens re-baselined, preview regenerated; no new environment variable.
+
 ## 2026-06-08
 
 - **`Home`: tariff lines show HC/HP windows as ranges** — the single "last switch per period" line (`HC 15:02   HP 05:32`) is replaced by **two lines, one per period**, each showing that period's last completed window as `HH:MM ► HH:MM` (same arrow style as the `Écran` schedule line) — e.g. `HC 13:00 ► 15:00` / `HP 05:32 ► 13:00`. Windows are learned **live** from the meter's `PTEC` transitions: a window is recorded when the transition that *ends* it arrives, so a multi-window-per-day off-peak schedule renders correctly **without relying on the `HC_WINDOWS` config**. Each period's line stays absent until one of its windows has completed since startup (after a restart: blank → one line → both, a few hours each step); the period currently in effect shows its last *completed* window since the in-progress one has no end yet. Goldens re-baselined, preview regenerated; no new environment variable.

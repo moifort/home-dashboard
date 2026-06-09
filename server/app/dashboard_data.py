@@ -12,17 +12,17 @@ from app.system.scheduler import current_screen_refresh, next_screen_refresh, ne
 
 
 def _attach_tariff(home: dict) -> None:
-    """Per-period last completed window as 'HH:MM ► HH:MM' lines (live PTEC only;
-    each period's line absent until its own window has completed since startup)."""
+    """All recently completed windows as 'HH:MM ► HH:MM' lines, grouped HC then HP
+    (live PTEC only; each period's lines absent until its own windows have
+    completed since startup, so the panel fills up over the day). The period label
+    is shown only on the first line of each group; the rest are left blank."""
     tariff = CORE.current_tariff()
     if not tariff:
         return
     lines = []
     for key, label in (("hc", "HC"), ("hp", "HP")):
-        win = tariff.get(key)
-        if win:
-            start, end = win
-            lines.append({"period": label,
+        for i, (start, end) in enumerate(tariff.get(key) or []):
+            lines.append({"period": label if i == 0 else "",
                           "start_text": f"{start:%H:%M}",
                           "end_text": f"{end:%H:%M}"})
     if lines:

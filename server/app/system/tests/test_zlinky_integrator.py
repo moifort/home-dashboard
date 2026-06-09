@@ -90,7 +90,7 @@ def tic_db(tmp_path, monkeypatch):
                                             "last_persist": 0.0})
     monkeypatch.setattr(command, "_slot", {"start": None, "papp_sum": 0.0, "papp_n": 0})
     monkeypatch.setattr(command, "_period", (None, 0.0))
-    monkeypatch.setattr(command, "_tariff_windows", {"HC": None, "HP": None})
+    monkeypatch.setattr(command, "_tariff_windows", {"HC": [], "HP": []})
     monkeypatch.setattr(command, "_open_window", None)
     monkeypatch.setattr(command, "_tariff_period", None)
     monkeypatch.setattr(command, "last_hchc", None)
@@ -233,12 +233,12 @@ def test_current_tariff_after_first_window_completes(tic_db):
     command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 17, 2))
     tariff = command.current_tariff()
     assert tariff["period"] == "HP"
-    assert tariff["hc"] == (_now(5, 15, 2), _now(5, 17, 2))
+    assert tariff["hc"] == [(_now(5, 15, 2), _now(5, 17, 2))]
     # HP's own window hasn't completed yet.
-    assert tariff["hp"] is None
+    assert tariff["hp"] == []
 
 
-def test_current_tariff_keeps_both_windows(tic_db):
+def test_current_tariff_keeps_both_periods(tic_db):
     command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 12, 0))
     command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 15, 2))
     command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 17, 2))
@@ -246,5 +246,21 @@ def test_current_tariff_keeps_both_windows(tic_db):
     command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 18, 0))
     tariff = command.current_tariff()
     assert tariff["period"] == "HC"
-    assert tariff["hc"] == (_now(5, 15, 2), _now(5, 17, 2))
-    assert tariff["hp"] == (_now(5, 17, 2), _now(5, 18, 0))
+    assert tariff["hc"] == [(_now(5, 15, 2), _now(5, 17, 2))]
+    assert tariff["hp"] == [(_now(5, 17, 2), _now(5, 18, 0))]
+
+
+def test_current_tariff_keeps_last_two_windows_per_period(tic_db):
+    # Each HC→HP→HC… cycle completes one window per period. Drive enough
+    # transitions to accumulate three HC windows and assert only the last two
+    # are kept (oldest first → chronological).
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 0, 0))
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 1, 0))
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 2, 0))  # HC #1: 1→2
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 3, 0))
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 4, 0))  # HC #2: 3→4
+    command._on_tic(_reading(1.0, 2.0, period="HC"), now=_now(5, 5, 0))
+    command._on_tic(_reading(1.0, 2.0, period="HP"), now=_now(5, 6, 0))  # HC #3: 5→6
+    tariff = command.current_tariff()
+    assert tariff["hc"] == [(_now(5, 3, 0), _now(5, 4, 0)),
+                            (_now(5, 5, 0), _now(5, 6, 0))]
