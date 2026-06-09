@@ -18,11 +18,11 @@ solar). Blue nodes are this project's own repos.
 
 ```mermaid
 flowchart TD
-    ESP["ESP32 firmware"]:::mine
     SCREEN["e-Paper screen"]:::hw
+    ESP["ESP32 firmware"]:::mine
     SERVER["Dashboard server<br/>Docker / CasaOS"]:::mine
 
-    ESP -->|drives e-ink| SCREEN
+    SCREEN -->|"SPI · e-paper HAT"| ESP
     ESP -->|"GET /display · every 120 min"| SERVER
 
     MOSQ["Mosquitto<br/>local MQTT broker"]:::ext
@@ -32,17 +32,17 @@ flowchart TD
     PLANTS["Plant soil sensors"]:::dev
     WATER["Water meter<br/>ESPHome wM-Bus"]:::mine
 
-    SERVER -->|subscribe / poll| MOSQ
-    MOSQ --> Z2M
-    MOSQ --> WATER
-    Z2M --> LINKY
-    Z2M --> PLUGS
-    Z2M --> PLANTS
+    SERVER -->|"subscribe / poll"| MOSQ
+    MOSQ -->|"zigbee2mqtt/#"| Z2M
+    MOSQ -->|"index m³"| WATER
+    Z2M -->|"TIC frames"| LINKY
+    Z2M -->|"power (W)"| PLUGS
+    Z2M -->|"moisture · temp · lux"| PLANTS
 
     ECO["EcoFlow cloud<br/>app API + MQTT"]:::ext
     PV["Solar · PowerStream"]:::dev
     SERVER -->|"login + heartbeats (cloud)"| ECO
-    ECO --> PV
+    ECO -->|"PV watts"| PV
 
     CRYPTO["Crypto trading bot<br/>GraphQL"]:::mine
     UNIFI["UniFi gateway"]:::ext
