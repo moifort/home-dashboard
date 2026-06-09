@@ -550,7 +550,7 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
     stats_top = region_top + CHART_TOP
-    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 5
+    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
     _draw_stats_bar(draw, fonts, [[("Home", "bold", BLACK)]], x, stats_top, width, sep_y)
 
     y = sep_y + 4
@@ -605,7 +605,7 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
     stats_top = region_top
-    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 5
+    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
     _draw_stats_bar(draw, fonts, [[("Plantes", "bold", BLACK)]], x, stats_top, width, sep_y)
 
     # Sparkline hugs the gutter's right edge, on the name line.
@@ -694,7 +694,7 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     def section_title(label, y):
         """Draw a domain title + its 1px separator; return the y of the first row."""
         draw.text((x, y), label, fill=BLACK, font=fonts["bold"])
-        sep = y + title_h + 3
+        sep = y + title_h + 8
         draw.line([(x, sep), (x + width - 1, sep)], fill=BLACK, width=1)
         return sep + 4
 
