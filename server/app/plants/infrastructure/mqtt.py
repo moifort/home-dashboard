@@ -39,11 +39,10 @@ def _parse_reading(payload: bytes) -> dict:
             if isinstance(val, (int, float)) and not isinstance(val, bool):
                 reading[metric] = float(val)
                 break
-    # Status enums straight from the device: water_warning drives the watering
-    # flag, battery_state the low-battery flag.
-    for status in ("water_warning", "battery_state"):
-        if isinstance(data.get(status), str):
-            reading[status] = data[status]
+    # battery_state drives the low-battery flag. The device's water_warning is
+    # deliberately not read: watering is decided by soil moisture vs threshold.
+    if isinstance(data.get("battery_state"), str):
+        reading["battery_state"] = data["battery_state"]
     return reading
 
 

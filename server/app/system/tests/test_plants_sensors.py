@@ -19,10 +19,40 @@ def test_parse_one_sensor():
 
 
 def test_name_keeps_extra_colons():
-    # Only the first ':' splits topic/name, so a label may contain colons.
+    # The first ':' splits topic/name; the last segment ("Salon") isn't numeric,
+    # so it stays part of the label rather than being read as a threshold.
     sensors = _parse_sensors("zigbee2mqtt/p1:Plante:Salon")
     assert sensors[0].topic == "zigbee2mqtt/p1"
     assert sensors[0].name == "Plante:Salon"
+    assert sensors[0].threshold is None
+
+
+def test_parse_threshold_segment():
+    # A numeric trailing segment is read as the per-plant watering threshold.
+    sensors = _parse_sensors("zigbee2mqtt/Ficus:Ficus:30")
+    assert sensors[0].name == "Ficus"
+    assert sensors[0].threshold == 30.0
+
+
+def test_threshold_with_colon_in_name():
+    # Name may still hold colons even with a threshold (only the LAST segment).
+    sensors = _parse_sensors("zigbee2mqtt/p1:Plante:Salon:40")
+    assert sensors[0].name == "Plante:Salon"
+    assert sensors[0].threshold == 40.0
+
+
+def test_threshold_falls_back_to_global_default():
+    # No per-plant threshold -> the global default applies.
+    sensors = _parse_sensors("zigbee2mqtt/Ficus:Ficus", default_threshold=25.0)
+    assert sensors[0].threshold == 25.0
+
+
+def test_out_of_range_trailing_number_is_name_not_threshold():
+    # A trailing number outside (0, 100] is not a moisture threshold, so it stays
+    # part of the label and the global default applies.
+    sensors = _parse_sensors("zigbee2mqtt/p1:Zone:200", default_threshold=30.0)
+    assert sensors[0].name == "Zone:200"
+    assert sensors[0].threshold == 30.0
 
 
 def test_one_slug_per_plant_no_grouping():
@@ -82,24 +112,30 @@ def test_parse_reading_partial_and_garbage():
 
 def test_parse_reading_real_payload_air_humidity_not_soil():
     # The real device frame: soil_moisture (88) is the moisture; air `humidity`
-    # (93) must NOT be read as soil moisture. Status enums are picked up too.
+    # (93) must NOT be read as soil moisture. battery_state is picked up;
+    # water_warning is deliberately ignored (watering is moisture vs threshold).
     reading = _parse_reading(
         b'{"linkquality": 60, "soil_moisture": 88, "illuminance": 0, '
         b'"temperature": 23.6, "soil_sampling": 600, "humidity": 93, '
         b'"water_warning": "none", "battery_state": "middle"}'
     )
     assert reading == {"moisture": 88.0, "illuminance": 0.0, "temperature": 23.6,
-                       "water_warning": "none", "battery_state": "middle"}
+                       "battery_state": "middle"}
 
 
-def test_needs_water_from_water_warning():
+def test_needs_water_from_threshold():
     today = date(2026, 6, 2)
-    dry = build_plant_view("Ficus", {"moisture": 88.0, "water_warning": "warning"}, {}, today)
-    assert dry["needs_water"] is True
-    ok = build_plant_view("Ficus", {"moisture": 88.0, "water_warning": "none"}, {}, today)
-    assert ok["needs_water"] is False
-    # No water_warning at all -> no watering flag (no threshold fallback anymore).
-    assert build_plant_view("Ficus", {"moisture": 20.0}, {}, today)["needs_water"] is False
+    # Below threshold -> needs water; at/above -> doesn't.
+    assert build_plant_view("Ficus", {"moisture": 20.0}, {}, today, 30.0)["needs_water"] is True
+    assert build_plant_view("Ficus", {"moisture": 30.0}, {}, today, 30.0)["needs_water"] is False
+    assert build_plant_view("Ficus", {"moisture": 45.0}, {}, today, 30.0)["needs_water"] is False
+    # No threshold -> never flags, even when bone dry.
+    assert build_plant_view("Ficus", {"moisture": 5.0}, {}, today)["needs_water"] is False
+    # No moisture reading -> no flag even with a threshold.
+    assert build_plant_view("Ficus", {}, {}, today, 30.0)["needs_water"] is False
+    # The device's water_warning is ignored entirely.
+    assert build_plant_view("Ficus", {"moisture": 80.0, "water_warning": "warning"},
+                            {}, today, 30.0)["needs_water"] is False
 
 
 def test_low_battery_flag():

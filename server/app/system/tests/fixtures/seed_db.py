@@ -164,9 +164,11 @@ def _plant_rows():
     """Daily soil-sensor readings (the day's latest of each metric) for two
     plants over the spark window, including today (the on-screen current value).
     Ficus reports every day; Basilic skips two early days to exercise the spark's
-    gap. The status enums are only meaningful on today's live row (NULL on
-    history): Ficus is "warning"/"low" → both red icons; Basilic "none"/"middle"
-    → neither. Values are deterministic per (plant, day index)."""
+    gap. battery_state is only meaningful on today's live row (NULL on history):
+    Ficus "low" → red battery icon, Basilic "middle" → none. The water drop is
+    driven elsewhere (today's moisture vs the 50% threshold in conftest): Ficus
+    45 < 50 → drop, Basilic 61 ≥ 50 → none. Values are deterministic per (plant,
+    day index)."""
     start = TODAY - timedelta(days=9)
     rows = []
     for i, d in enumerate(_daterange(start, TODAY)):
@@ -174,11 +176,11 @@ def _plant_rows():
         today = d == TODAY
         rows.append(("ficus", ds, float(30 + (i % 6) * 5), 20.0 + (i % 3),
                      800.0 + (i % 4) * 150, 18.0 + (i % 5),
-                     "warning" if today else None, "low" if today else None, _FETCHED_AT))
+                     "low" if today else None, _FETCHED_AT))
         if i not in (1, 4):  # two missing days early -> a gap in Basilic's spark
             rows.append(("basilic", ds, float(45 + (i % 5) * 4), 22.0 + (i % 2),
                          600.0 + (i % 3) * 200, 22.0 + (i % 4),
-                         "none" if today else None, "middle" if today else None, _FETCHED_AT))
+                         "middle" if today else None, _FETCHED_AT))
     return rows
 
 
@@ -271,7 +273,7 @@ def seed():
     conn.executemany(
         "INSERT OR REPLACE INTO daily_plants "
         "(slug, date, moisture, temperature, illuminance, fertility, "
-        "water_warning, battery_state, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "battery_state, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         _plant_rows(),
     )
     conn.commit()

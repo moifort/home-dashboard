@@ -1,11 +1,11 @@
 """Plants domain repository — the only place that touches daily_plants.
 
 One row per (slug, date). Numeric metrics (soil moisture, temperature,
-illuminance, fertility) and status strings (water_warning, battery_state) are
-instantaneous states, not counters — an upsert keeps the day's latest of each:
-numeric metrics merge (a frame overwrites only the ones it carries, so metrics
-arriving in separate Z2M frames accumulate), status strings overwrite when
-present. No backfill: history starts at first connection.
+illuminance, fertility) and the battery_state status string are instantaneous
+states, not counters — an upsert keeps the day's latest of each: numeric metrics
+merge (a frame overwrites only the ones it carries, so metrics arriving in
+separate Z2M frames accumulate), the status string overwrites when present. No
+backfill: history starts at first connection.
 """
 import logging
 from datetime import datetime
@@ -15,9 +15,9 @@ from app.system.config import PARIS_TZ
 
 logger = logging.getLogger(__name__)
 
-# Numeric metrics (REAL) merged per frame; status strings (TEXT) overwritten.
+# Numeric metrics (REAL) merged per frame; the status string (TEXT) overwritten.
 _METRICS = ("moisture", "temperature", "illuminance", "fertility")
-_STATUS = ("water_warning", "battery_state")
+_STATUS = ("battery_state",)
 _FIELDS = _METRICS + _STATUS
 
 
@@ -32,14 +32,15 @@ def init_schema():
             temperature REAL,
             illuminance REAL,
             fertility REAL,
-            water_warning TEXT,
             battery_state TEXT,
             fetched_at TEXT NOT NULL,
             PRIMARY KEY (slug, date)
         )"""
     )
-    # The status columns were added after the table's first shape; add them to a
+    # battery_state was added after the table's first shape; add it to a
     # pre-existing dev DB so older daily_plants rows keep working (NULL status).
+    # A legacy water_warning column may still linger on old DBs — left untouched,
+    # never read or written (watering is now soil-moisture vs threshold).
     cols = {r[1] for r in conn.execute("PRAGMA table_info(daily_plants)")}
     for col in _STATUS:
         if col not in cols:
@@ -67,8 +68,8 @@ def get_day(slug: str, date: str) -> dict | None:
     reported."""
     conn = connect()
     cur = conn.execute(
-        "SELECT moisture, temperature, illuminance, fertility, water_warning, "
-        "battery_state FROM daily_plants WHERE slug = ? AND date = ?",
+        "SELECT moisture, temperature, illuminance, fertility, battery_state "
+        "FROM daily_plants WHERE slug = ? AND date = ?",
         (slug, date),
     )
     row = cur.fetchone()
@@ -85,8 +86,8 @@ def upsert_day(slug: str, date: str, fields: dict):
     now = datetime.now(PARIS_TZ).isoformat()
     conn = connect()
     cur = conn.execute(
-        "SELECT moisture, temperature, illuminance, fertility, water_warning, "
-        "battery_state FROM daily_plants WHERE slug = ? AND date = ?",
+        "SELECT moisture, temperature, illuminance, fertility, battery_state "
+        "FROM daily_plants WHERE slug = ? AND date = ?",
         (slug, date),
     )
     row = cur.fetchone()
@@ -97,9 +98,9 @@ def upsert_day(slug: str, date: str, fields: dict):
     conn.execute(
         "INSERT OR REPLACE INTO daily_plants "
         "(slug, date, moisture, temperature, illuminance, fertility, "
-        "water_warning, battery_state, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "battery_state, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (slug, date, merged["moisture"], merged["temperature"], merged["illuminance"],
-         merged["fertility"], merged["water_warning"], merged["battery_state"], now),
+         merged["fertility"], merged["battery_state"], now),
     )
     conn.commit()
     conn.close()

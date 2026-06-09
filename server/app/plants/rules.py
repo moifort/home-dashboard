@@ -1,15 +1,14 @@
 """Plants business rules — pure, no IO.
 
 Builds the per-plant display card from its current reading and its recent daily
-moisture history. The card's title line carries a red water-drop icon when the
-device flags the plant for watering (its `water_warning`) and a red battery icon
-when its battery is low; line 2 shows humidity, temperature and illuminance with
-a 7-day moisture spark.
+moisture history. The card's title line carries a red water-drop icon when soil
+moisture falls below the plant's watering threshold and a red battery icon when
+its battery is low; line 2 shows humidity, temperature and illuminance with a
+7-day moisture spark.
 """
 from datetime import timedelta
 
-# water_warning / battery_state enum values that mean "all good" (no alert).
-_WATER_OK = ("none", "normal", "ok", "")
+# battery_state enum values that mean "battery low" (red battery icon).
 _BATTERY_LOW = ("low", "empty", "critical")
 
 
@@ -25,19 +24,21 @@ def _int_text(value):
     return str(round(value)) if value is not None else "—"
 
 
-def build_plant_view(name: str, current: dict, history: dict, today) -> dict:
+def build_plant_view(name: str, current: dict, history: dict, today,
+                     threshold=None) -> dict:
     """Assemble one plant's render dict. `current` is today's latest reading (or
     empty), `history` maps date→moisture over the recent window.
 
-    needs_water comes from the device's `water_warning` enum (any value other
-    than none/normal/ok); low_battery comes from `battery_state`."""
+    needs_water is purely soil-moisture-vs-threshold (moisture < threshold); the
+    device's own `water_warning` is ignored. With no threshold or no moisture
+    reading there is no watering flag. low_battery comes from `battery_state`."""
     moisture = current.get("moisture") if current else None
     fertility = current.get("fertility") if current else None
     illuminance = current.get("illuminance") if current else None
     temperature = current.get("temperature") if current else None
 
-    warning = current.get("water_warning") if current else None
-    needs_water = warning is not None and str(warning).strip().lower() not in _WATER_OK
+    needs_water = (moisture is not None and threshold is not None
+                   and moisture < threshold)
 
     battery = current.get("battery_state") if current else None
     low_battery = battery is not None and str(battery).strip().lower() in _BATTERY_LOW
