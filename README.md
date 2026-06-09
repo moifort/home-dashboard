@@ -18,19 +18,19 @@ The ESP32 drives the screen and pulls a ready-made image from the server. The se
 flowchart TD
     subgraph repo["this repo"]
         SCREEN["e-Paper screen"]:::hw
-        ESP["ESP32 firmware"]:::mine
-        SERVER["Dashboard server<br/>Docker / CasaOS"]:::mine
+        ESP["ESP32 firmware<br/>moifort/home-dashboard"]:::mine
+        SERVER["Dashboard server<br/>moifort/home-dashboard"]:::mine
     end
 
     SCREEN --> ESP
     ESP --> SERVER
 
-    MOSQ["Mosquitto<br/>local MQTT broker"]:::ext
-    Z2M["Zigbee2MQTT"]:::ext
+    MOSQ["Mosquitto<br/>eclipse-mosquitto"]:::ext
+    Z2M["Zigbee2MQTT<br/>Koenkk/zigbee2mqtt"]:::ext
     LINKY["Linky meter<br/>Lixee ZLinky_TIC"]:::dev
     PLUGS["Power plugs<br/>NOUS A7Z"]:::dev
     PLANTS["Plant soil sensors<br/>Arteco ZS-304Z"]:::dev
-    WATER["Water meter<br/>ESPHome wM-Bus"]:::mine
+    WATER["Water meter<br/>moifort/watermeter"]:::mine
 
     SERVER --> MOSQ
     MOSQ --> Z2M
@@ -39,7 +39,7 @@ flowchart TD
     Z2M --> PLUGS
     Z2M --> PLANTS
 
-    HB["Homebridge"]:::ext
+    HB["Homebridge<br/>homebridge/homebridge"]:::ext
     HOME["Apple Home<br/>(Maison)"]:::ext
     MOSQ --> HB
     HB --> HOME
@@ -58,6 +58,13 @@ flowchart TD
     classDef ext  fill:#eeeeee,stroke:#999999,color:#222222;
     classDef dev  fill:#ffffff,stroke:#bbbbbb,color:#222222;
     classDef hw   fill:#fff4cc,stroke:#caa300,color:#3a3000;
+
+    click ESP "https://github.com/moifort/home-dashboard" _blank
+    click SERVER "https://github.com/moifort/home-dashboard" _blank
+    click WATER "https://github.com/moifort/watermeter" _blank
+    click MOSQ "https://github.com/eclipse/mosquitto" _blank
+    click Z2M "https://github.com/Koenkk/zigbee2mqtt" _blank
+    click HB "https://github.com/homebridge/homebridge" _blank
 ```
 
 Blue boxes are this repo's code: the server and ESP32 firmware ([moifort/home-dashboard](https://github.com/moifort/home-dashboard)), the water-meter ESPHome config ([moifort/watermeter](https://github.com/moifort/watermeter)), and my crypto bot (private repo). The rest are off-the-shelf Docker containers: [eclipse-mosquitto](https://github.com/eclipse/mosquitto), [Koenkk/zigbee2mqtt](https://github.com/Koenkk/zigbee2mqtt) and [homebridge/homebridge](https://github.com/homebridge/homebridge). Homebridge re-exposes the same Zigbee devices to Apple Home, so they also show up in the Maison app.
