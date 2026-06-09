@@ -87,12 +87,12 @@ def seeded_db(tmp_path, monkeypatch, frozen_now):
     monkeypatch.setattr(water, "ENABLED", True)
     monkeypatch.setattr(water, "PRICE_M3", 3.9)
     # Two soil sensors -> the "Plantes" gutter panel (Ficus reports daily,
-    # Basilic skips two early days so its moisture spark shows a gap). Both carry
-    # a 50% moisture floor: Ficus (45% today) is under it -> red drop; Basilic
-    # (61%) is above -> no drop. Exercises both threshold branches.
+    # Basilic skips two early days so its moisture spark shows a gap). The seeded
+    # status enums drive the icons: Ficus is water_warning="warning" + battery
+    # "low" (both red icons), Basilic "none"/"middle" (neither).
     monkeypatch.setattr(plants, "SENSORS", [
-        plants.Sensor("ficus", "zigbee2mqtt/ficus", "Ficus", 50),
-        plants.Sensor("basilic", "zigbee2mqtt/basilic", "Basilic", 50),
+        plants.Sensor("ficus", "zigbee2mqtt/ficus", "Ficus"),
+        plants.Sensor("basilic", "zigbee2mqtt/basilic", "Basilic"),
     ])
     monkeypatch.setattr(plants, "ENABLED", True)
 

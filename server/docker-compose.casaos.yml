@@ -61,9 +61,9 @@ services:
       # Keep "Cumulus"/"Lave-linge" to inherit the migrated history. Empty = off.
       POWER_SENSORS: zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge
       # Plant soil sensors (left-gutter "Plantes" panel, under Home): any Z2M soil
-      # sensor reporting soil_moisture/temperature/illuminance. Declare them
-      # ';'-separated as `topic:Display Name[:threshold]` (trailing % = moisture
-      # floor, used when the device sends no water_warning). Empty = off.
+      # sensor reporting soil_moisture/temperature/illuminance (+ water_warning /
+      # battery_state). Declare them ';'-separated as `topic:Display Name`. The
+      # red water-drop comes from the device's water_warning. Empty = off.
       PLANTS_SENSORS: ""
       # Optional UniFi network panel (bottom-right) — set the password to enable.
       # Use the gateway's LAN IP (bridge network can't use localhost).

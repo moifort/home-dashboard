@@ -4,10 +4,8 @@ Every Zigbee2MQTT plant sensor that reports instantaneous states (soil moisture 
 temperature °C, illuminance lux, fertility µS/cm) is declared in a single env var
 and shown as one gutter line — its current soil moisture + a 7-day moisture spark.
 
-Config: PLANTS_SENSORS = "topic:Display Name[:threshold];topic2:Other Name[:40]"
-(`;` separates sensors; within one entry the first field is the MQTT topic, then
-the display name, and an optional trailing numeric field is the soil-moisture
-floor in % — below it the plant shows a red water drop "needs watering"). The
+Config: PLANTS_SENSORS = "topic:Display Name;topic2:Other Name" (`;` separates
+sensors, the first `:` of each entry splits the MQTT topic from its label). The
 broker host/port/credentials are shared (system.config); this domain owns the
 topics. One MQTT listener and one slug per sensor — 1 sensor = 1 plant, no grouping
 (unlike the power sensors, you don't sum soil-moisture readings).
@@ -15,7 +13,8 @@ topics. One MQTT listener and one slug per sensor — 1 sensor = 1 plant, no gro
 Unlike the power sensors, a reading is an instantaneous state (not a cumulative
 counter): we keep the latest value of each metric for the current day rather than
 integrating. All four metrics are persisted; the on-screen card shows soil
-moisture (+ a red drop under the threshold), fertility and illuminance.
+moisture, temperature and illuminance, plus a red water drop when the device's
+`water_warning` flags it and a red battery icon when `battery_state` is low.
 """
 import logging
 import os
@@ -30,7 +29,7 @@ from app.plants.infrastructure import repository
 
 logger = logging.getLogger(__name__)
 
-Sensor = namedtuple("Sensor", "slug topic name threshold")
+Sensor = namedtuple("Sensor", "slug topic name")
 
 
 def _slugify(name: str) -> str:
@@ -41,22 +40,13 @@ def _slugify(name: str) -> str:
     return "-".join(ascii_name.lower().split())
 
 
-def _parse_threshold(token: str):
-    """A trailing numeric field (optionally a trailing '%') as a float, else None."""
-    try:
-        return float(token.strip().rstrip("%").strip())
-    except ValueError:
-        return None
-
-
 def _parse_sensors(raw: str) -> list:
-    """Parse "topic:Name[:threshold];topic2:Name 2[:40]" into a list of Sensor.
+    """Parse "topic:Name;topic2:Name 2" into a list of Sensor; skip malformed.
 
-    Each entry is `topic:name[:threshold]`. The topic never contains a colon
-    (Z2M topics use '/'), so we split on ':' and read an optional trailing numeric
-    field as the soil-moisture floor (%). One sensor per topic (deduped); each is
-    its own plant. The storage slug is `_slugify(name)`; a rare name collision
-    falls back to a per-topic suffix. No grouping/summing (states, not counters)."""
+    One sensor per topic (deduped by topic); each is its own plant. The storage
+    slug is `_slugify(name)`; a rare name collision falls back to a per-topic
+    suffix so two plants never share a row. No grouping/summing (states, not
+    counters)."""
     sensors = []
     seen_topics = set()
     seen_slugs = set()
@@ -67,16 +57,8 @@ def _parse_sensors(raw: str) -> list:
         if ":" not in entry:
             logger.warning("PLANTS_SENSORS entry ignored (no ':' topic/name): %r", entry)
             continue
-        parts = entry.split(":")
-        topic = parts[0].strip()
-        rest = parts[1:]
-        # A trailing numeric field is the moisture threshold; the rest is the name.
-        threshold = None
-        if len(rest) >= 2 and _parse_threshold(rest[-1]) is not None:
-            threshold = _parse_threshold(rest[-1])
-            name = ":".join(rest[:-1]).strip()
-        else:
-            name = ":".join(rest).strip()
+        topic, name = entry.split(":", 1)
+        topic, name = topic.strip(), name.strip()
         if not topic or not name:
             logger.warning("PLANTS_SENSORS entry ignored (empty topic or name): %r", entry)
             continue
@@ -88,7 +70,7 @@ def _parse_sensors(raw: str) -> list:
             slug = f"{slug}-{_slugify(topic.replace('/', ' '))}"
         seen_topics.add(topic)
         seen_slugs.add(slug)
-        sensors.append(Sensor(slug, topic, name, threshold))
+        sensors.append(Sensor(slug, topic, name))
     return sensors
 
 

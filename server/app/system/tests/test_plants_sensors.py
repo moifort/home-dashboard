@@ -16,25 +16,13 @@ def test_parse_one_sensor():
     assert sensors[0].slug == "ficus"
     assert sensors[0].topic == "zigbee2mqtt/Ficus"
     assert sensors[0].name == "Ficus"
-    assert sensors[0].threshold is None
 
 
-def test_threshold_after_name():
-    sensors = _parse_sensors("zigbee2mqtt/ficus:Ficus:30")
-    assert sensors[0].name == "Ficus"
-    assert sensors[0].threshold == 30.0
-
-
-def test_threshold_percent_suffix():
-    sensors = _parse_sensors("zigbee2mqtt/ficus:Ficus:40%")
-    assert sensors[0].threshold == 40.0
-
-
-def test_non_numeric_trailing_field_is_part_of_name():
-    # No numeric threshold -> the trailing field is kept as part of the name.
+def test_name_keeps_extra_colons():
+    # Only the first ':' splits topic/name, so a label may contain colons.
     sensors = _parse_sensors("zigbee2mqtt/p1:Plante:Salon")
+    assert sensors[0].topic == "zigbee2mqtt/p1"
     assert sensors[0].name == "Plante:Salon"
-    assert sensors[0].threshold is None
 
 
 def test_one_slug_per_plant_no_grouping():
@@ -110,15 +98,8 @@ def test_needs_water_from_water_warning():
     assert dry["needs_water"] is True
     ok = build_plant_view("Ficus", {"moisture": 88.0, "water_warning": "none"}, {}, today)
     assert ok["needs_water"] is False
-
-
-def test_needs_water_threshold_fallback_without_warning():
-    today = date(2026, 6, 2)
-    # No water_warning -> fall back to the configured moisture floor.
-    dry = build_plant_view("Ficus", {"moisture": 20.0}, {}, today, threshold=30)
-    assert dry["needs_water"] is True
-    ok = build_plant_view("Ficus", {"moisture": 50.0}, {}, today, threshold=30)
-    assert ok["needs_water"] is False
+    # No water_warning at all -> no watering flag (no threshold fallback anymore).
+    assert build_plant_view("Ficus", {"moisture": 20.0}, {}, today)["needs_water"] is False
 
 
 def test_low_battery_flag():

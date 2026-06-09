@@ -27,6 +27,6 @@ def attach(data: dict, sensors):
     data["plants"] = [
         rules.build_plant_view(
             s.name, repository.get_day(s.slug, today_str) or {},
-            _history(s.slug, today), today, s.threshold)
+            _history(s.slug, today), today)
         for s in sensors
     ]
