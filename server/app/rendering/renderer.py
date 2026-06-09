@@ -160,10 +160,10 @@ def render_dashboard(data: dict) -> Image.Image:
     home = data.get("home")
     if home:
         home_bottom = _draw_home_panel(draw, fonts, home, region_top=0)
-        top = home_bottom + 2
+        top = home_bottom + 5
         plants = data.get("plants")
         if plants:
-            top = _draw_plants_panel(draw, fonts, plants, region_top=top) + 2
+            top = _draw_plants_panel(draw, fonts, plants, region_top=top) + 5
         _draw_alerts_panel(draw, fonts, data.get("alert_board") or [], region_top=top)
 
     # UniFi "Réseau" panel in the empty bottom-right column, directly under the
@@ -750,7 +750,7 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
                 atoms.append(num_atom(figure))
             atoms += [num_atom(w) for w in money.split()]
             y = wrap_atoms(atoms, color, y)
-        y += 2  # gap before the next domain section
+        y += 5  # gap before the next domain section
 
 
 def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
