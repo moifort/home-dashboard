@@ -3,41 +3,38 @@
 <p align="center">
   <img src="hardware/device.jpg" alt="Dashboard on its stand" width="760">
 </p>
-
-An always-on e-paper screen for the home. It reads your smart-home data over MQTT (the broker your Zigbee2MQTT / Home Assistant setup already runs) and renders one dashboard: electricity, solar, water, plants and network. A small ESP32 wakes on a timer, pulls the ready-made image from a server you host yourself, then goes back to sleep. No backlight, barely any power.
-
 <p align="center">
   <img src="server/scripts/preview.png" alt="Dashboard preview" width="760">
 </p>
 
-## What it shows
+E-paper screen for the home. It reads your smart-home data and renders: electricity, solar, water, plants and network. A small ESP32 wakes on a timer, pulls the ready-made image from a server you host yourself, then goes back to sleep. No backlight, barely any power.
 
-Electricity is the core panel. Everything else is optional and turns on once you set its config.
+
+
+## Features
 
 | Panel | What you see |
 |-------|--------------|
-| **Electricity** (core) | Last 9 days of consumption as stacked off-peak/peak bars, plus a live `Auj.` (today) bar. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
-| **Prises & Talon** (plugs & baseline power) | A table under the chart: one row per power sensor you add (water heater, washing machine...) with its daily kWh and off-peak share, plus the home's permanent standby draw in watts. |
-| **Solaire** (Solar) | Daily solar production from an EcoFlow PowerStream: average, period total and money saved. |
-| **Eau** (Water) | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
-| **Plantes** (Plants) | One card per soil sensor: moisture, temperature, light, a 7-day trend, and a water-drop icon when moisture drops below your threshold. |
+| **Electricity** (core) | Last 9 days + live of consumption as stacked off-peak/peak bars. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
+| **Plugs & baseline power** | One row per power sensor you add (water heater, washing machine...) with its daily kWh and off-peak share, plus the home's permanent standby draw in watts. |
+| **Solar** | Daily solar production from an EcoFlow PowerStream: average, period total and money saved. |
+| **Water** | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
+| **Plants** | One card per soil sensor: moisture, temperature, light, a 7-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot. |
-| **Réseau** (Network) | UniFi internet & Wi-Fi quality, latency, data usage and top clients. |
-| **Alertes** (Alerts) | Plain-language notes (shown in French) flagging a sharp rise, a probable leak, or a disconnect, each with its €/day impact. |
-
-Every chart has an `Auj.` (today) bar that grows through the day, plus a small intraday strip under each bar showing how the day was spent. History starts the day you connect each source (no backfill).
+| **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients. |
+| **Alerts**  | Notes flagging a smart alerts, a probable leak, or a disconnect, each with its €/day impact. |
 
 ## Hardware
 
-| Component | Reference |
-|-----------|-----------|
-| e-Paper display | [Waveshare 10.85" (G) 4-color](https://www.waveshare.com/10.85inch-e-paper-hat-plus.htm) |
-| Microcontroller | [Seeed XIAO ESP32-S3](https://www.seeedstudio.com/XIAO-ESP32S3-p-5627.html) |
-| Electricity meter reader | [Lixee ZLinky_TIC V2](https://lixee.fr/fr/produits/42-zlinky-tic-v2-3770014375179.html) |
-| Power plugs | [NOUS A7Z](https://amzn.to/4evpkKK): Zigbee 16 A plug with energy monitoring (Z2M model `TS011F` / `_TZ3008_reatplte`) |
-| Plant soil sensors | [Arteco ZS-304Z](https://fr.aliexpress.com/item/1005010441104606.html): Zigbee soil sensor (moisture / temp / light) |
-| Server | Any Docker host (CasaOS, Raspberry Pi, a NAS) |
-| 3D printed case | [Dashboard.3mf](hardware/case/Dashboard.3mf): matte PLA, 15% infill, no supports |
+| Component | Reference | Price |
+|-----------|-----------|-----------|
+| e-Paper display | [Waveshare 10.85" (G) 4-color](https://www.waveshare.com/10.85inch-e-paper-hat-plus.htm) | 98,39€ |
+| Microcontroller | [Seeed XIAO ESP32-S3](https://www.seeedstudio.com/XIAO-ESP32S3-p-5627.html) | 15,59€ |
+| Electricity meter reader | [Lixee ZLinky_TIC V2](https://lixee.fr/fr/produits/42-zlinky-tic-v2-3770014375179.html) | 49€ |
+| Power plugs | [NOUS A7Z](https://amzn.to/4evpkKK): Zigbee 16 A plug with energy monitoring (Z2M model `TS011F` / `_TZ3008_reatplte`) | 10€ |
+| Plant soil sensors | [Arteco ZS-304Z](https://fr.aliexpress.com/item/1005010441104606.html): Zigbee soil sensor (moisture / temp / light) | 5€ |
+| Server | Any Docker host (CasaOS, Raspberry Pi, a NAS) | – |
+| 3D printed case | [Dashboard.3mf](hardware/case/Dashboard.3mf): matte PLA, 15% infill, no supports | – |
 
 ## Installation
 
@@ -238,8 +235,6 @@ flowchart TD
     click Z2M "https://github.com/Koenkk/zigbee2mqtt" _blank
 ```
 
-Blue boxes are my code: this repo (server + ESP32 firmware), the water-meter ESPHome config ([moifort/watermeter](https://github.com/moifort/watermeter)) and a private crypto bot. The rest are off-the-shelf containers ([eclipse-mosquitto](https://github.com/eclipse/mosquitto), [Koenkk/zigbee2mqtt](https://github.com/Koenkk/zigbee2mqtt)). The devices push their readings to Mosquitto and the server subscribes; the power plugs and EcoFlow also get re-polled every 60s.
-
 ## Endpoints
 
 | Method | Path | Description |
@@ -250,19 +245,6 @@ Blue boxes are my code: this repo (server + ESP32 firmware), the water-meter ESP
 | `GET` | `/status` | Server status as JSON (last render, day count, per-domain config) |
 | `GET` | `/api/data` | The full render data as JSON (debug) |
 
-## Development
-
-A golden-master test suite guards the render pipeline. It freezes a known input (a seeded DB and a fixed clock) and compares the output byte-for-byte against committed references: the data (`data.golden.json`) and the rendered EPD buffer (`display.golden.bin`).
-
-```bash
-cd server
-pip install -r requirements-dev.txt
-pytest -q                  # must stay green: nothing changed
-pytest -q --update-golden  # re-baseline after an intentional layout/data change
-```
-
-On a render mismatch the actual/golden/diff PNGs land in `/tmp`. CI runs the suite on every push and PR. The render golden depends on the FreeType/Pillow build, so it's generated locally and checked strictly there, and only smoke-tested in CI. The data golden is byte-exact everywhere.
-
 ## License
 
-MIT
+DWTFYW
