@@ -91,7 +91,11 @@ static bool fetchDisplayBuffer(const String &serverUrl, uint8_t *buf) {
     WiFiClient *stream = http.getStreamPtr();
     uint32_t bytesRead = 0;
 
-    while (bytesRead < DISPLAY_BUFFER_SIZE && http.connected()) {
+    // Overall deadline: a stalled server (connection open, no more bytes) would
+    // otherwise spin here forever — the screen freezes and the battery drains.
+    unsigned long start = millis();
+    while (bytesRead < DISPLAY_BUFFER_SIZE && http.connected()
+           && (millis() - start) < FETCH_DEADLINE_MS) {
         size_t available = stream->available();
         if (available > 0) {
             size_t toRead = min((size_t)(DISPLAY_BUFFER_SIZE - bytesRead), available);

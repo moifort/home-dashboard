@@ -12,6 +12,7 @@
 #define WIFI_TIMEOUT_MS     15000
 #define WIFI_MAX_RETRIES    3
 #define BOOT_WAIT_MS        3000
+#define FETCH_DEADLINE_MS   60000  // hard cap on the /display body read loop
 
 bool loadConfig(String &ssid, String &pass, String &serverUrl);
 void saveConfig(const String &ssid, const String &pass, const String &serverUrl);
