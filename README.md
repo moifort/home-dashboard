@@ -10,67 +10,6 @@ An always-on e-paper screen for the home. It reads your smart-home data over MQT
   <img src="server/scripts/preview.png" alt="Dashboard preview" width="760">
 </p>
 
-## Architecture
-
-The ESP32 drives the screen and pulls a ready-made image from the server. The server does the actual work: it talks to your LAN devices and to the EcoFlow cloud for solar.
-
-```mermaid
-flowchart TD
-    subgraph repo["this repo"]
-        SCREEN["e-Paper screen"]:::hw
-        ESP["ESP32 firmware<br/>moifort/home-dashboard"]:::mine
-        SERVER["Dashboard server<br/>moifort/home-dashboard"]:::mine
-    end
-
-    SCREEN --> ESP
-    ESP --> SERVER
-
-    MOSQ["Mosquitto<br/>eclipse-mosquitto"]:::ext
-    Z2M["Zigbee2MQTT<br/>Koenkk/zigbee2mqtt"]:::ext
-    LINKY["Linky meter<br/>Lixee ZLinky_TIC"]:::dev
-    PLUGS["Power plugs<br/>NOUS A7Z"]:::dev
-    PLANTS["Plant soil sensors<br/>Arteco ZS-304Z"]:::dev
-    WATER["Water meter<br/>moifort/watermeter"]:::mine
-
-    SERVER --> MOSQ
-    MOSQ --> Z2M
-    MOSQ --> WATER
-    Z2M --> LINKY
-    Z2M --> PLUGS
-    Z2M --> PLANTS
-
-    HB["Homebridge<br/>homebridge/homebridge"]:::ext
-    HOME["Apple Home<br/>(Maison)"]:::ext
-    MOSQ --> HB
-    HB --> HOME
-
-    ECO["EcoFlow cloud<br/>app API + MQTT"]:::ext
-    PV["Solar · PowerStream"]:::dev
-    SERVER --> ECO
-    ECO --> PV
-
-    CRYPTO["Crypto trading bot<br/>GraphQL"]:::mine
-    UNIFI["UniFi gateway"]:::ext
-    SERVER --> CRYPTO
-    SERVER --> UNIFI
-
-    classDef mine fill:#d4ecff,stroke:#0a6ebd,color:#062a44;
-    classDef ext  fill:#eeeeee,stroke:#999999,color:#222222;
-    classDef dev  fill:#ffffff,stroke:#bbbbbb,color:#222222;
-    classDef hw   fill:#fff4cc,stroke:#caa300,color:#3a3000;
-
-    click ESP "https://github.com/moifort/home-dashboard" _blank
-    click SERVER "https://github.com/moifort/home-dashboard" _blank
-    click WATER "https://github.com/moifort/watermeter" _blank
-    click MOSQ "https://github.com/eclipse/mosquitto" _blank
-    click Z2M "https://github.com/Koenkk/zigbee2mqtt" _blank
-    click HB "https://github.com/homebridge/homebridge" _blank
-```
-
-Blue boxes are this repo's code: the server and ESP32 firmware ([moifort/home-dashboard](https://github.com/moifort/home-dashboard)), the water-meter ESPHome config ([moifort/watermeter](https://github.com/moifort/watermeter)), and my crypto bot (private repo). The rest are off-the-shelf Docker containers: [eclipse-mosquitto](https://github.com/eclipse/mosquitto), [Koenkk/zigbee2mqtt](https://github.com/Koenkk/zigbee2mqtt) and [homebridge/homebridge](https://github.com/homebridge/homebridge). Homebridge re-exposes the same Zigbee devices to Apple Home, so they also show up in the Maison app.
-
-> Arrows show what connects to what. Over MQTT the devices push their readings to Mosquitto and the server subscribes; the power plugs and EcoFlow also get re-polled every 60s.
-
 ## What it shows
 
 Electricity is the core panel. Everything else is optional and turns on once you set its config.
@@ -78,7 +17,7 @@ Electricity is the core panel. Everything else is optional and turns on once you
 | Panel | What you see |
 |-------|--------------|
 | **Electricity** (core) | Last 9 days of consumption as stacked off-peak/peak bars, plus a live `Auj.` (today) bar. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
-| **Talon** (baseline power) | A table of the home's permanent standby draw (fridge, internet box, that sort of thing) in watts, with a row per power sensor you add. |
+| **Prises & Talon** (plugs & baseline power) | A table under the chart: one row per power sensor you add (water heater, washing machine...) with its daily kWh and off-peak share, plus the home's permanent standby draw in watts. |
 | **Solaire** (Solar) | Daily solar production from an EcoFlow PowerStream: average, period total and money saved. |
 | **Eau** (Water) | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
 | **Plantes** (Plants) | One card per soil sensor: moisture, temperature, light, a 7-day trend, and a water-drop icon when moisture drops below your threshold. |
@@ -86,7 +25,7 @@ Electricity is the core panel. Everything else is optional and turns on once you
 | **Réseau** (Network) | UniFi internet & Wi-Fi quality, latency, data usage and top clients. |
 | **Alertes** (Alerts) | Plain-language notes (shown in French) flagging a sharp rise, a probable leak, or a disconnect, each with its €/day impact. |
 
-Every chart has an `Auj.` (today) bar that grows through the day, plus a small intraday strip under each bar showing how the day was spent. There's no minimum threshold: every real reading counts, and a day with no data shows `N/A`. History starts the day you connect each source (no backfill).
+Every chart has an `Auj.` (today) bar that grows through the day, plus a small intraday strip under each bar showing how the day was spent. History starts the day you connect each source (no backfill).
 
 ## Hardware
 
@@ -96,9 +35,9 @@ Every chart has an `Auj.` (today) bar that grows through the day, plus a small i
 | Microcontroller | [Seeed XIAO ESP32-S3](https://www.seeedstudio.com/XIAO-ESP32S3-p-5627.html) |
 | Electricity meter reader | [Lixee ZLinky_TIC V2](https://lixee.fr/fr/produits/42-zlinky-tic-v2-3770014375179.html) |
 | Power plugs | [NOUS A7Z](https://amzn.to/4evpkKK): Zigbee 16 A plug with energy monitoring (Z2M model `TS011F` / `_TZ3008_reatplte`) |
-| Plant soil sensors | [Arteco ZS-304Z](https://fr.aliexpress.com/item/1005010441104606.html?spm=a2g0o.order_list.order_list_main.22.566f5e5bBjWddT&gatewayAdapt=glo2fra): Zigbee soil sensor (moisture / temp / light) |
+| Plant soil sensors | [Arteco ZS-304Z](https://fr.aliexpress.com/item/1005010441104606.html): Zigbee soil sensor (moisture / temp / light) |
 | Server | Any Docker host (CasaOS, Raspberry Pi, a NAS) |
-| 3D printed case | [Dashboard.3mf](hardware/case/Dashboard.3mf), matte PLA recommended |
+| 3D printed case | [Dashboard.3mf](hardware/case/Dashboard.3mf): matte PLA, 15% infill, no supports |
 
 ## Installation
 
@@ -106,7 +45,7 @@ Every chart has an `Auj.` (today) bar that grows through the day, plus a small i
 
 The dashboard reads the meter's teleinfo locally over MQTT. No cloud API, no token:
 
-1. Plug a [Lixee ZLinky_TIC](https://lixee.fr/produits/30-zlinky-tic-3770014375070.html) into your Linky meter's **TIC connector** (the I1/I2 terminals under the green cover).
+1. Plug a [Lixee ZLinky_TIC](https://lixee.fr/fr/produits/42-zlinky-tic-v2-3770014375179.html) into your Linky meter's **TIC connector** (the I1/I2 terminals under the green cover).
 2. Pair it in **Zigbee2MQTT** and note its topic (e.g. `zigbee2mqtt/linky`).
 
 It expects an HC/HP (off-peak/peak) contract. History builds up from the first connection, so a day the server is down stays blank.
@@ -136,11 +75,9 @@ PRICE_ABO_MONTHLY=15.65
 
 # Refresh schedule. The ESP32 wakes every N minutes, must match the firmware.
 SCREEN_REFRESH_INTERVAL_MIN=120
-DATA_LEAD_MIN=10
-INTRADAY_MAX_W=3000                  # intraday strip scale (W at full height)
 ```
 
-Then add any optional panels below.
+Then add any optional panels below ([.env.example](server/.env.example) lists every variable, including the fine-tuning ones).
 
 <details>
 <summary><b>Solar (EcoFlow PowerStream)</b></summary>
@@ -152,7 +89,6 @@ ECOFLOW_EMAIL=your_ecoflow_account_email
 ECOFLOW_PASSWORD=your_ecoflow_account_password
 ECOFLOW_DEVICE_SN=your_powerstream_serial_number
 ECOFLOW_API_HOST=api-e.ecoflow.com   # EU; api.ecoflow.com (global) / api-a.ecoflow.com (asia)
-INTRADAY_SOLAR_MAX_W=800             # intraday strip scale (W at full height)
 ```
 </details>
 
@@ -164,7 +100,6 @@ An ESPHome wM-Bus reader publishes the meter's cumulative index (m³) to MQTT, a
 ```env
 WATER_TOPIC=watermeter/index_m3        # cumulative index in m³ (raw float payload)
 WATER_PRICE_M3=4.30                    # €/m³ (0 = hide cost)
-INTRADAY_WATER_MAX_L=150               # intraday strip scale (L per 4h bucket)
 ```
 </details>
 
@@ -220,14 +155,14 @@ UNIFI_SSID_MAIN=your_main_wifi_ssid
 **Docker Compose:**
 
 ```bash
-curl -O https://raw.githubusercontent.com/moifort/dashboard/main/server/docker-compose.yml
+curl -O https://raw.githubusercontent.com/moifort/home-dashboard/main/server/docker-compose.yml
 docker compose up -d
 ```
 
 **CasaOS:** import this compose file from the CasaOS interface:
 
 ```
-https://raw.githubusercontent.com/moifort/dashboard/main/server/docker-compose.casaos.yml
+https://raw.githubusercontent.com/moifort/home-dashboard/main/server/docker-compose.casaos.yml
 ```
 
 The dashboard is then at `http://your-server:5000`.
@@ -252,6 +187,59 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 
 To reconfigure later, type `reset` within 3 seconds of boot. The ESP32 then wakes on a clock-aligned interval (`REFRESH_INTERVAL_MIN`, default 120 min), refreshes the screen, and deep-sleeps until the next boundary. A failed cycle just retries with backoff.
 
+## Architecture
+
+The ESP32 drives the screen and pulls a ready-made image from the server. The server does the actual work: it talks to your LAN devices and to the EcoFlow cloud for solar.
+
+```mermaid
+flowchart TD
+    subgraph repo["this repo"]
+        SCREEN["e-Paper screen"]:::hw
+        ESP["ESP32 firmware<br/>moifort/home-dashboard"]:::mine
+        SERVER["Dashboard server<br/>moifort/home-dashboard"]:::mine
+    end
+
+    SCREEN --> ESP
+    ESP --> SERVER
+
+    MOSQ["Mosquitto<br/>eclipse-mosquitto"]:::ext
+    Z2M["Zigbee2MQTT<br/>Koenkk/zigbee2mqtt"]:::ext
+    LINKY["Linky meter<br/>Lixee ZLinky_TIC"]:::dev
+    PLUGS["Power plugs<br/>NOUS A7Z"]:::dev
+    PLANTS["Plant soil sensors<br/>Arteco ZS-304Z"]:::dev
+    WATER["Water meter<br/>moifort/watermeter"]:::mine
+
+    SERVER --> MOSQ
+    MOSQ --> Z2M
+    MOSQ --> WATER
+    Z2M --> LINKY
+    Z2M --> PLUGS
+    Z2M --> PLANTS
+
+    ECO["EcoFlow cloud<br/>app API + MQTT"]:::ext
+    PV["Solar · PowerStream"]:::dev
+    SERVER --> ECO
+    ECO --> PV
+
+    CRYPTO["Crypto trading bot<br/>GraphQL"]:::mine
+    UNIFI["UniFi gateway"]:::ext
+    SERVER --> CRYPTO
+    SERVER --> UNIFI
+
+    classDef mine fill:#d4ecff,stroke:#0a6ebd,color:#062a44;
+    classDef ext  fill:#eeeeee,stroke:#999999,color:#222222;
+    classDef dev  fill:#ffffff,stroke:#bbbbbb,color:#222222;
+    classDef hw   fill:#fff4cc,stroke:#caa300,color:#3a3000;
+
+    click ESP "https://github.com/moifort/home-dashboard" _blank
+    click SERVER "https://github.com/moifort/home-dashboard" _blank
+    click WATER "https://github.com/moifort/watermeter" _blank
+    click MOSQ "https://github.com/eclipse/mosquitto" _blank
+    click Z2M "https://github.com/Koenkk/zigbee2mqtt" _blank
+```
+
+Blue boxes are my code: this repo (server + ESP32 firmware), the water-meter ESPHome config ([moifort/watermeter](https://github.com/moifort/watermeter)) and a private crypto bot. The rest are off-the-shelf containers ([eclipse-mosquitto](https://github.com/eclipse/mosquitto), [Koenkk/zigbee2mqtt](https://github.com/Koenkk/zigbee2mqtt)). The devices push their readings to Mosquitto and the server subscribes; the power plugs and EcoFlow also get re-polled every 60s.
+
 ## Endpoints
 
 | Method | Path | Description |
@@ -260,6 +248,7 @@ To reconfigure later, type `reset` within 3 seconds of boot. The ESP32 then wake
 | `GET` | `/` | Auto-refreshing HTML preview in a browser |
 | `GET` | `/preview.png` | The dashboard rendered as a PNG |
 | `GET` | `/status` | Server status as JSON (last render, day count, per-domain config) |
+| `GET` | `/api/data` | The full render data as JSON (debug) |
 
 ## Development
 
@@ -273,10 +262,6 @@ pytest -q --update-golden  # re-baseline after an intentional layout/data change
 ```
 
 On a render mismatch the actual/golden/diff PNGs land in `/tmp`. CI runs the suite on every push and PR. The render golden depends on the FreeType/Pillow build, so it's generated locally and checked strictly there, and only smoke-tested in CI. The data golden is byte-exact everywhere.
-
-## 3D printed case
-
-[Dashboard.3mf](hardware/case/Dashboard.3mf): matte PLA, 15% infill, no supports.
 
 ## License
 
