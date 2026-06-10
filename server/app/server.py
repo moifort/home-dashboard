@@ -67,6 +67,11 @@ def render_to_buffer(data: dict) -> bytes:
 # --- HTTP Server ---
 
 class DashboardHandler(BaseHTTPRequestHandler):
+    # The server is single-threaded: without a socket timeout, one client that
+    # opens a connection and never sends its request (or dies mid-read) would
+    # block every further /display pull. A silent connection is dropped instead.
+    timeout = 60
+
     def do_GET(self):
         if self.path == "/display":
             self._serve_display()
@@ -153,6 +158,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         body = json.dumps(status, indent=2).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
@@ -166,6 +172,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
