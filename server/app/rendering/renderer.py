@@ -488,17 +488,17 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
 
     def spark(values, sy):
         """7 thin bars normalised to this row's own max, grown up from the text
-        baseline. Missing days leave a gap; present days draw at least a 1px tick."""
+        baseline. A missing or zero day leaves a gap; positive days draw a bar."""
         if not values:
             return
-        present = [v for v in values if v is not None]
+        present = [v for v in values if v]          # positives only
         max_v = max(present) if present else 0
         baseline = sy + text_h
         for j, v in enumerate(values):
-            if v is None:
+            if not v:                                # None or 0 -> no bar
                 continue
             bx = spark_left + j * (SPARK_BAR_W + SPARK_BAR_GAP)
-            h = max(1, round(v / max_v * SPARK_MAX_H)) if max_v > 0 else 1
+            h = max(1, round(v / max_v * SPARK_MAX_H))
             draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
 
     # Title row above the separator (section-title band): abbreviated column
@@ -880,19 +880,14 @@ def _intraday_buckets(values, agg="mean"):
 def _draw_intraday(draw, cx, strip_baseline, buckets, ceiling, today=False):
     """One day's intraday mini bar-graph: INTRADAY_BARS sparkline-style bars
     (same 3px/2px geometry as the bottom-table sparklines) grown up from
-    `strip_baseline`. Any present value draws at least a 1px tick; a None
-    bucket draws the same zero tick (a quiet slot — water meter silent, PV
-    asleep — is a zero, not a hole). Only today's buckets after the last
-    sample (not elapsed yet) keep a gap. Heights are normalised to the
-    chart's fixed `ceiling`; values above it clip to the full INTRADAY_H."""
-    last = max((i for i, v in enumerate(buckets) if v is not None), default=-1)
-    if last < 0:
-        return
-    fill_until = last if today else len(buckets) - 1
+    `strip_baseline`. A None or zero bucket leaves a gap; only positive
+    buckets draw a bar. Heights are normalised to the chart's fixed
+    `ceiling`; values above it clip to the full INTRADAY_H. `today` is kept
+    for signature stability (no longer affects drawing)."""
     for i, v in enumerate(buckets):
-        if v is None and i > fill_until:
+        if not v:                                # None or 0 -> no bar
             continue
-        h = max(1, round(min(v or 0.0, ceiling) / ceiling * INTRADAY_H))
+        h = max(1, round(min(v, ceiling) / ceiling * INTRADAY_H))
         x = cx + i * (SPARK_BAR_W + SPARK_BAR_GAP)
         draw.rectangle([x, strip_baseline - h, x + SPARK_BAR_W - 1, strip_baseline - 1], fill=BLACK)
 
