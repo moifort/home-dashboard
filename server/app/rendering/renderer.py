@@ -620,18 +620,17 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
         return cx
 
     def spark(values, sy):
-        """7 thin bars normalised to this plant's own max, grown up from the text
-        baseline. Missing days leave a gap; present days draw at least a 1px tick."""
+        """7 thin bars on the absolute 0-100% moisture scale, grown up from the
+        text baseline. Missing days leave a gap; present days draw at least a
+        1px tick (a bone-dry day stays visible)."""
         if not values:
             return
-        present = [v for v in values if v is not None]
-        max_v = max(present) if present else 0
         baseline = sy + line_h
         for j, v in enumerate(values):
             if v is None:
                 continue
             bx = spark_left + j * (SPARK_BAR_W + SPARK_BAR_GAP)
-            h = max(1, round(v / max_v * SPARK_MAX_H)) if max_v > 0 else 1
+            h = max(1, round(min(v, 100) / 100 * SPARK_MAX_H))
             draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
 
     # The watering drop matches the name's cap height and sits on its baseline,
