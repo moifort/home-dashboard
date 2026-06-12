@@ -8,6 +8,8 @@ import time
 import certifi
 import paho.mqtt.client as mqtt
 
+from app.module.mqtt import pump
+
 from .ecoflow_client import (
     GET_QUOTA_INTERVAL,
     EcoflowAuthError,
@@ -98,16 +100,17 @@ class EcoflowMqttListener:
 
         client.on_connect = on_connect
         client.on_message = on_message
-        client.reconnect_delay_set(min_delay=1, max_delay=120)
         client.connect(cert["url"], cert["port"], keepalive=15)
 
         last_poll = time.monotonic()
-        while not self._stop.is_set():
-            client.loop(timeout=1.0)
+
+        def repoll():
+            nonlocal last_poll
             if time.monotonic() - last_poll >= GET_QUOTA_INTERVAL:
                 client.publish(get_topic, build_get_quota_request(self._sn), qos=1)
                 last_poll = time.monotonic()
-        client.disconnect()
+
+        pump(client, self._stop, tick=repoll)
 
     def stop(self):
         self._stop.set()

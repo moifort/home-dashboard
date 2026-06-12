@@ -12,6 +12,19 @@ from datetime import timedelta
 _BATTERY_LOW = ("low", "empty", "critical")
 
 
+def latest_metrics(rows: list) -> dict:
+    """Merge day rows (newest first, today first; None for absent days) into
+    the freshest known value of each field. A soil reading is a slowly-moving
+    instantaneous state, so yesterday's value beats an em dash right after the
+    midnight rollover (the sensor reports only once or twice a day)."""
+    merged = {}
+    for row in rows:
+        for key, value in (row or {}).items():
+            if value is not None and key not in merged:
+                merged[key] = value
+    return merged
+
+
 def moisture_spark(history: dict, today, days: int = 7) -> list:
     """The last `days` complete days' soil moisture (oldest→newest, ending
     yesterday); None for any day with no reading (keeps the spark's gap)."""

@@ -12,6 +12,8 @@ import threading
 
 import paho.mqtt.client as mqtt
 
+from app.module.mqtt import pump
+
 logger = logging.getLogger(__name__)
 
 # A household's lifetime index in kWh stays well under 100k, while the same
@@ -124,12 +126,8 @@ class ZLinkyMqttListener:
 
         client.on_connect = on_connect
         client.on_message = on_message
-        client.reconnect_delay_set(min_delay=1, max_delay=120)
         client.connect(self._host, self._port, keepalive=30)
-
-        while not self._stop.is_set():
-            client.loop(timeout=1.0)
-        client.disconnect()
+        pump(client, self._stop)
 
     def stop(self):
         self._stop.set()
