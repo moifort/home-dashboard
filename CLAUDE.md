@@ -44,7 +44,7 @@ server/app/
 
   module/              # transverse infra, ready to use
     db.py              #   connect() — the single SQLite primitive
-    mqtt.py            #   (reserved) generic MQTT base
+    mqtt.py            #   pump() — shared network loop, raises on lost connection
     format.py          #   shared display/parse helpers + the AlertRule descriptor
   system/              # config, scheduler, tests
     config.py          #   global settings (paths, version, TZ, DB_PATH, PORT, MQTT_*…)

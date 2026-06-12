@@ -113,7 +113,7 @@ POWER_SENSORS=zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge
 <details>
 <summary><b>Plant soil sensors</b></summary>
 
-Any Zigbee2MQTT soil sensor reporting `soil_moisture`, `temperature` and `illuminance`. Each becomes a `Plantes` card. The format is `topic:Display Name:threshold`, where the trailing number is the watering threshold (soil-moisture %): the water-drop icon shows when moisture drops below it. A plant without its own threshold falls back to `PLANTS_MOISTURE_THRESHOLD`.
+Any Zigbee2MQTT soil sensor reporting `soil_moisture`, `temperature` and `illuminance`. Each becomes a `Plantes` card. The format is `topic:Display Name:threshold`, where the trailing number is the watering threshold (soil-moisture %): the water-drop icon shows when moisture drops below it. A plant without its own threshold falls back to `PLANTS_MOISTURE_THRESHOLD`. These sensors report rarely (battery), so enabling `retain` on the device in Zigbee2MQTT is recommended: a server restart then repopulates the cards immediately instead of waiting for the next wake-up.
 
 ```env
 PLANTS_SENSORS=zigbee2mqtt/ficus:Ficus:30;zigbee2mqtt/basilic:Basilic:40
