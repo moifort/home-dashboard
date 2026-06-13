@@ -19,7 +19,7 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 | **Plugs & baseline power** | One row per power sensor you add (water heater, washing machine...) with its daily kWh and off-peak share, plus the home's permanent standby draw in watts. |
 | **Solar** | Daily solar production from an EcoFlow PowerStream: average, period total and money saved. |
 | **Water** | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
-| **Plants** | One card per soil sensor: moisture, temperature, light, a 7-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |
+| **Plants** | One card per soil sensor: moisture, temperature, light, the time since its last reading, a 10-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot. |
 | **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients. |
 | **Alerts**  | Notes flagging a smart alerts, a probable leak, or a disconnect, each with its €/day impact. |

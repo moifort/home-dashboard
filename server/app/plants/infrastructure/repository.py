@@ -63,6 +63,19 @@ def get_cached_plants(slug: str, start: str, end: str) -> list[dict]:
     return rows
 
 
+def get_last_seen(slug: str) -> str | None:
+    """The most recent write timestamp (`fetched_at`) for this plant, i.e. when
+    it last reported, or None if it never has. Persisted, so it survives a
+    restart (unlike the in-memory /status tracker)."""
+    conn = connect()
+    cur = conn.execute(
+        "SELECT MAX(fetched_at) FROM daily_plants WHERE slug = ?", (slug,)
+    )
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row and row[0] else None
+
+
 def get_day(slug: str, date: str) -> dict | None:
     """The day's stored metrics + status for one plant, or None if it never
     reported."""

@@ -412,6 +412,19 @@ def _short_name(name: str, limit: int = 15) -> str:
     return name if len(name) <= limit else name[: limit - 1] + "…"
 
 
+def _fit_text(draw, text, font, max_w) -> str:
+    """Truncate `text` (adding an ellipsis) so it draws within `max_w` pixels;
+    returns "" when there's no room at all."""
+    text = (text or "").strip()
+    if max_w <= 0:
+        return ""
+    if draw.textlength(text, font=font) <= max_w:
+        return text
+    while text and draw.textlength(text + "…", font=font) > max_w:
+        text = text[:-1]
+    return (text + "…") if text else ""
+
+
 def _build_bottom_rows(data) -> list:
     """Assemble the bottom table rows: each configured power sensor (Cumulus,
     Lave-linge, …) then Talon (core Linky, always shown). Each row is a 6-column
@@ -592,25 +605,23 @@ def _draw_battery(draw, x, top, w, h, fill):
 def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
     """Draw the "Plantes" panel in the left gutter, stacked under Home: a title
     banner with a 1px separator, then a two-line card per plant. Line 1 (the
-    card's title): name (bold, left, truncated), then — right of the name — a red
-    water-drop icon when the plant needs watering and a red battery icon when its
-    battery is low, with the 7-day moisture sparkline hugging the gutter's right
-    edge. Line 2: three uniform label/value pairs "hum 45%  temp 27°  lum 76"
-    (labels regular, numbers bold, all black). Returns the y below the last card
-    (for the Alerts panel stacked beneath)."""
+    card's title): the name (bold, truncated to the room left) carrying its red
+    water-drop / low-battery icons, the relative last-seen label ("3h", regular)
+    glued to its right, then the moisture sparkline hugging the gutter's right
+    edge. Line 2: three uniform
+    label/value pairs "hum 45%  temp 27°  lum 76" (labels regular, numbers bold,
+    all black). Returns the y below the last card (for the Alerts panel stacked
+    beneath)."""
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
     right = x + width
+    gap = 6  # min breathing room between the name, the last-seen label and the spark
 
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
     stats_top = region_top
     sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
     _draw_stats_bar(draw, fonts, [[("Plantes", "bold", BLACK)]], x, stats_top, width, sep_y)
-
-    # Sparkline hugs the gutter's right edge, on the name line.
-    spark_w = SPARK_BARS * (SPARK_BAR_W + SPARK_BAR_GAP) - SPARK_BAR_GAP
-    spark_left = right - spark_w
 
     def put(segments, sx, sy):
         cx = sx
@@ -619,12 +630,10 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
             cx += draw.textlength(text, font=fonts[fk])
         return cx
 
-    def spark(values, sy):
-        """7 thin bars on the absolute 0-100% moisture scale, grown up from the
+    def spark(values, sy, spark_left):
+        """Thin bars on the absolute 0-100% moisture scale, grown up from the
         text baseline. Missing days leave a gap; present days draw at least a
         1px tick (a bone-dry day stays visible)."""
-        if not values:
-            return
         baseline = sy + line_h
         for j, v in enumerate(values):
             if v is None:
@@ -644,16 +653,36 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
 
     y = sep_y + 4
     for p in plants:
-        # Line 1 (card title): name, then red watering/battery icons to its right,
-        # and the 7-day moisture spark at the right edge.
-        nx = put([(_short_name(p.get("name", "")), "bold", BLACK)], x, y) + 6
+        # Line 1 (card title): the name + red watering/battery icons, the compact
+        # last-seen label glued to its right, then the moisture spark hugging the
+        # right edge.
+        values = p.get("spark") or []
+        spark_w = (len(values) * (SPARK_BAR_W + SPARK_BAR_GAP) - SPARK_BAR_GAP
+                   if values else 0)
+        spark_left = right - spark_w
+        if values:
+            spark(values, y, spark_left)
+
+        # Truncate the name to the room before the spark, reserving space for the
+        # icons and the last-seen label that follow it.
+        seen = p.get("last_seen_text")
+        seen_w = draw.textlength(seen, font=fonts["regular"]) if seen else 0
+        name_bound = (spark_left - gap) if values else right
+        icon_w = (drop_w + gap if p.get("needs_water") else 0) + \
+                 (bat_w + gap if p.get("low_battery") else 0)
+        reserve = (seen_w + gap) if seen else 0
+        name = _fit_text(draw, _short_name(p.get("name", "")), fonts["bold"],
+                         name_bound - x - icon_w - reserve)
+        nx = put([(name, "bold", BLACK)], x, y) + gap
         if p.get("needs_water"):
             _draw_water_drop(draw, nx + drop_w / 2, y + baseline - drop_h, drop_w, drop_h, RED)
-            nx += drop_w + 6
+            nx += drop_w + gap
         if p.get("low_battery"):
             _draw_battery(draw, nx, y + (line_h - bat_h) // 2, bat_w, bat_h, RED)
-            nx += bat_w + 6
-        spark(p.get("spark"), y)
+            nx += bat_w + gap
+        # Last-seen label glued to the right of the name (+ icons).
+        if seen:
+            put([(seen, "regular", BLACK)], nx, y)
         # Line 2: uniform hum / temp / lum pairs (labels regular, numbers bold).
         y2 = y + line_h + 1
         segs = [("hum ", "regular", BLACK)]

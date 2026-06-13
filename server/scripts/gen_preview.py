@@ -281,12 +281,12 @@ if "plants" not in data:
     data["plants"] = [
         {"name": "Ficus", "moisture_pct": 45, "moisture_text": "45",
          "temperature": 27.0, "temperature_text": "27", "illuminance_text": "76",
-         "needs_water": True, "low_battery": True,
-         "spark": [40, 45, 50, 55, 30, 35, 40]},
+         "needs_water": True, "low_battery": True, "last_seen_text": "3h",
+         "spark": [35, 40, 45, 50, 55, 30, 35, 40, 45, 42]},
         {"name": "Basilic", "moisture_pct": 61, "moisture_text": "61",
          "temperature": 24.0, "temperature_text": "24", "illuminance_text": "850",
-         "needs_water": False, "low_battery": False,
-         "spark": [53, 57, None, 45, 49, 53, 57]},
+         "needs_water": False, "low_battery": False, "last_seen_text": "5h",
+         "spark": [49, 53, 57, None, 45, 49, 53, 57, 61, 58]},
     ]
 
 # Preview only: force a representative set of triggering values so the

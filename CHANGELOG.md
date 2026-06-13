@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-13
+
+- **`Plantes`: cards show how long since the last reading, with a longer moisture trend**: each card's title line now carries a compact "time ago" label (`3h`, `12min`, `2j`) glued to the right of the plant's name, so you can tell at a glance how fresh the reading is (these sensors report only 1-2 times a day). It is computed from the last stored reading's timestamp, so it survives a restart. The moisture sparkline also grew from 7 to 10 days. Render and data goldens re-baselined, preview regenerated; no new environment variable.
+
 ## 2026-06-12
 
 - **Fix: MQTT listeners reconnect after a lost connection**: paho's manual `loop()` never reconnects by itself; it just returns an error code, which every listener ignored. The first broker hiccup (restart, network blip, missed keepalive) silently turned a listener into a zombie: thread alive, subscribed to nothing, spinning on a dead socket until the next deploy. Most visible on the `Plantes` cards (a soil sensor reports only 1-2 times a day, so one missed report meant a whole day of em dashes), but the Linky, water, power-plug and solar listeners were equally affected. All five now share a single network-loop pump (`module/mqtt.py`) that turns a failed loop into an exception and falls back to the existing retry path: fresh connect, resubscribe, and a "retrying in 60s" log line instead of silence. No new environment variable; goldens unchanged.

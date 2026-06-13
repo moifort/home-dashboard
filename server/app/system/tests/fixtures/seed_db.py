@@ -167,19 +167,22 @@ def _plant_rows():
     gap. battery_state is only meaningful on today's live row (NULL on history):
     Ficus "low" → red battery icon, Basilic "middle" → none. The water drop is
     driven elsewhere (today's moisture vs the 50% threshold in conftest): Ficus
-    45 < 50 → drop, Basilic 61 ≥ 50 → none. Values are deterministic per (plant,
-    day index)."""
-    start = TODAY - timedelta(days=9)
+    45 < 50 → drop, Basilic 61 ≥ 50 → none. Values are keyed on the day's distance
+    from TODAY (not the seed start), so today's reading — and the documented
+    water-drop scenario — stay fixed however far back the window reaches. Seeds
+    enough days to fill the 10-day moisture spark window."""
+    start = TODAY - timedelta(days=11)
     rows = []
-    for i, d in enumerate(_daterange(start, TODAY)):
+    for d in _daterange(start, TODAY):
         ds = d.strftime("%Y-%m-%d")
-        today = d == TODAY
-        rows.append(("ficus", ds, float(30 + (i % 6) * 5), 20.0 + (i % 3),
-                     800.0 + (i % 4) * 150, 18.0 + (i % 5),
+        ago = (TODAY - d).days  # 0 = today; stable under a deeper window
+        today = ago == 0
+        rows.append(("ficus", ds, float(30 + ((ago + 3) % 6) * 5), 20.0 + (ago % 3),
+                     800.0 + (ago % 4) * 150, 18.0 + (ago % 5),
                      "low" if today else None, _FETCHED_AT))
-        if i not in (1, 4):  # two missing days early -> a gap in Basilic's spark
-            rows.append(("basilic", ds, float(45 + (i % 5) * 4), 22.0 + (i % 2),
-                         600.0 + (i % 3) * 200, 22.0 + (i % 4),
+        if ago not in (5, 8):  # two missing days -> a gap in Basilic's spark
+            rows.append(("basilic", ds, float(45 + ((ago + 4) % 5) * 4), 22.0 + (ago % 2),
+                         600.0 + (ago % 3) * 200, 22.0 + (ago % 4),
                          "middle" if today else None, _FETCHED_AT))
     return rows
 

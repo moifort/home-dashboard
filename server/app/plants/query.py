@@ -26,20 +26,23 @@ def _current(slug: str, today) -> dict:
 
 
 def _history(slug: str, today) -> dict:
-    """date→moisture over the last 8 days (the spark window), from the DB."""
-    week_ago = (today - timedelta(days=8)).strftime("%Y-%m-%d")
+    """date→moisture over the spark window (the last SPARK_DAYS complete days,
+    plus a day of slack), from the DB."""
+    start = (today - timedelta(days=rules.SPARK_DAYS + 1)).strftime("%Y-%m-%d")
     today_str = today.strftime("%Y-%m-%d")
     return {r["date"]: r["moisture"]
-            for r in repository.get_cached_plants(slug, week_ago, today_str)
+            for r in repository.get_cached_plants(slug, start, today_str)
             if r["moisture"] is not None}
 
 
 def attach(data: dict, sensors):
     """Attach one render entry per plant, in declared order."""
-    today = datetime.now(PARIS_TZ).date()
+    now = datetime.now(PARIS_TZ)
+    today = now.date()
     data["plants"] = [
         rules.build_plant_view(
             s.name, _current(s.slug, today),
-            _history(s.slug, today), today, s.threshold)
+            _history(s.slug, today), today, s.threshold,
+            last_seen=repository.get_last_seen(s.slug), now=now)
         for s in sensors
     ]
