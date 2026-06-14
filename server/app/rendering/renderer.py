@@ -709,13 +709,13 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
 
 def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     """Draw the alert status board in the top-left gutter, under the Home panel.
-    Each monitored domain is its own section: a bold title with a 1px separator
-    (same look as the other panel titles) over its lines — one per active item
-    (label + unit black, the ▲/▼ arrow + number bold, red for a problem, black
-    for a positive note), or a discreet "ok" when the domain is quiet. Domains
-    with problems come first (most severe on top). Capped by the screen bottom so
-    it never writes out of the region; falls back to a "Tout va bien" section if
-    no domain is monitored."""
+    All active alerts share a single "Alertes" section: a bold title with a 1px
+    separator (same look as the other panel titles) over its lines — one per
+    active item (label + unit black, the ▲/▼ arrow + number bold, red for a
+    problem, black for a positive note). Items are listed domain by domain in
+    build_board order (most problems first), problems before positive notes.
+    Capped by the screen bottom so it never writes out of the region; falls back
+    to a "Tout va bien" line when nothing is active."""
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
 
@@ -771,25 +771,23 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
         wrap_atoms([[(w, "regular")] for w in "Tout va bien".split()], BLACK, y)
         return
 
-    y = region_top
+    # Single "Alertes" section: one title + separator, then every active item
+    # flattened across domains (build_board already ordered the rows — most
+    # problems first — and the items within each row by severity).
+    y = section_title("Alertes", region_top)
     for r in rows:
-        if y > max_y:
-            break
-        y = section_title(r["label"], y)
-        # Only domains with active items reach here (quiet ones were dropped by
-        # build_board). A negative alert is written entirely in red, a positive
-        # note all black; figures follow the house rule (bold number, regular
-        # glued unit) via num_atom.
+        # A negative alert is written entirely in red, a positive note all black;
+        # figures follow the house rule (bold number, regular glued unit) via
+        # num_atom.
         for message, figure, money, good in r["items"]:
             if y > max_y:
-                break
+                return
             color = BLACK if good else RED
             atoms = [[(w, "regular")] for w in message.split()]
             if figure:
                 atoms.append(num_atom(figure))
             atoms += [num_atom(w) for w in money.split()]
             y = wrap_atoms(atoms, color, y)
-        y += 5  # gap before the next domain section
 
 
 def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
