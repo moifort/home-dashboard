@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-14
+
+- **`Home`: ESP32 battery autonomy — days since the last charge**: the dashboard now tracks how long the device runs on a charge, with no extra sensor. The firmware reports its boot count and reset reason as query params on the `/display` pull; the server logs each pull into battery cycles (a run on one charge, bounded by power-on events — power restored after a recharge or a flat battery) and shows a `Batt.` line in the `Home` panel (`4j` = days since the last charge). Average and record autonomy, plus the last telemetry, are exposed on `/status`. A new optional variable **`BATTERY_MONITOR`** (default `true`; set `false` to disable) gates it. Caveat: the autonomy is most meaningful over a full discharge cycle (charge → flat → recharge); a proactive top-up while the device is still alive leaves no power-on signal. Data and render goldens re-baselined. **Reflash the firmware** to start sending the telemetry (backward compatible: an un-flashed firmware sends nothing and the tracking simply stays empty).
+
 ## 2026-06-13
 
 - **`Plantes`: cards show how long since the last reading, with a longer moisture trend**: each card's title line now carries a compact "time ago" label (`3h`, `12min`, `2j`) glued to the right of the plant's name, so you can tell at a glance how fresh the reading is (these sensors report only 1-2 times a day). It is computed from the last stored reading's timestamp, so it survives a restart. The moisture sparkline also grew from 7 to 10 days. Render and data goldens re-baselined, preview regenerated; no new environment variable.

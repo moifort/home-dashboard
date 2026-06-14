@@ -80,6 +80,10 @@ services:
       # leave the topic empty to disable this one.
       WATER_TOPIC: watermeter/index_m3
       WATER_PRICE_M3: "0"
+      # ESP32 battery autonomy (the "Batt." line in Home): the firmware reports its
+      # boot count / reset reason on each /display pull and the server bounds each
+      # charge cycle on power-on events. On by default; set "false" to disable.
+      BATTERY_MONITOR: "true"
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/status')" || exit 1
       interval: 30s

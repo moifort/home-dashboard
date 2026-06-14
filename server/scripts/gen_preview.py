@@ -73,6 +73,13 @@ data["home"].setdefault("tariff", [
     {"period": "", "start_text": "17:02", "end_text": "23:32"},
 ])
 
+# No device telemetry in the dev DB; inject a representative battery line so the
+# Home panel shows the "Batt." autonomy row (days since the last charge).
+data["home"].setdefault("battery", {
+    "since_value": "4", "since_unit": "j", "since_text": "4j 6h",
+    "avg_text": "4j 16h", "record_text": "5j 10h", "cycles": 3,
+})
+
 # The dev DB may hold no Linky history (build_core always emits the 9 calendar
 # days, data or not); inject a representative EDF stacked HC/HP week whenever
 # no complete day carries data so the preview shows a full consumption chart.

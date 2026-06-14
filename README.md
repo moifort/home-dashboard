@@ -22,6 +22,7 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 | **Plants** | One card per soil sensor: moisture, temperature, light, the time since its last reading, a 10-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot. |
 | **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients. |
+| **Device battery** | Days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
 | **Alerts**  | Notes flagging a smart alerts, a probable leak, or a disconnect, each with its €/day impact. |
 
 ## Hardware
@@ -147,6 +148,16 @@ UNIFI_SSID_MAIN=your_main_wifi_ssid
 ```
 </details>
 
+<details>
+<summary><b>ESP32 battery autonomy</b></summary>
+
+The `Home` panel shows how long the device has run since its last charge (`Batt. 4j`), with average and record autonomy on `/status`. No extra sensor: the firmware reports its boot count and reset reason on each `/display` pull, and the server bounds each charge cycle on power-on events (power restored after a recharge or a flat battery). On by default; set `BATTERY_MONITOR=false` to disable. The autonomy is most meaningful over a full discharge cycle (charge → flat → recharge); a top-up while the device is still running leaves no power-on signal. Reflash the firmware to start sending the telemetry.
+
+```env
+BATTERY_MONITOR=true                   # set false to disable the Home battery line
+```
+</details>
+
 ### 3. Run the server
 
 **Docker Compose:**
@@ -239,7 +250,7 @@ flowchart TD
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/display` | EPD binary buffer (163,200 bytes), rendered fresh, for the ESP32 |
+| `GET` | `/display` | EPD binary buffer (163,200 bytes), rendered fresh, for the ESP32 (also records the device's battery telemetry from its query params) |
 | `GET` | `/` | Auto-refreshing HTML preview in a browser |
 | `GET` | `/preview.png` | The dashboard rendered as a PNG |
 | `GET` | `/status` | Server status as JSON (last render, day count, per-domain config) |
