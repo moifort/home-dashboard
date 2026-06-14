@@ -573,6 +573,12 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
         (home.get("next_text", ""), "bold", BLACK),
     ]
     row([("Écran", "regular", BLACK)], schedule, y)
+    batt = home.get("battery")
+    if batt:
+        y += line_h
+        # ESP32 autonomy: days since the last charge (number bold, unit regular, glued).
+        row([("Batt.", "regular", BLACK)],
+            [(batt["since_value"], "bold", BLACK), (batt["since_unit"], "regular", BLACK)], y)
     for line in home.get("tariff") or []:
         y += line_h
         rng = [(line["start_text"], "bold", BLACK),

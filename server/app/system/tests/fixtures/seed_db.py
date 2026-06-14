@@ -11,7 +11,7 @@ and `connect()` reads that module global.
 """
 from datetime import date, datetime, timedelta
 
-from app import electricity, plants, solar, water
+from app import battery, electricity, plants, solar, water
 from app.electricity import power
 from app.module import db
 from app.system.config import PARIS_TZ
@@ -234,6 +234,21 @@ def _water_sample_rows():
     return rows
 
 
+def _battery_cycle_rows():
+    """ESP32 battery cycles: three completed runs (feeding the avg / record
+    autonomy stats) plus the current run started ~4 days before FIXED_NOW (so the
+    Home panel shows '4j' since the last charge). started_at/ended_at are tz-aware
+    so they subtract cleanly against the frozen aware 'now'."""
+    def iso(mo, d, h, mi):
+        return datetime(2026, mo, d, h, mi, tzinfo=PARIS_TZ).isoformat()
+    return [
+        (iso(5, 10, 9, 0), iso(5, 14, 22, 0), 55, 55),    # completed: 4j 13h
+        (iso(5, 16, 8, 0), iso(5, 21, 18, 0), 66, 66),    # completed: 5j 10h
+        (iso(5, 23, 10, 0), iso(5, 27, 12, 0), 50, 50),   # completed: 4j 2h
+        (iso(5, 29, 11, 30), iso(6, 2, 12, 30), 49, 49),  # current run (open)
+    ]
+
+
 def seed():
     """Create every schema and insert the deterministic rows. Assumes
     `app.module.db.DB_PATH` already points at the (empty) target file."""
@@ -242,6 +257,7 @@ def seed():
     power.init_schema()
     water.init_schema()
     plants.init_schema()
+    battery.init_schema()
 
     conn = db.connect()
     conn.executemany(
@@ -278,6 +294,11 @@ def seed():
         "(slug, date, moisture, temperature, illuminance, fertility, "
         "battery_state, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         _plant_rows(),
+    )
+    conn.executemany(
+        "INSERT INTO battery_cycles (started_at, ended_at, wakes, last_boot) "
+        "VALUES (?, ?, ?, ?)",
+        _battery_cycle_rows(),
     )
     conn.commit()
     conn.close()

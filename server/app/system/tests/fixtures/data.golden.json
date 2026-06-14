@@ -482,6 +482,14 @@
     }
   ],
   "home": {
+    "battery": {
+      "avg_text": "4j 16h",
+      "cycles": 3,
+      "record_text": "5j 10h",
+      "since_text": "4j 3h",
+      "since_unit": "j",
+      "since_value": "4"
+    },
     "last_text": "14:00",
     "next_text": "16:00",
     "tariff": [

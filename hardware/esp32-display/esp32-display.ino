@@ -70,6 +70,13 @@ static String buildDisplayUrl(const String &serverUrl) {
     String url = serverUrl;
     if (url.endsWith("/")) url += "display";
     else if (!url.endsWith("/display")) url += "/display";
+    // Battery-autonomy telemetry: the server logs these to bound each charge
+    // cycle. bootCount/failCount survive deep sleep and reset only on power loss;
+    // reset_reason 1=POWERON (recharged / first boot → new cycle), 8=DEEPSLEEP
+    // (our timer wake → same cycle), 9=BROWNOUT.
+    url += "?boot=" + String(bootCount)
+         + "&reason=" + String((int)esp_reset_reason())
+         + "&fail=" + String(failCount);
     return url;
 }
 

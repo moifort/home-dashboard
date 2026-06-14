@@ -6,9 +6,22 @@ domain; every optional domain contributes its own fields via attach().
 from datetime import datetime
 
 from app import alerts as alerts_engine
+from app import battery
 from app.system.config import PARIS_TZ
 from app.registry import CORE, OPTIONAL
 from app.system.scheduler import current_screen_refresh, next_screen_refresh, next_screen_wake
+
+
+def _attach_battery(home: dict, now: datetime) -> None:
+    """Add the ESP32 autonomy line ('jours depuis la dernière charge') to the Home
+    panel. Done here — not in battery.attach — because the live pull path rebuilds
+    `home` from scratch, which would otherwise drop an attached key (like the
+    tariff)."""
+    if not battery.enabled():
+        return
+    view = battery.query.home_line(now)
+    if view:
+        home["battery"] = view
 
 
 def _attach_tariff(home: dict) -> None:
@@ -39,6 +52,7 @@ def build_home_live(now: datetime) -> dict:
         "next_text": f"{next_screen_wake(now):%H:%M}",
     }
     _attach_tariff(home)
+    _attach_battery(home, now)
     return home
 
 
@@ -55,6 +69,7 @@ def build_dashboard_data(days: list[dict]) -> dict:
         "next_text": f"{next_screen_refresh(this_refresh):%H:%M}",
     }
     _attach_tariff(data["home"])
+    _attach_battery(data["home"], now)
     for integration in OPTIONAL:
         if integration.enabled():
             integration.attach(data)

@@ -12,6 +12,7 @@ from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from app import dashboard_data as dashboard
 from app.system.config import (
@@ -73,27 +74,41 @@ class DashboardHandler(BaseHTTPRequestHandler):
     timeout = 60
 
     def do_GET(self):
-        if self.path == "/display":
-            self._serve_display()
-        elif self.path in ("/", "/index.html"):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == "/display":
+            self._serve_display(parse_qs(parsed.query))
+        elif path in ("/", "/index.html"):
             self._serve_preview()
-        elif self.path == "/preview.png":
+        elif path == "/preview.png":
             self._serve_preview_png()
-        elif self.path == "/status":
+        elif path == "/status":
             self._serve_status()
-        elif self.path == "/api/data":
+        elif path == "/api/data":
             self._serve_data()
         else:
             self.send_error(404)
 
-    def _serve_display(self):
+    def _serve_display(self, params):
         """GET /display — the EPD buffer, rendered fresh from the current data.
 
         The Home panel's "displayed at" time is the real GET moment and "next
-        refresh" the device's next wake. A build/render failure returns 503; the
-        ESP32 keeps its current image and retries at its next scheduled wake."""
+        refresh" the device's next wake. The ESP32's telemetry query params
+        (boot/reason/fail) are recorded first so the rendered Home reflects this
+        pull. A build/render failure returns 503; the ESP32 keeps its current
+        image and retries at its next scheduled wake."""
+        now = datetime.now(PARIS_TZ)
+        # Generic pull hook: any enabled optional domain exposing record_pull
+        # ingests the device telemetry carried on the /display request.
+        for integration in OPTIONAL:
+            record = getattr(integration, "record_pull", None)
+            if record and integration.enabled():
+                try:
+                    record(params, now)
+                except Exception as e:
+                    logger.warning("record_pull failed for %s: %s", integration.__name__, e)
         try:
-            buf = render_to_buffer(build_fresh(datetime.now(PARIS_TZ)))
+            buf = render_to_buffer(build_fresh(now))
         except Exception as e:
             logger.error("Display render failed: %s", e, exc_info=True)
             self.send_error(503, "Render failed")
