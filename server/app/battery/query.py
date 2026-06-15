@@ -39,6 +39,7 @@ def status() -> dict:
         "battery_enabled": ENABLED,
         "battery_last_report": command.last_report,
         "battery_since": view["since_text"] if view else None,
+        "battery_percent": view["percent"] if view else None,
         "battery_avg": view["avg_text"] if view else None,
         "battery_record": view["record_text"] if view else None,
         "battery_cycles": view["cycles"] if view else 0,

@@ -67,15 +67,24 @@ def build_battery_view(cycles: list[dict], now: datetime) -> dict | None:
         for c in cycles[:-1]
     ]
     avg_text = record_text = None
+    percent = None
     if completed:
         avg = sum(completed, timedelta()) / len(completed)
         avg_text = _duration_text(avg)
-        record_text = _duration_text(max(completed))
+        record_td = max(completed)
+        record_text = _duration_text(record_td)
+        # Estimated charge left: the longest completed run ≈ a full charge, so the
+        # share of it not yet elapsed is the remaining %. Clamp to [0, 100] (a run
+        # outlasting the record reads 0 % — it's living on borrowed time).
+        if record_td.total_seconds() > 0:
+            frac = (record_td - since) / record_td * 100
+            percent = round(max(0.0, min(100.0, frac)))
 
     return {
         "since_value": value,
         "since_unit": unit,
         "since_text": _duration_text(since),
+        "percent": percent,
         "avg_text": avg_text,
         "record_text": record_text,
         "cycles": len(completed),

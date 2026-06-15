@@ -485,6 +485,7 @@
     "battery": {
       "avg_text": "4j 16h",
       "cycles": 3,
+      "percent": 24,
       "record_text": "5j 10h",
       "since_text": "4j 3h",
       "since_unit": "j",

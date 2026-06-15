@@ -576,9 +576,16 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
     batt = home.get("battery")
     if batt:
         y += line_h
-        # ESP32 autonomy: days since the last charge (number bold, unit regular, glued).
-        row([("Batt.", "regular", BLACK)],
-            [(batt["since_value"], "bold", BLACK), (batt["since_unit"], "regular", BLACK)], y)
+        # ESP32 autonomy. Once a full cycle is on record, show the estimated charge
+        # left with the days-since-charge in parens: "25% (4j)" — else days alone.
+        # Number bold, unit regular, glued.
+        days = [(batt["since_value"], "bold", BLACK), (batt["since_unit"], "regular", BLACK)]
+        if batt.get("percent") is not None:
+            batt_segs = [(str(batt["percent"]), "bold", BLACK), ("%", "regular", BLACK),
+                         (" (", "regular", BLACK), *days, (")", "regular", BLACK)]
+        else:
+            batt_segs = days
+        row([("Batt.", "regular", BLACK)], batt_segs, y)
     for line in home.get("tariff") or []:
         y += line_h
         rng = [(line["start_text"], "bold", BLACK),

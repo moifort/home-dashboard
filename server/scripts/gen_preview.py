@@ -76,7 +76,7 @@ data["home"].setdefault("tariff", [
 # No device telemetry in the dev DB; inject a representative battery line so the
 # Home panel shows the "Batt." autonomy row (days since the last charge).
 data["home"].setdefault("battery", {
-    "since_value": "4", "since_unit": "j", "since_text": "4j 6h",
+    "since_value": "4", "since_unit": "j", "since_text": "4j 6h", "percent": 22,
     "avg_text": "4j 16h", "record_text": "5j 10h", "cycles": 3,
 })
 
