@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-15
+
+- **`Home`: battery line now shows an estimated charge %**: building on the autonomy tracking, the `Batt.` line adds an estimated remaining charge derived from the recorded cycle timing — no extra sensor. The longest completed run is taken as a full charge (100%), and the share of it not yet elapsed on the current run is the remaining charge, so the line reads `Batt. 22% (4j)` (% as the main figure, days since charge in parens). The estimate sharpens as more cycles accumulate; until at least one full cycle is on record it falls back to days alone (`Batt. 4j`). A run outlasting the record reads `0%` (living on borrowed time). Also exposed as `battery_percent` on `/status`. Data and render goldens re-baselined, preview regenerated; no new environment variable.
+
 ## 2026-06-14
 
 - **`Alertes`: all alerts under a single section header**: the left-gutter status board used to give every active domain (`EDF`, `Eau`, `Solaire`, `Crypto`…) its own bold title and 1px separator, so a few alerts across domains burned a lot of vertical space in section headers alone. The active items are now listed under one `Alertes` (Alerts) header, in the same order (most problems first, problems in red before positive notes in black) — the per-domain titles are gone, freeing room to show more lines. The messages already name what they flag, so no domain label is needed. Render golden re-baselined, preview regenerated; no new environment variable.

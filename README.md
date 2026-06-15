@@ -22,7 +22,7 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 | **Plants** | One card per soil sensor: moisture, temperature, light, the time since its last reading, a 10-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot. |
 | **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients. |
-| **Device battery** | Days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
+| **Device battery** | Estimated charge % and days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
 | **Alerts**  | Notes flagging a smart alerts, a probable leak, or a disconnect, each with its €/day impact. |
 
 ## Hardware
@@ -151,7 +151,7 @@ UNIFI_SSID_MAIN=your_main_wifi_ssid
 <details>
 <summary><b>ESP32 battery autonomy</b></summary>
 
-The `Home` panel shows how long the device has run since its last charge (`Batt. 4j`), with average and record autonomy on `/status`. No extra sensor: the firmware reports its boot count and reset reason on each `/display` pull, and the server bounds each charge cycle on power-on events (power restored after a recharge or a flat battery). On by default; set `BATTERY_MONITOR=false` to disable. The autonomy is most meaningful over a full discharge cycle (charge → flat → recharge); a top-up while the device is still running leaves no power-on signal. Reflash the firmware to start sending the telemetry.
+The `Home` panel shows an estimated remaining charge with the days since the last charge in parens (`Batt. 22% (4j)`), with average and record autonomy on `/status`. No extra sensor: the firmware reports its boot count and reset reason on each `/display` pull, and the server bounds each charge cycle on power-on events (power restored after a recharge or a flat battery). The % is derived from the cycle timing — the longest completed run is taken as a full charge, and the share of it not yet elapsed on the current run is the charge left — so it sharpens as more cycles accumulate; until a full cycle is on record the line shows days alone (`Batt. 4j`). On by default; set `BATTERY_MONITOR=false` to disable. The autonomy is most meaningful over a full discharge cycle (charge → flat → recharge); a top-up while the device is still running leaves no power-on signal. Reflash the firmware to start sending the telemetry.
 
 ```env
 BATTERY_MONITOR=true                   # set false to disable the Home battery line
