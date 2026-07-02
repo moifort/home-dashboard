@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 PERSIST_INTERVAL = 30   # seconds between daily_consumption writes (mirrors power)
 SLOT_MIN = 30           # tic_samples granularity — one row per 30-min slot
 MAX_INDEX_STEP_KWH = 15  # a single TIC step above this is implausible → re-baseline
+MAX_CATCHUP_KW = 12      # scales the cap with the gap: a delta after an MQTT
+                         # outage is legitimate up to elapsed_h × the subscribed
+                         # power, so a same-day catch-up is no longer discarded
 
 # Runtime state surfaced by query.status().
 last_message_time = ""
@@ -31,7 +34,8 @@ last_hphp = None
 # Integration state — only the single linky-mqtt thread writes it, no lock.
 # base_* = the last seen index (each frame's delta is added then re-baselined).
 _state = {"date": None, "hc_kwh": 0.0, "hp_kwh": 0.0,
-          "base_hchc": None, "base_hphp": None, "last_persist": 0.0}
+          "base_hchc": None, "base_hphp": None, "last_persist": 0.0,
+          "last_frame": None}
 # Current 30-min slot accumulator for tic_samples (mean PAPP of the slot).
 _slot = {"start": None, "papp_sum": 0.0, "papp_n": 0}
 # Last PTEC period seen ("HC"/"HP") — read by the power sub-domain threads and by
@@ -128,16 +132,25 @@ def _on_tic(reading: dict, now: datetime | None = None):
 
     # Index deltas → today's kWh. First frame just baselines. A negative delta
     # (meter/index reset) or an implausible jump is dropped and re-baselined.
+    # The plausibility cap grows with the gap since the previous frame: after a
+    # same-day MQTT outage the first frame carries the whole outage's energy,
+    # which is legitimate up to elapsed × MAX_CATCHUP_KW.
     if _state["base_hchc"] is not None:
+        cap = MAX_INDEX_STEP_KWH
+        if _state["last_frame"] is not None:
+            elapsed_h = (now - _state["last_frame"]).total_seconds() / 3600
+            cap = max(MAX_INDEX_STEP_KWH, elapsed_h * MAX_CATCHUP_KW)
         d_hc = hchc - _state["base_hchc"]
         d_hp = hphp - _state["base_hphp"]
-        if d_hc < 0 or d_hp < 0 or d_hc > MAX_INDEX_STEP_KWH or d_hp > MAX_INDEX_STEP_KWH:
-            logger.warning("Implausible index delta (hc=%.3f hp=%.3f kWh), re-baselining", d_hc, d_hp)
+        if d_hc < 0 or d_hp < 0 or d_hc > cap or d_hp > cap:
+            logger.warning("Implausible index delta (hc=%.3f hp=%.3f kWh, cap=%.1f), re-baselining",
+                           d_hc, d_hp, cap)
         else:
             _state["hc_kwh"] += d_hc
             _state["hp_kwh"] += d_hp
     _state["base_hchc"] = hchc
     _state["base_hphp"] = hphp
+    _state["last_frame"] = now
 
     if papp is not None:
         _slot["papp_sum"] += papp

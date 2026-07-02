@@ -87,7 +87,7 @@ def tic_db(tmp_path, monkeypatch):
     repository.init_schema()
     monkeypatch.setattr(command, "_state", {"date": None, "hc_kwh": 0.0, "hp_kwh": 0.0,
                                             "base_hchc": None, "base_hphp": None,
-                                            "last_persist": 0.0})
+                                            "last_persist": 0.0, "last_frame": None})
     monkeypatch.setattr(command, "_slot", {"start": None, "papp_sum": 0.0, "papp_n": 0})
     monkeypatch.setattr(command, "_period", None)
     monkeypatch.setattr(command, "_tariff_windows", {"HC": [], "HP": []})
@@ -130,6 +130,21 @@ def test_negative_delta_rebaselines_without_adding(tic_db):
 def test_absurd_jump_rebaselines_without_adding(tic_db):
     command._on_tic(_reading(100.0, 50.0), now=_now(5, 12, 0))
     command._on_tic(_reading(100.0 + command.MAX_INDEX_STEP_KWH + 1, 50.0), now=_now(5, 12, 1))
+    assert command._state["hc_kwh"] == 0.0
+
+
+def test_catchup_after_outage_is_accepted(tic_db):
+    # 3h MQTT outage at high load: the 20 kWh catch-up delta stays under the
+    # elapsed-scaled cap (3h × 12 kW = 36 kWh) and must be counted.
+    command._on_tic(_reading(100.0, 50.0), now=_now(5, 9, 0))
+    command._on_tic(_reading(120.0, 50.0), now=_now(5, 12, 0))
+    assert command._state["hc_kwh"] == pytest.approx(20.0)
+
+
+def test_absurd_jump_after_short_gap_still_rejected(tic_db):
+    # 16 kWh in one minute is physically impossible → still re-baselined.
+    command._on_tic(_reading(100.0, 50.0), now=_now(5, 12, 0))
+    command._on_tic(_reading(116.0, 50.0), now=_now(5, 12, 1))
     assert command._state["hc_kwh"] == 0.0
 
 
