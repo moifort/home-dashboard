@@ -184,11 +184,15 @@ def current_tariff() -> dict | None:
     at least one window has completed (then reloaded on every later restart); a
     period's list stays empty until one of its own windows has completed (each
     period is independent). No freshness check — an observed window stays listed
-    until trimmed out by newer ones of that period."""
-    if not _tariff_windows["HC"] and not _tariff_windows["HP"]:
+    until trimmed out by newer ones of that period.
+
+    Snapshots the window lists: the linky-mqtt thread appends to them live, and
+    handing out the live objects would let the HTTP render thread iterate a list
+    mid-mutation."""
+    hc, hp = list(_tariff_windows["HC"]), list(_tariff_windows["HP"])
+    if not hc and not hp:
         return None
-    return {"period": _tariff_period,
-            "hc": _tariff_windows["HC"], "hp": _tariff_windows["HP"]}
+    return {"period": _tariff_period, "hc": hc, "hp": hp}
 
 
 def start():
