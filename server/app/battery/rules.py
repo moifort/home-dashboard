@@ -13,6 +13,13 @@ from datetime import datetime, timedelta
 # restarted — the start of a fresh battery cycle.
 DEEPSLEEP_REASON = 8
 
+# A completed cycle shorter than this is a spurious boundary, not a real
+# charge-to-empty run: a USB power blip or a re-flash also reports POWERON and
+# opens a "cycle" minutes or hours long. Letting those into the stats drags the
+# average down and can crown a bogus record — the 100 % reference of the charge
+# estimate. Real runs last several days.
+MIN_CYCLE = timedelta(days=2)
+
 
 def is_power_on(reason: int | None, boot: int | None, last_boot: int | None) -> bool:
     """Whether this pull starts a new battery cycle.
@@ -63,8 +70,11 @@ def build_battery_view(cycles: list[dict], now: datetime) -> dict | None:
     value, unit = _single_unit(since)
 
     completed = [
-        datetime.fromisoformat(c["ended_at"]) - datetime.fromisoformat(c["started_at"])
-        for c in cycles[:-1]
+        td for td in (
+            datetime.fromisoformat(c["ended_at"]) - datetime.fromisoformat(c["started_at"])
+            for c in cycles[:-1]
+        )
+        if td >= MIN_CYCLE
     ]
     avg_text = record_text = None
     percent = None
