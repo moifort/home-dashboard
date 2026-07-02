@@ -7,23 +7,21 @@ pulls in the cycle, `last_boot` keeps the firmware's RTC bootCount of the most
 recent pull (so a reset-to-1 boot can be detected as a new cycle even if the reset
 reason is missing). No backfill: history starts at the first reporting firmware.
 """
-from app.module.db import connect
+from app.module.db import transaction
 
 
 def init_schema():
     """Create the battery_cycles table (idempotent)."""
-    conn = connect()
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS battery_cycles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            started_at TEXT NOT NULL,
-            ended_at TEXT NOT NULL,
-            wakes INTEGER NOT NULL,
-            last_boot INTEGER
-        )"""
-    )
-    conn.commit()
-    conn.close()
+    with transaction() as conn:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS battery_cycles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at TEXT NOT NULL,
+                ended_at TEXT NOT NULL,
+                wakes INTEGER NOT NULL,
+                last_boot INTEGER
+            )"""
+        )
 
 
 def _row(r) -> dict:
@@ -33,47 +31,40 @@ def _row(r) -> dict:
 
 def get_last_cycle() -> dict | None:
     """The current (most recent) cycle, or None if none recorded yet."""
-    conn = connect()
-    cur = conn.execute(
-        "SELECT id, started_at, ended_at, wakes, last_boot FROM battery_cycles "
-        "ORDER BY id DESC LIMIT 1"
-    )
-    row = cur.fetchone()
-    conn.close()
-    return _row(row) if row else None
+    with transaction() as conn:
+        cur = conn.execute(
+            "SELECT id, started_at, ended_at, wakes, last_boot FROM battery_cycles "
+            "ORDER BY id DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+        return _row(row) if row else None
 
 
 def get_cycles() -> list[dict]:
     """Every cycle, oldest first. The last one is the current (open) cycle; the
     rest are completed runs whose ended_at marks where that charge ran out."""
-    conn = connect()
-    cur = conn.execute(
-        "SELECT id, started_at, ended_at, wakes, last_boot FROM battery_cycles "
-        "ORDER BY id"
-    )
-    rows = [_row(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
+    with transaction() as conn:
+        cur = conn.execute(
+            "SELECT id, started_at, ended_at, wakes, last_boot FROM battery_cycles "
+            "ORDER BY id"
+        )
+        return [_row(r) for r in cur.fetchall()]
 
 
 def insert_cycle(started_at: str, boot: int | None):
     """Open a new cycle (a power-on): ended_at starts equal to started_at."""
-    conn = connect()
-    conn.execute(
-        "INSERT INTO battery_cycles (started_at, ended_at, wakes, last_boot) "
-        "VALUES (?, ?, 1, ?)",
-        (started_at, started_at, boot),
-    )
-    conn.commit()
-    conn.close()
+    with transaction() as conn:
+        conn.execute(
+            "INSERT INTO battery_cycles (started_at, ended_at, wakes, last_boot) "
+            "VALUES (?, ?, 1, ?)",
+            (started_at, started_at, boot),
+        )
 
 
 def update_cycle(cycle_id: int, ended_at: str, wakes: int, boot: int | None):
     """Extend the current cycle with a new pull (deep-sleep wake)."""
-    conn = connect()
-    conn.execute(
-        "UPDATE battery_cycles SET ended_at = ?, wakes = ?, last_boot = ? WHERE id = ?",
-        (ended_at, wakes, boot, cycle_id),
-    )
-    conn.commit()
-    conn.close()
+    with transaction() as conn:
+        conn.execute(
+            "UPDATE battery_cycles SET ended_at = ?, wakes = ?, last_boot = ? WHERE id = ?",
+            (ended_at, wakes, boot, cycle_id),
+        )

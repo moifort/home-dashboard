@@ -6,6 +6,7 @@ shared `connect()` so every repository talks to the same configured DB.
 """
 import os
 import sqlite3
+from contextlib import contextmanager
 
 from app.system.config import DB_PATH
 
@@ -23,3 +24,17 @@ def connect() -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
     return conn
+
+
+@contextmanager
+def transaction():
+    """Scoped connection for repository calls: commit on success, always close.
+
+    Replaces the connect/commit/close boilerplate every repository repeated;
+    committing on read-only paths is a no-op."""
+    conn = connect()
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()

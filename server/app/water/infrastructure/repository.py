@@ -7,65 +7,57 @@ litre profiles.
 """
 from datetime import datetime, timedelta
 
-from app.module.db import connect
+from app.module.db import transaction
 from app.system.config import PARIS_TZ
 
 
 def init_schema():
     """Create the daily_water + water_samples tables (idempotent)."""
-    conn = connect()
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS daily_water (
-            date TEXT PRIMARY KEY,
-            index_m3 REAL NOT NULL,
-            fetched_at TEXT NOT NULL
-        )"""
-    )
-    # One row per 30-min slot: the slot's last cumulative index (m³) — litres
-    # per slot are derived as index diffs at read time. Unlimited retention —
-    # feeds the mini intraday graph under each Eau bar.
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS water_samples (
-            ts TEXT PRIMARY KEY,
-            index_m3 REAL NOT NULL
-        )"""
-    )
-    conn.commit()
-    conn.close()
+    with transaction() as conn:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS daily_water (
+                date TEXT PRIMARY KEY,
+                index_m3 REAL NOT NULL,
+                fetched_at TEXT NOT NULL
+            )"""
+        )
+        # One row per 30-min slot: the slot's last cumulative index (m³) — litres
+        # per slot are derived as index diffs at read time. Unlimited retention —
+        # feeds the mini intraday graph under each Eau bar.
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS water_samples (
+                ts TEXT PRIMARY KEY,
+                index_m3 REAL NOT NULL
+            )"""
+        )
 
 
 def get_cached_water(start: str, end: str) -> list[dict]:
-    conn = connect()
-    cur = conn.execute(
-        "SELECT date, index_m3 FROM daily_water WHERE date >= ? AND date < ? ORDER BY date",
-        (start, end),
-    )
-    rows = [{"date": r[0], "index_m3": r[1]} for r in cur.fetchall()]
-    conn.close()
-    return rows
+    with transaction() as conn:
+        cur = conn.execute(
+            "SELECT date, index_m3 FROM daily_water WHERE date >= ? AND date < ? ORDER BY date",
+            (start, end),
+        )
+        return [{"date": r[0], "index_m3": r[1]} for r in cur.fetchall()]
 
 
 def upsert_water(date: str, index_m3: float):
     now = datetime.now(PARIS_TZ).isoformat()
-    conn = connect()
-    conn.execute(
-        "INSERT OR REPLACE INTO daily_water (date, index_m3, fetched_at) VALUES (?, ?, ?)",
-        (date, index_m3, now),
-    )
-    conn.commit()
-    conn.close()
+    with transaction() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO daily_water (date, index_m3, fetched_at) VALUES (?, ?, ?)",
+            (date, index_m3, now),
+        )
 
 
 def insert_water_sample(ts: str, index_m3: float):
     """Persist the slot's latest cumulative index (ts = 30-min slot start, ISO
     local). INSERT OR REPLACE keeps the last reading of the slot."""
-    conn = connect()
-    conn.execute(
-        "INSERT OR REPLACE INTO water_samples (ts, index_m3) VALUES (?, ?)",
-        (ts, index_m3),
-    )
-    conn.commit()
-    conn.close()
+    with transaction() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO water_samples (ts, index_m3) VALUES (?, ?)",
+            (ts, index_m3),
+        )
 
 
 def get_water_litre_profiles(start: str, end: str) -> dict[str, list]:
@@ -81,20 +73,19 @@ def get_water_litre_profiles(start: str, end: str) -> dict[str, list]:
     litres but still re-baselines.
     """
     baseline_start = (datetime.fromisoformat(start) - timedelta(days=1)).strftime("%Y-%m-%d")
-    conn = connect()
-    cur = conn.execute(
-        "SELECT ts, index_m3 FROM water_samples WHERE ts >= ? AND ts < ? ORDER BY ts",
-        (baseline_start, end),
-    )
-    profiles: dict[str, list] = {}
-    prev_index = None
-    for ts, index_m3 in cur.fetchall():
-        if prev_index is not None and ts[:10] >= start:
-            delta = index_m3 - prev_index
-            if delta >= 0:
-                dt = datetime.fromisoformat(ts)
-                slot = dt.hour * 2 + (1 if dt.minute >= 30 else 0)
-                profiles.setdefault(ts[:10], [None] * 48)[slot] = round(delta * 1000, 1)
-        prev_index = index_m3
-    conn.close()
-    return profiles
+    with transaction() as conn:
+        cur = conn.execute(
+            "SELECT ts, index_m3 FROM water_samples WHERE ts >= ? AND ts < ? ORDER BY ts",
+            (baseline_start, end),
+        )
+        profiles: dict[str, list] = {}
+        prev_index = None
+        for ts, index_m3 in cur.fetchall():
+            if prev_index is not None and ts[:10] >= start:
+                delta = index_m3 - prev_index
+                if delta >= 0:
+                    dt = datetime.fromisoformat(ts)
+                    slot = dt.hour * 2 + (1 if dt.minute >= 30 else 0)
+                    profiles.setdefault(ts[:10], [None] * 48)[slot] = round(delta * 1000, 1)
+            prev_index = index_m3
+        return profiles
