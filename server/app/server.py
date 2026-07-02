@@ -101,12 +101,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # Generic pull hook: any enabled optional domain exposing record_pull
         # ingests the device telemetry carried on the /display request.
         for integration in OPTIONAL:
-            record = getattr(integration, "record_pull", None)
-            if record and integration.enabled():
-                try:
+            try:
+                record = getattr(integration, "record_pull", None)
+                if record and integration.enabled():
                     record(params, now)
-                except Exception as e:
-                    logger.warning("record_pull failed for %s: %s", integration.__name__, e)
+            except Exception as e:
+                logger.warning("record_pull failed for %s: %s", integration.__name__, e)
         try:
             buf = render_to_buffer(build_fresh(now))
         except Exception as e:
