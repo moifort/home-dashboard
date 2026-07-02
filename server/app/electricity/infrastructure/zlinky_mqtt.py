@@ -8,11 +8,8 @@ pricing period, "HC.."/"HP..").
 """
 import json
 import logging
-import threading
 
-import paho.mqtt.client as mqtt
-
-from app.module.mqtt import pump
+from app.module.mqtt import MqttListener
 
 logger = logging.getLogger(__name__)
 
@@ -76,60 +73,15 @@ def _parse_tic(payload: bytes) -> dict | None:
     }
 
 
-class ZLinkyMqttListener:
+class ZLinkyMqttListener(MqttListener):
     """Background thread reading the Linky teleinfo from an MQTT topic.
 
     Calls on_tic(reading) for each parsed frame. Reconnects automatically.
     """
 
     def __init__(self, host, port, topic, username, password, on_tic):
-        self._host = host
-        self._port = port
-        self._topic = topic
-        self._username = username
-        self._password = password
-        self._on_tic = on_tic
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
+        super().__init__(host, port, topic, username, password, on_tic,
+                         label="Linky", thread_name="linky-mqtt")
 
-    def start(self):
-        self._thread = threading.Thread(target=self._run, name="linky-mqtt", daemon=True)
-        self._thread.start()
-
-    def _run(self):
-        while not self._stop.is_set():
-            try:
-                self._connect_and_listen()
-            except Exception as exc:
-                logger.warning("Linky MQTT session ended (%s), retrying in 60s", exc)
-                self._stop.wait(60)
-
-    def _connect_and_listen(self):
-        client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        if self._username:
-            client.username_pw_set(self._username, self._password)
-
-        def on_connect(c, userdata, flags, reason_code, properties):
-            if reason_code != 0:
-                logger.error("Linky MQTT connect failed: %s", reason_code)
-                return
-            c.subscribe(self._topic, qos=0)
-            logger.info("Linky MQTT connected, subscribed to %s", self._topic)
-
-        def on_message(c, userdata, msg):
-            reading = _parse_tic(msg.payload)
-            if reading is not None:
-                try:
-                    self._on_tic(reading)
-                except Exception:
-                    logger.exception("on_tic callback failed")
-
-        client.on_connect = on_connect
-        client.on_message = on_message
-        client.connect(self._host, self._port, keepalive=30)
-        pump(client, self._stop)
-
-    def stop(self):
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=5)
+    def _parse(self, payload: bytes):
+        return _parse_tic(payload)

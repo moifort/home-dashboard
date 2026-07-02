@@ -7,11 +7,8 @@ avoid waking them. The domain owns turning a reading into a stored daily row.
 """
 import json
 import logging
-import threading
 
-import paho.mqtt.client as mqtt
-
-from app.module.mqtt import pump
+from app.module.mqtt import MqttListener
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +45,7 @@ def _parse_reading(payload: bytes) -> dict:
     return reading
 
 
-class PlantsMqttListener:
+class PlantsMqttListener(MqttListener):
     """Background thread reading soil metrics from a Zigbee2MQTT device topic.
 
     Calls on_reading({metric: value, ...}) on each message carrying at least one
@@ -56,58 +53,9 @@ class PlantsMqttListener:
     """
 
     def __init__(self, slug, host, port, topic, username, password, on_reading):
-        self._slug = slug
-        self._host = host
-        self._port = port
-        self._topic = topic
-        self._username = username
-        self._password = password
-        self._on_reading = on_reading
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
+        super().__init__(host, port, topic, username, password, on_reading,
+                         label=f"Plant ({slug})", thread_name=f"plant-{slug}-mqtt")
 
-    def start(self):
-        self._thread = threading.Thread(
-            target=self._run, name=f"plant-{self._slug}-mqtt", daemon=True
-        )
-        self._thread.start()
-
-    def _run(self):
-        while not self._stop.is_set():
-            try:
-                self._connect_and_listen()
-            except Exception as exc:
-                logger.warning(
-                    "Plant MQTT session (%s) ended (%s), retrying in 60s", self._slug, exc
-                )
-                self._stop.wait(60)
-
-    def _connect_and_listen(self):
-        client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        if self._username:
-            client.username_pw_set(self._username, self._password)
-
-        def on_connect(c, userdata, flags, reason_code, properties):
-            if reason_code != 0:
-                logger.error("Plant MQTT connect failed (%s): %s", self._slug, reason_code)
-                return
-            c.subscribe(self._topic, qos=0)
-            logger.info("Plant MQTT connected (%s), subscribed to %s", self._slug, self._topic)
-
-        def on_message(c, userdata, msg):
-            reading = _parse_reading(msg.payload)
-            if reading:
-                try:
-                    self._on_reading(reading)
-                except Exception:
-                    logger.exception("on_reading callback failed (%s)", self._slug)
-
-        client.on_connect = on_connect
-        client.on_message = on_message
-        client.connect(self._host, self._port, keepalive=30)
-        pump(client, self._stop)
-
-    def stop(self):
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=5)
+    def _parse(self, payload: bytes):
+        # An empty reading (no known metric) is skipped, same as unparseable.
+        return _parse_reading(payload) or None

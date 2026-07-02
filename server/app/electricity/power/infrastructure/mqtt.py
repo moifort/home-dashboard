@@ -6,12 +6,9 @@ sensor (its topic); the integration owns the power -> energy accumulation.
 """
 import json
 import logging
-import threading
 import time
 
-import paho.mqtt.client as mqtt
-
-from app.module.mqtt import pump
+from app.module.mqtt import MqttListener
 
 logger = logging.getLogger(__name__)
 
@@ -32,76 +29,30 @@ def _parse_power(payload: bytes) -> float | None:
     return None
 
 
-class PowerMqttListener:
+class PowerMqttListener(MqttListener):
     """Background thread reading `power` from a Zigbee2MQTT device topic.
 
     Calls on_power(watts) on each reported value. Reconnects automatically.
+    Requests `power` at subscribe time then every GET_INTERVAL so integration
+    keeps getting samples during long, steady loads.
     """
 
     def __init__(self, slug, host, port, topic, username, password, on_power):
-        self._slug = slug
-        self._host = host
-        self._port = port
-        self._topic = topic
-        self._username = username
-        self._password = password
-        self._on_power = on_power
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
+        super().__init__(host, port, topic, username, password, on_power,
+                         label=f"Power ({slug})", thread_name=f"power-{slug}-mqtt")
+        self._get_topic = f"{topic}/get"
+        self._last_poll = 0.0
 
-    def start(self):
-        self._thread = threading.Thread(
-            target=self._run, name=f"power-{self._slug}-mqtt", daemon=True
-        )
-        self._thread.start()
+    def _parse(self, payload: bytes):
+        return _parse_power(payload)
 
-    def _run(self):
-        while not self._stop.is_set():
-            try:
-                self._connect_and_listen()
-            except Exception as exc:
-                logger.warning(
-                    "Power MQTT session (%s) ended (%s), retrying in 60s", self._slug, exc
-                )
-                self._stop.wait(60)
+    def _request_power(self, client):
+        client.publish(self._get_topic, json.dumps({"power": ""}), qos=0)
+        self._last_poll = time.monotonic()
 
-    def _connect_and_listen(self):
-        client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        if self._username:
-            client.username_pw_set(self._username, self._password)
-        get_topic = f"{self._topic}/get"
+    def _on_subscribed(self, client):
+        self._request_power(client)
 
-        def on_connect(c, userdata, flags, reason_code, properties):
-            if reason_code != 0:
-                logger.error("Power MQTT connect failed (%s): %s", self._slug, reason_code)
-                return
-            c.subscribe(self._topic, qos=0)
-            c.publish(get_topic, json.dumps({"power": ""}), qos=0)
-            logger.info("Power MQTT connected (%s), subscribed to %s", self._slug, self._topic)
-
-        def on_message(c, userdata, msg):
-            watts = _parse_power(msg.payload)
-            if watts is not None:
-                try:
-                    self._on_power(watts)
-                except Exception:
-                    logger.exception("on_power callback failed (%s)", self._slug)
-
-        client.on_connect = on_connect
-        client.on_message = on_message
-        client.connect(self._host, self._port, keepalive=30)
-
-        last_poll = time.monotonic()
-
-        def repoll():
-            nonlocal last_poll
-            if time.monotonic() - last_poll >= GET_INTERVAL:
-                client.publish(get_topic, json.dumps({"power": ""}), qos=0)
-                last_poll = time.monotonic()
-
-        pump(client, self._stop, tick=repoll)
-
-    def stop(self):
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=5)
+    def _tick(self, client):
+        if time.monotonic() - self._last_poll >= GET_INTERVAL:
+            self._request_power(client)
