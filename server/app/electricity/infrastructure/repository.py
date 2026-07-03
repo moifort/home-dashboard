@@ -7,6 +7,7 @@ render path and the 30-min TIC samples written by the ZLinky integrator.
 from datetime import datetime
 
 from app.module.db import transaction
+from app.module.slots import SLOTS_PER_DAY, slot_index
 from app.system.config import PARIS_TZ
 
 from app.electricity.infrastructure.linky_client import (
@@ -113,8 +114,7 @@ def get_papp_profiles(start: str, end: str) -> dict[str, list]:
         profiles: dict[str, list] = {}
         for ts, papp in cur.fetchall():
             dt = datetime.fromisoformat(ts)
-            slot = dt.hour * 2 + (1 if dt.minute >= 30 else 0)
-            profiles.setdefault(ts[:10], [None] * 48)[slot] = papp
+            profiles.setdefault(ts[:10], [None] * SLOTS_PER_DAY)[slot_index(dt)] = papp
         return profiles
 
 

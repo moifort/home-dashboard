@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
+from app.module.slots import slot_start
 from app.water.infrastructure import repository
 from app.water.infrastructure.mqtt import WaterMqttListener
 
@@ -12,18 +13,9 @@ logger = logging.getLogger(__name__)
 last_report = ""
 
 
-SLOT_MIN = 30  # water_samples slot width (minutes)
-
-
 def init_schema():
     """Create the daily_water + water_samples tables (idempotent)."""
     repository.init_schema()
-
-
-def _slot_start(now: datetime) -> str:
-    """The ISO start of `now`'s 30-min slot (local time)."""
-    return now.replace(minute=now.minute - now.minute % SLOT_MIN,
-                       second=0, microsecond=0).isoformat()
 
 
 def _on_water_index(m3: float, now: datetime | None = None):
@@ -34,7 +26,7 @@ def _on_water_index(m3: float, now: datetime | None = None):
     global last_report
     now = now or datetime.now(PARIS_TZ)
     repository.upsert_water(now.strftime("%Y-%m-%d"), m3)
-    repository.insert_water_sample(_slot_start(now), m3)
+    repository.insert_water_sample(slot_start(now), m3)
     last_report = now.isoformat()
 
 

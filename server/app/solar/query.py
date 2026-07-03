@@ -30,8 +30,8 @@ def status() -> dict:
     return {
         "ecoflow_enabled": ENABLED,
         "last_solar_report": command.last_solar_report,
-        "solar_wh_today": round(command._solar_state["wh"], 2),
-        "solar_state_date": command._solar_state["date"],
+        "solar_wh_today": round(command._integrator.wh, 2),
+        "solar_state_date": command._integrator.date,
         "solar_last_pv_watts": command.last_pv_watts,
         "solar_samples": command.sample_count,
     }

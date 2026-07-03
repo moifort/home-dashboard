@@ -6,6 +6,7 @@ command side integrates the heartbeat power into daily Wh and persists it here.
 from datetime import datetime
 
 from app.module.db import transaction
+from app.module.slots import SLOTS_PER_DAY, slot_index
 from app.system.config import PARIS_TZ
 
 
@@ -70,6 +71,5 @@ def get_pv_profiles(start: str, end: str) -> dict[str, list]:
         profiles: dict[str, list] = {}
         for ts, pv_w in cur.fetchall():
             dt = datetime.fromisoformat(ts)
-            slot = dt.hour * 2 + (1 if dt.minute >= 30 else 0)
-            profiles.setdefault(ts[:10], [None] * 48)[slot] = pv_w
+            profiles.setdefault(ts[:10], [None] * SLOTS_PER_DAY)[slot_index(dt)] = pv_w
         return profiles

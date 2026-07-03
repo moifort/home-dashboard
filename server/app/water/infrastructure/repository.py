@@ -8,6 +8,7 @@ litre profiles.
 from datetime import datetime, timedelta
 
 from app.module.db import transaction
+from app.module.slots import SLOTS_PER_DAY, slot_index
 from app.system.config import PARIS_TZ
 
 
@@ -85,7 +86,6 @@ def get_water_litre_profiles(start: str, end: str) -> dict[str, list]:
                 delta = index_m3 - prev_index
                 if delta >= 0:
                     dt = datetime.fromisoformat(ts)
-                    slot = dt.hour * 2 + (1 if dt.minute >= 30 else 0)
-                    profiles.setdefault(ts[:10], [None] * 48)[slot] = round(delta * 1000, 1)
+                    profiles.setdefault(ts[:10], [None] * SLOTS_PER_DAY)[slot_index(dt)] = round(delta * 1000, 1)
             prev_index = index_m3
         return profiles

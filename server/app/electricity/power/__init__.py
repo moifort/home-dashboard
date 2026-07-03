@@ -18,13 +18,13 @@ members of a multi-topic group get a per-topic suffix so they never collide.
 """
 import logging
 import os
-import time
 import unicodedata
 from collections import Counter, namedtuple
 from datetime import datetime, timedelta
 
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
 from app.module.format import format_energy_kwh
+from app.module.integrator import DailyEnergyIntegrator
 from app.electricity import is_off_peak
 from app.electricity.power.infrastructure import repository
 from app.electricity.power.infrastructure.mqtt import PowerMqttListener
@@ -32,9 +32,6 @@ from app.electricity.power.infrastructure.mqtt import PowerMqttListener
 logger = logging.getLogger(__name__)
 
 Sensor = namedtuple("Sensor", "slug topic name")
-
-MAX_SAMPLE_GAP_H = 5 / 60  # cap a sample's time weight at 5 min to avoid overcounting silence
-PERSIST_INTERVAL = 30  # seconds between SQLite writes
 
 
 def _slugify(name: str) -> str:
@@ -103,8 +100,12 @@ SENSORS = _parse_sensors(POWER_SENSORS)
 ENABLED = bool(MQTT_HOST) and bool(SENSORS)
 
 # Per-sensor integration state (power -> daily kWh). Only each sensor's MQTT
-# listener thread touches its own entry, so no lock is needed.
-_states: dict = {}
+# listener thread touches its own entries, so no lock is needed. _hc_wh is the
+# off-peak split the shared integrator doesn't know about: its persists can lag
+# the split by at most the current sample (caught up 30s later; the day-end
+# flush is exact because the last sample's split lands before the rollover).
+_integrators: dict = {}
+_hc_wh: dict = {}
 _last_report: dict = {}
 
 
@@ -120,39 +121,25 @@ def init_schema():
 def _make_on_power(slug: str):
     """Build the MQTT callback that integrates one sensor's power into daily kWh."""
 
+    def _flush(date: str, wh: float):
+        repository.upsert_power(slug, date, wh, _hc_wh.get(slug, 0.0))
+
+    def _reload(date: str) -> float:
+        tomorrow = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        existing = repository.get_cached_power(slug, date, tomorrow)
+        hc = existing[0]["hc_kwh"] if existing else None
+        _hc_wh[slug] = hc * 1000 if hc is not None else 0.0
+        return existing[0]["cons_kwh"] * 1000 if existing else 0.0
+
+    integrator = _integrators[slug] = DailyEnergyIntegrator(_flush, _reload)
+
     def _on_power(watts: float):
         now = datetime.now(PARIS_TZ)
-        today = now.strftime("%Y-%m-%d")
-        st = _states.setdefault(slug, {"date": None, "wh": 0.0, "hc_wh": 0.0,
-                                       "last_ts": None, "last_persist": 0.0})
-
-        if st["date"] != today:
-            if st["date"] is not None:
-                repository.upsert_power(slug, st["date"], st["wh"], st["hc_wh"])  # flush the finished day
-            tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-            existing = repository.get_cached_power(slug, today, tomorrow)
-            st["date"] = today
-            st["wh"] = existing[0]["cons_kwh"] * 1000 if existing else 0.0
-            hc = existing[0]["hc_kwh"] if existing else None
-            st["hc_wh"] = hc * 1000 if hc is not None else 0.0
-            st["last_ts"] = None
-            st["last_persist"] = 0.0
-
-        if st["last_ts"] is not None:
-            dt_h = (now - st["last_ts"]).total_seconds() / 3600
-            if dt_h > 0:
-                inc = watts * min(dt_h, MAX_SAMPLE_GAP_H)
-                st["wh"] += inc
-                # Off-peak as the meter sees it (the ZLinky's live PTEC): the
-                # whole interval is attributed to `now` (as the day already is).
-                if is_off_peak():
-                    st["hc_wh"] += inc
-        st["last_ts"] = now
-
-        mono = time.monotonic()
-        if mono - st["last_persist"] >= PERSIST_INTERVAL:
-            repository.upsert_power(slug, today, st["wh"], st["hc_wh"])
-            st["last_persist"] = mono
+        inc = integrator.feed(watts, now)
+        # Off-peak as the meter sees it (the ZLinky's live PTEC): the whole
+        # interval is attributed to `now` (as the day already is).
+        if inc and is_off_peak():
+            _hc_wh[slug] = _hc_wh.get(slug, 0.0) + inc
         _last_report[slug] = now.isoformat()
 
     return _on_power

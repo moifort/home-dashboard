@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timedelta
 
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
+from app.module.slots import slot_start
 from app.electricity.infrastructure import repository
 from app.electricity.infrastructure.linky_client import compute_talon_w
 from app.electricity.infrastructure.zlinky_mqtt import ZLinkyMqttListener
@@ -19,7 +20,6 @@ from app.electricity.infrastructure.zlinky_mqtt import ZLinkyMqttListener
 logger = logging.getLogger(__name__)
 
 PERSIST_INTERVAL = 30   # seconds between daily_consumption writes (mirrors power)
-SLOT_MIN = 30           # tic_samples granularity — one row per 30-min slot
 MAX_INDEX_STEP_KWH = 15  # a single TIC step above this is implausible → re-baseline
 MAX_CATCHUP_KW = 12      # scales the cap with the gap: a delta after an MQTT
                          # outage is legitimate up to elapsed_h × the subscribed
@@ -59,12 +59,6 @@ _tariff_period = None
 def init_schema():
     """Create the daily_consumption + tic_samples tables (idempotent)."""
     repository.init_schema()
-
-
-def _slot_start(now: datetime) -> str:
-    """The ISO start of `now`'s 30-min slot (local time)."""
-    return now.replace(minute=now.minute - now.minute % SLOT_MIN,
-                       second=0, microsecond=0).isoformat()
 
 
 def _flush_slot():
@@ -112,7 +106,7 @@ def _on_tic(reading: dict, now: datetime | None = None):
     # Slot boundary first: flush the finished 30-min slot (still holds the
     # previous frames' indexes/PAPP), so a 23h30 slot lands in tic_samples
     # before the day flush below reads the night samples for the final talon.
-    slot = _slot_start(now)
+    slot = slot_start(now)
     if _slot["start"] != slot:
         _flush_slot()
         _slot["start"] = slot
