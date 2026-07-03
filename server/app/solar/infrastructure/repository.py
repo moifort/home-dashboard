@@ -40,6 +40,16 @@ def get_cached_production(start: str, end: str) -> list[dict]:
         return [{"date": r[0], "pv_kwh": round(r[1] / 1000, 2)} for r in cur.fetchall()]
 
 
+def get_record_before(date: str) -> tuple[float | None, int]:
+    """(best daily production in kWh, number of recorded days) strictly before
+    `date` — the baseline for the 'record broken yesterday' alert."""
+    with transaction() as conn:
+        mx, n = conn.execute(
+            "SELECT MAX(pv_wh), COUNT(*) FROM daily_production WHERE date < ?", (date,)
+        ).fetchone()
+        return (round(mx / 1000, 2) if mx is not None else None, n)
+
+
 def upsert_production(date: str, pv_wh: float):
     now = datetime.now(PARIS_TZ).isoformat()
     with transaction() as conn:

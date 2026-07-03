@@ -67,6 +67,13 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
     # from a real 0 Wh day (device off but reporting), which renders "0 Wh".
     yesterday_kwh = _merged_by_date(slugs, yesterday_str, today_str).get(yesterday_str)
 
+    # Yesterday's off-peak share of the group (None when no member carries the
+    # HC split yet) — feeds the "heated on peak hours" alert.
+    hc_vals = [r["hc_kwh"] for slug in slugs
+               for r in repository.get_cached_power(slug, yesterday_str, today_str)
+               if r["hc_kwh"] is not None]
+    yesterday_hc_kwh = sum(hc_vals) if hc_vals else None
+
     past = list(_merged_by_date(slugs, nine_ago, today_str).values())
     avg = sum(past) / len(past) if past else 0.0
 
@@ -83,6 +90,8 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
     return {
         "yesterday_text": yesterday_text,
         "yesterday_unit": yesterday_unit,
+        "yesterday_kwh": yesterday_kwh,  # numeric, for the peak-hours alert
+        "yesterday_hc_kwh": yesterday_hc_kwh,
         "avg_text": avg_text,
         "avg_unit": avg_unit,
         "avg_kwh": avg if past else None,  # numeric (kWh) for sorting + alert money

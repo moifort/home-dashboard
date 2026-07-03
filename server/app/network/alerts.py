@@ -32,6 +32,17 @@ def _latency(data):
     return None
 
 
+def _new_device(data):
+    """A client MAC never seen before joined the network in the last 24h —
+    worth a look whether it's a guest, a new gadget or an intruder. Names the
+    most recent one; extra newcomers collapse into a '+N' figure."""
+    names = (data.get("unifi") or {}).get("new_clients") or []
+    if not names:
+        return None
+    figure = f"+{len(names) - 1}" if len(names) > 1 else ""
+    return (f"Nouvel appareil {names[0]}", figure)
+
+
 def _wifi_bad(data):
     unifi = data.get("unifi") or {}
     if not unifi:
@@ -47,6 +58,7 @@ RULES = [
     AlertRule("isp_bad", _isp_bad, "Réseau", 100, False),
     AlertRule("wifi_bad", _wifi_bad, "Réseau", 80, False),
     AlertRule("latency", _latency, "Réseau", 70, False),
+    AlertRule("new_device", _new_device, "Réseau", 60, False),
     AlertRule("net_usage", _net_usage, "Réseau", 45, False),
 ]
 

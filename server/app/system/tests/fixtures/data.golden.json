@@ -4,6 +4,12 @@
       "alert": true,
       "items": [
         [
+          "Cumulus chauffé en heures pleines",
+          "40%",
+          "dépense 0,06€",
+          false
+        ],
+        [
           "Heures creuses Lave-linge en baisse",
           "45pts",
           "dépense 0,02€/j",
@@ -11,8 +17,8 @@
         ]
       ],
       "label": "Prises",
-      "n_bad": 1,
-      "severity": 18
+      "n_bad": 2,
+      "severity": 22
     }
   ],
   "days": [
@@ -594,6 +600,8 @@
         3.2
       ],
       "trend_pct": 3,
+      "yesterday_hc_kwh": 1.92,
+      "yesterday_kwh": 3.2,
       "yesterday_text": "3.2",
       "yesterday_unit": "kWh"
     },
@@ -614,6 +622,8 @@
         1.15
       ],
       "trend_pct": -5,
+      "yesterday_hc_kwh": 0.29,
+      "yesterday_kwh": 1.15,
       "yesterday_text": "1.1",
       "yesterday_unit": "kWh"
     },
@@ -634,6 +644,8 @@
         2.45
       ],
       "trend_pct": 36,
+      "yesterday_hc_kwh": 1.4700000000000002,
+      "yesterday_kwh": 2.45,
       "yesterday_text": "2.5",
       "yesterday_unit": "kWh"
     }

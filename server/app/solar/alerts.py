@@ -1,10 +1,9 @@
 """Solar domain alerts — the "Solaire" status-board section."""
-from app.module.format import AlertRule, _eur, _money
+from app.module.format import AlertRule, _money
 
 from app.solar import PRICE_HP
 
 SOLAR_DROP_PCT = 30       # production_stats.avg_kwh_pct <= -this -> chute
-SOLAR_RISE_PCT = 30       # production_stats.avg_kwh_pct >= -> forte hausse solaire
 
 
 def _solar_off(data):
@@ -27,20 +26,20 @@ def _solar_drop(data):
     return None
 
 
-def _solar_high(data):
-    stats = data.get("production_stats") or {}
-    pct = stats.get("avg_kwh_pct")
-    if pct is not None and pct >= SOLAR_RISE_PCT:
-        sav = stats.get("savings_eur")
-        money = f"économie {_eur(sav)}€" if sav else ""
-        return ("Forte production solaire", f"{round(pct)}%", money)
+def _solar_record(data):
+    """Yesterday broke the all-time daily production record — an event, not a
+    restatement of the banner (which the removed 'forte production' note was).
+    The record_kwh field is set by attach() once enough history exists."""
+    kwh = (data.get("production_stats") or {}).get("record_kwh")
+    if kwh:
+        return ("Record de production solaire", f"{kwh:.2f}kWh")
     return None
 
 
 RULES = [
     AlertRule("solar_off", _solar_off, "Solaire", 95, False),
     AlertRule("solar_drop", _solar_drop, "Solaire", 40, False),
-    AlertRule("solar_high", _solar_high, "Solaire", 9, True),
+    AlertRule("solar_record", _solar_record, "Solaire", 9, True),
 ]
 
 BOARDS = [

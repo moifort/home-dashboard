@@ -28,6 +28,11 @@ def attach(data: dict):
     if not panel:
         return
     command.snapshot(panel.pop("_snap"))
+    # Remember every client MAC ever seen; surface the ones that appeared in
+    # the last 24h so the board can flag a new device on the network.
+    seen = [(c["mac"], c.get("display_name") or c.get("hostname") or c["mac"])
+            for c in (raw.get("clients") or []) if c.get("mac")]
+    panel["new_clients"] = repository.register_clients(seen)
     for column, key in _TREND_COLUMNS:
         panel[key] = _compute_trend(column)
     data["unifi"] = panel

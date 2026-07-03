@@ -22,6 +22,23 @@ def attach(data: dict):
     )
     data.update(build_production_panel(prod_by_date, now, data.get("days"), PRICE_HP,
                                        pv_profiles=profiles))
+    _attach_record(data, prod_by_date, now)
+
+
+RECORD_MIN_DAYS = 14  # history required before a record is worth announcing
+
+
+def _attach_record(data: dict, prod_by_date: dict, now: datetime) -> None:
+    """Flag a daily-production record broken yesterday (event alert): yesterday's
+    kWh beat every recorded day before it, with enough history that early days
+    don't break a 'record' every other morning."""
+    yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    y_kwh = prod_by_date.get(yesterday)
+    if not y_kwh:
+        return
+    record, n_days = repository.get_record_before(yesterday)
+    if record is not None and n_days >= RECORD_MIN_DAYS and y_kwh > record:
+        data["production_stats"]["record_kwh"] = y_kwh
 
 
 LIVE_MAX_AGE_S = 15 * 60  # a live figure older than this is stale — hide it
