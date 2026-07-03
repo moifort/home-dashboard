@@ -30,7 +30,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 _TIME_MODULES = [
     "app.dashboard_data",
     "app.electricity.query",
-    "app.electricity.power",
+    "app.electricity.power.query",
     "app.solar.query",
     "app.solar.command",
     "app.water.query",
