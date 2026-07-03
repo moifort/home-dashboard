@@ -20,7 +20,7 @@ def attach(data: dict):
         (now - timedelta(days=8)).strftime("%Y-%m-%d"),
         (now + timedelta(days=1)).strftime("%Y-%m-%d"),
     )
-    data.update(build_production_panel(prod_by_date, now, data.get("talon"), PRICE_HP,
+    data.update(build_production_panel(prod_by_date, now, data.get("days"), PRICE_HP,
                                        pv_profiles=profiles))
 
 

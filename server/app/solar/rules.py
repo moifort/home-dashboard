@@ -17,7 +17,7 @@ def fetch_window(now: datetime) -> tuple[str, str]:
     return full_start, end
 
 
-def build_production_panel(prod_by_date: dict, now: datetime, talon: dict | None,
+def build_production_panel(prod_by_date: dict, now: datetime, consumption_days: list | None,
                           price_hp: float, pv_profiles: dict | None = None) -> dict:
     """Build the solar production history: always the last 9 days, ending today.
 
@@ -25,9 +25,10 @@ def build_production_panel(prod_by_date: dict, now: datetime, talon: dict | None
     as production accumulates through the day (the EDF chart does the same since
     the ZLinky integrates live).
 
-    `pv_profiles` maps a date to its 48-slot intraday mean-PV profile
-    (None-padded); each shown day carries its profile as `intraday` for the
-    mini graph under its bar (None when the date has no sample).
+    `consumption_days` is the core chart's day list (grid import); it feeds the
+    autonomy figure. `pv_profiles` maps a date to its 48-slot intraday mean-PV
+    profile (None-padded); each shown day carries its profile as `intraday` for
+    the mini graph under its bar (None when the date has no sample).
     """
     today = now.date()
     production_days = []
@@ -46,14 +47,31 @@ def build_production_panel(prod_by_date: dict, now: datetime, talon: dict | None
                 if (ds := (today - timedelta(days=i)).strftime("%Y-%m-%d")) in prod_by_date]
 
     stats = _compute_production_stats(recent, previous, price_hp)
-    # Share of the base load (talon) the solar covers: average daily PV energy
-    # over the talon's average daily energy (W → kWh/day). Core Linky runs before
-    # the optional slices, so the talon is already populated.
-    talon_w = (talon or {}).get("avg_w")
-    if talon_w and talon_w > 0:
-        talon_kwh = talon_w * 24 / 1000
-        stats["talon_cover_pct"] = round(stats["avg_kwh"] / talon_kwh * 100)
+    stats["autonomy_pct"] = _compute_autonomy(production_days, consumption_days)
     return {"production_days": production_days, "production_stats": stats}
+
+
+def _compute_autonomy(production_days: list[dict], consumption_days: list | None):
+    """Share of the home's consumption the solar covered (%), over the complete
+    days both charts have data for.
+
+    The Linky measures grid import, already net of self-consumed solar, so total
+    consumption = grid + PV and autonomy = PV / (grid + PV). Model: all PV is
+    self-consumed (no export measurement; the micro-inverter is sized well below
+    the base load). A day with pv 0.0 is a data gap (real production is never
+    exactly zero), so it is skipped rather than counted as a sunless day."""
+    cons_by_date = {d["date"]: d["hc_kwh"] + d["hp_kwh"]
+                    for d in consumption_days or [] if not d.get("today")}
+    pv_sum = grid_sum = 0.0
+    for day in production_days:
+        grid = cons_by_date.get(day["date"], 0.0)
+        if day["today"] or day["pv_kwh"] <= 0 or grid <= 0:
+            continue
+        pv_sum += day["pv_kwh"]
+        grid_sum += grid
+    if pv_sum <= 0:
+        return None
+    return round(pv_sum / (grid_sum + pv_sum) * 100)
 
 
 def _compute_production_stats(current: list[dict], previous: list[dict], price_hp: float) -> dict:

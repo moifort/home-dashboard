@@ -1092,10 +1092,10 @@
     }
   ],
   "production_stats": {
+    "autonomy_pct": 51,
     "avg_kwh": 8.4,
     "avg_kwh_pct": -8,
     "savings_eur": 13.9,
-    "talon_cover_pct": 111,
     "total_kwh": 67.2
   },
   "stats": {

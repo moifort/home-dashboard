@@ -170,7 +170,7 @@ if not data.get("production_days"):
         for i, v in enumerate(pv)
     ]
     data["production_stats"] = {"avg_kwh": 5.3, "avg_kwh_pct": 8, "total_kwh": 67.2,
-                                "savings_eur": 8.4, "talon_cover_pct": 111}
+                                "savings_eur": 8.4, "autonomy_pct": 42}
 
 # The Solaire intraday strips need solar_samples history (accumulates going
 # forward only); inject the demo bell on every day that lacks a profile —

@@ -1160,21 +1160,21 @@ def _build_consumption_items(stats):
 
 
 def _build_production_items(stats):
-    # Share of the base load (talon) the solar covers. Always shown — falls back
-    # to N/A when the talon has no value yet (no talon_w on the recent days).
-    pct = stats.get("talon_cover_pct")
+    # Autonomy: share of the home's consumption the solar covered (grid + PV
+    # denominator). Always shown — N/A until both charts share complete days.
+    pct = stats.get("autonomy_pct")
     if pct is not None:
-        talon = [("Talon ", "regular", BLACK), (str(pct), "bold", BLACK), ("%", "regular", BLACK)]
+        autonomy = [("Auton. ", "regular", BLACK), (str(pct), "bold", BLACK), ("%", "regular", BLACK)]
     else:
-        talon = [("Talon ", "regular", BLACK), ("N/A", "bold", BLACK)]
+        autonomy = [("Auton. ", "regular", BLACK), ("N/A", "bold", BLACK)]
 
     # Solar: more is better, so a rising trend is good (black), falling is bad (red).
-    # Talon sits to the left of Total.
+    # Autonomy sits to the left of Total.
     return [
         [("Solaire", "bold", BLACK)],
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
-        talon,
+        autonomy,
         [("Total ", "regular", BLACK), (str(stats.get('total_kwh', 0)), "bold", BLACK),
          ("kWh   ", "regular", BLACK), (str(stats.get('savings_eur', 0)), "bold", BLACK),
          ("€", "regular", BLACK)],
