@@ -24,6 +24,21 @@ def attach(data: dict):
                                        pv_profiles=profiles))
 
 
+LIVE_MAX_AGE_S = 15 * 60  # a live figure older than this is stale — hide it
+
+
+def live_power(now: datetime | None = None) -> dict | None:
+    """The inverter's instantaneous PV watts for the Home panel, or None when no
+    fresh heartbeat exists — the line disappears rather than showing stale watts."""
+    if command.last_pv_watts is None or not command.last_solar_report:
+        return None
+    now = now or datetime.now(PARIS_TZ)
+    seen = datetime.fromisoformat(command.last_solar_report)
+    if (now - seen).total_seconds() > LIVE_MAX_AGE_S:
+        return None
+    return {"watts_text": f"{round(command.last_pv_watts)}"}
+
+
 def status() -> dict:
     from app.solar import ENABLED
 

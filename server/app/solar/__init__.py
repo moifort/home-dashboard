@@ -27,9 +27,9 @@ def enabled() -> bool:
 
 
 from app.solar.command import init_schema, start  # noqa: E402
-from app.solar.query import attach, status  # noqa: E402
+from app.solar.query import attach, live_power, status  # noqa: E402
 
 __all__ = [
-    "enabled", "init_schema", "start", "attach", "status",
+    "enabled", "init_schema", "start", "attach", "status", "live_power",
     "ENABLED", "EMAIL", "PASSWORD", "DEVICE_SN", "API_HOST", "PRICE_HP",
 ]

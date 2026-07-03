@@ -27,6 +27,7 @@ MAX_CATCHUP_KW = 12      # scales the cap with the gap: a delta after an MQTT
 
 # Runtime state surfaced by query.status().
 last_message_time = ""
+last_papp = None  # most recent PAPP (VA ≈ W) — the Home panel's live draw figure
 last_error = ""
 last_hchc = None
 last_hphp = None
@@ -147,6 +148,8 @@ def _on_tic(reading: dict, now: datetime | None = None):
     _state["last_frame"] = now
 
     if papp is not None:
+        global last_papp
+        last_papp = papp
         _slot["papp_sum"] += papp
         _slot["papp_n"] += 1
 

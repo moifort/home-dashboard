@@ -6,7 +6,7 @@ domain; every optional domain contributes its own fields via attach().
 from datetime import datetime, timedelta
 
 from app import alerts as alerts_engine
-from app import battery
+from app import battery, solar
 from app.system.config import DAYS_FR, MONTHS_FR, PARIS_TZ
 from app.registry import CORE, OPTIONAL
 from app.system.scheduler import current_screen_refresh, next_screen_refresh, next_screen_wake
@@ -16,6 +16,20 @@ def _date_text(now: datetime) -> str:
     """Today as 'mar. 2 juin' — French, lowercase (e-paper rule), no locale
     dependency (Docker images ship C.UTF-8 only)."""
     return f"{DAYS_FR[now.weekday()].lower()}. {now.day} {MONTHS_FR[now.month - 1]}"
+
+
+def _attach_live(home: dict, now: datetime) -> None:
+    """The 'right now' lines of the Home panel: the meter's instantaneous draw
+    (+ current HC/HP period) and the live PV watts. Each line simply stays absent
+    when its source has no fresh sample (listener down, night for the inverter's
+    keep-alive gaps, cold start)."""
+    grid = CORE.live_power(now)
+    if grid:
+        home["live_grid"] = grid
+    if solar.enabled():
+        pv = solar.live_power(now)
+        if pv:
+            home["live_solar"] = pv
 
 
 def _attach_net_cost(home: dict, data: dict, now: datetime) -> None:
@@ -89,6 +103,7 @@ def build_home_live(now: datetime, data: dict | None = None) -> dict:
     }
     _attach_tariff(home)
     _attach_battery(home, now)
+    _attach_live(home, now)
     if data:
         _attach_net_cost(home, data, now)
     return home
@@ -109,6 +124,7 @@ def build_dashboard_data(days: list[dict]) -> dict:
     }
     _attach_tariff(data["home"])
     _attach_battery(data["home"], now)
+    _attach_live(data["home"], now)
     for integration in OPTIONAL:
         if integration.enabled():
             integration.attach(data)

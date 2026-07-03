@@ -80,6 +80,11 @@ data["home"].setdefault("battery", {
     "avg_text": "4j 16h", "record_text": "5j 10h", "cycles": 3,
 })
 
+# No live MQTT streams here; inject the Home live-snapshot lines (instantaneous
+# meter draw + current period, live PV watts).
+data["home"].setdefault("live_grid", {"watts_text": "850", "period": "HP"})
+data["home"].setdefault("live_solar", {"watts_text": "320"})
+
 # The dev DB may hold no Linky history (build_core always emits the 9 calendar
 # days, data or not); inject a representative EDF stacked HC/HP week whenever
 # no complete day carries data so the preview shows a full consumption chart.

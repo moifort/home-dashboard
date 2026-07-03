@@ -677,6 +677,20 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
             segs += [(" ► ~", "regular", BLACK),
                      (net["proj_text"], "bold", BLACK), ("€", "regular", BLACK)]
         row([("Coût mois", "regular", BLACK)], segs, y)
+    # Live snapshot: the meter's instantaneous draw with the current tariff
+    # period, and the live PV watts. Absent lines mean no fresh sample.
+    live = home.get("live_grid")
+    if live:
+        y += line_h
+        segs = [(live["watts_text"], "bold", BLACK), ("W", "regular", BLACK)]
+        if live.get("period"):
+            segs.append((f" ({live['period']})", "regular", BLACK))
+        row([("Conso", "regular", BLACK)], segs, y)
+    pv = home.get("live_solar")
+    if pv:
+        y += line_h
+        row([("Solaire", "regular", BLACK)],
+            [(pv["watts_text"], "bold", BLACK), ("W", "regular", BLACK)], y)
     for line in home.get("tariff") or []:
         y += line_h
         rng = [(line["start_text"], "bold", BLACK),

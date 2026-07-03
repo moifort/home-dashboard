@@ -22,6 +22,22 @@ def build_core(days: list[dict]) -> dict:
                        papp_profiles=profiles)
 
 
+LIVE_MAX_AGE_S = 15 * 60  # a live figure older than this is stale — hide it
+
+
+def live_power(now: datetime | None = None) -> dict | None:
+    """The meter's instantaneous draw for the Home panel: last PAPP (W) + the
+    current tariff period, or None when no fresh frame exists (listener down,
+    cold start) — the line simply disappears rather than showing stale watts."""
+    if command.last_papp is None or not command.last_message_time:
+        return None
+    now = now or datetime.now(PARIS_TZ)
+    seen = datetime.fromisoformat(command.last_message_time)
+    if (now - seen).total_seconds() > LIVE_MAX_AGE_S:
+        return None
+    return {"watts_text": f"{round(command.last_papp)}", "period": command._period}
+
+
 def status() -> dict:
     """Status fragment for the /status endpoint."""
     from app.electricity import TOPIC
