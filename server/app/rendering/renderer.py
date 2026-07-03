@@ -34,6 +34,9 @@ LABEL_FONT_SIZE = 12
 # No energy threshold anywhere: a chart day is N/A only when it carries no data
 # at all (null/zero total — a meter gap, a day the inverter never reported).
 MAX_DAYS = 9  # reference column count for the stats banner width
+# The packed column width (= 380): 9 bar slots. Every stats banner, the crypto
+# grid, the bottom table and the Réseau panel share it.
+BANNER_W = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
 WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto grid
 # Table under the EDF chart: a section-title header row (Hier | Moy. | HC)
 # above the separator line — same band as the Solaire title opposite — then
@@ -80,8 +83,14 @@ WATER_SPLIT = HEIGHT // 2  # center column split: Eau (top half) over Solaire (b
 COL_GAP = 8  # écart horizontal entre les colonnes packées (Solaire/EDF, Eau, Crypto)
 # Les trois colonnes (largeur de référence MAX_DAYS) sont collées au bord droit,
 # l'espace libre est donc reporté tout à gauche au lieu d'être coincé entre Eau et Crypto.
-PANEL_LEFT = WIDTH - CHART_LEFT - 3 * (MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP) - 2 * COL_GAP
+PANEL_LEFT = WIDTH - CHART_LEFT - 3 * BANNER_W - 2 * COL_GAP
 # = 1360 - 2 - 3*380 - 16 = 202
+
+
+def _title_sep_y(draw, fonts, top) -> int:
+    """y of the 1px separator under a title band anchored at `top` — the shared
+    metric that keeps every panel's title/separator on the same line."""
+    return top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
 
 
 def render_dashboard(data: dict) -> Image.Image:
@@ -106,8 +115,7 @@ def render_dashboard(data: dict) -> Image.Image:
     # Right column (Crypto / Réseau) keeps its own divider, a bit above mid-screen.
     split = SOLAR_HEIGHT
     # Center column (Eau / Solaire) splits at exactly mid-height.
-    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
-    center_left = PANEL_LEFT + banner_width + COL_GAP
+    center_left = PANEL_LEFT + BANNER_W + COL_GAP
 
     # EDF consumption chart in the left column, its baseline aligned with the
     # Eau chart's to its right (region bottom = WATER_SPLIT + the top-chart
@@ -181,10 +189,9 @@ def _draw_right_banner(draw, fonts, items, region_top) -> int:
     """Draw a title-style banner (same look as the chart titles) right-aligned
     in the empty space beside the charts. Returns the y below its separator."""
     stats_top = region_top + CHART_TOP
-    separator_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
-    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
-    x = WIDTH - CHART_LEFT - banner_width
-    _draw_stats_bar(draw, fonts, items, x, stats_top, banner_width, separator_y)
+    separator_y = _title_sep_y(draw, fonts, stats_top)
+    x = WIDTH - CHART_LEFT - BANNER_W
+    _draw_stats_bar(draw, fonts, items, x, stats_top, BANNER_W, separator_y)
     return separator_y + 6
 
 
@@ -233,8 +240,7 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
     label_font = fonts["label"]
     value_font = fonts["bold"]
 
-    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
-    region_left = WIDTH - CHART_LEFT - banner_width
+    region_left = WIDTH - CHART_LEFT - BANNER_W
     region_right = WIDTH - CHART_LEFT
 
     # Level prices, top (upper) to bottom (lower).
@@ -342,14 +348,13 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
     font_value = fonts["value"]
     font_label = fonts["label"]
 
-    banner_width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
-    # Butt up against the Solar chart (which hugs the left edge for banner_width)
+    # Butt up against the Solar chart (which hugs the left edge for BANNER_W)
     # with a small gap, leaving the right column free for the Crypto panel.
-    region_left = PANEL_LEFT + banner_width + COL_GAP
+    region_left = PANEL_LEFT + BANNER_W + COL_GAP
 
     # Stats banner anchored at the top of the region (same look as chart titles).
     stats_top = region_top + CHART_TOP
-    separator_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    separator_y = _title_sep_y(draw, fonts, stats_top)
     items = [[("Eau", "bold", BLACK)],
              [(water_stats.get("avg_text", "N/A"), "bold", BLACK), ("L/j ", "regular", BLACK),
               _trend(water_stats.get("avg_pct", 0), True)],
@@ -357,7 +362,7 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
     cost = water_stats.get("cost_text")
     if cost:
         items.append([(cost, "bold", BLACK), ("€", "regular", BLACK)])
-    _draw_stats_bar(draw, fonts, items, region_left, stats_top, banner_width, separator_y)
+    _draw_stats_bar(draw, fonts, items, region_left, stats_top, BANNER_W, separator_y)
 
     # Bars: hug the bottom of the region, day labels below the baseline. The
     # intraday strip is squeezed between the bars' baseline and the labels —
@@ -471,12 +476,12 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
     split) — then a 6-column grid with one row per metric: name (left),
     yesterday kWh (left), kWh/j (right), trend (left, glued to kWh/j), HC %
     (left), and a 7-day sparkline hugging the right edge (no surrounding box)."""
-    width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
+    width = BANNER_W
     x = PANEL_LEFT
     # Mirror _draw_chart's bottom-banner geometry so the title row and separator
     # line up exactly with the Solaire title and its separator.
     header_y = region_top + DIVIDER_GAP
-    line_y = header_y + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    line_y = _title_sep_y(draw, fonts, header_y)
     y0 = line_y + BOTTOM_TEXT_GAP
     # Sparkline column owns the table's right edge; the bars are centred inside
     # it, leaving a small margin on each side (the column is wider than the graph).
@@ -563,7 +568,7 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
     stats_top = region_top + CHART_TOP
-    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    sep_y = _title_sep_y(draw, fonts, stats_top)
     _draw_stats_bar(draw, fonts, [[("Home", "bold", BLACK)]], x, stats_top, width, sep_y)
 
     y = sep_y + 4
@@ -633,7 +638,7 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
     stats_top = region_top
-    sep_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    sep_y = _title_sep_y(draw, fonts, stats_top)
     _draw_stats_bar(draw, fonts, [[("Plantes", "bold", BLACK)]], x, stats_top, width, sep_y)
 
     def put(segments, sx, sy):
@@ -726,7 +731,6 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
 
-    title_h = draw.textbbox((0, 0), "X", font=fonts["bold"])[3]
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
     row_h = line_h + 3
     max_y = HEIGHT - CHART_BOTTOM - line_h
@@ -735,7 +739,7 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     def section_title(label, y):
         """Draw a domain title + its 1px separator; return the y of the first row."""
         draw.text((x, y), label, fill=BLACK, font=fonts["bold"])
-        sep = y + title_h + 8
+        sep = _title_sep_y(draw, fonts, y)
         draw.line([(x, sep), (x + width - 1, sep)], fill=BLACK, width=1)
         return sep + 4
 
@@ -803,7 +807,7 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
     (latency, Wi-Fi signal, data usage — values with their unit in regular weight,
     glued to the bold number), then a top-4 clients mini-table per
     network (main Wi-Fi first, then IoT) with its client count."""
-    width = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
+    width = BANNER_W
     x = WIDTH - CHART_LEFT - width
     right = x + width
 
@@ -950,7 +954,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
     chart_width = len(days) * col_width - BAR_GAP
     # Keep the stats banner a constant width so it stays readable and aligned
     # even when a chart has few columns (e.g. solar history early on).
-    banner_width = max(chart_width, MAX_DAYS * col_width - BAR_GAP)
+    banner_width = max(chart_width, BANNER_W)
 
     # The top chart hugs the screen top and leaves a gap above the divider; the
     # bottom chart sits below the divider and hugs the screen bottom.
@@ -975,7 +979,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
     # Stats banner anchored at top of the region ("titre + bordure").
     value_h = draw.textbbox((0, 0), "0", font=font_value)[3]
     stats_top = region_top + (CHART_TOP if is_top else DIVIDER_GAP)
-    separator_y = stats_top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    separator_y = _title_sep_y(draw, fonts, stats_top)
     bar_max_height = max(20, baseline_y - separator_y - value_h - 14)
 
     # --- Bars ---
