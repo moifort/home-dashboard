@@ -15,15 +15,16 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 
 | Panel | What you see |
 |-------|--------------|
-| **Electricity** (core) | Last 9 days + live of consumption as stacked off-peak/peak bars. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
-| **Plugs & baseline power** | One row per power sensor you add (water heater, washing machine...) with its daily kWh and off-peak share, plus the home's permanent standby draw in watts. |
-| **Solar** | Daily solar production from an EcoFlow PowerStream: average, period total and money saved. |
+| **Electricity** (core) | Last 9 days + live of consumption as stacked off-peak/peak bars, with a dashed average line. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
+| **Home** | Today's date, the screen refresh schedule, the month's net home cost with its end-of-month projection (electricity + water minus solar, `Coût mois 58€ ► ~87€`), the live meter draw with the current tariff period (`Conso 850W (HP)`), live solar watts, and the learned HC/HP windows. |
+| **Plugs & baseline power** | One row per power sensor you add (water heater, washing machine...) with its daily kWh and off-peak share, plus the home's permanent standby draw in watts and what it costs per year. |
+| **Solar** | Daily solar production from an EcoFlow PowerStream: average, autonomy (share of the home's consumption the panels covered), period total and money saved. |
 | **Water** | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
 | **Plants** | One card per soil sensor: moisture, temperature, light, the time since its last reading, a 10-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot. |
-| **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients. |
+| **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients per network. |
 | **Device battery** | Estimated charge % and days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
-| **Alerts**  | Notes flagging a smart alerts, a probable leak, or a disconnect, each with its €/day impact. |
+| **Alerts**  | Anomalies to act on, each with its € impact: consumption or standby spikes, a probable water leak, the water heater running on peak hours, a plug drifting out of off-peak, a solar disconnect, a new device on the network. Plus one event note: a broken solar production record. |
 
 ## Hardware
 
