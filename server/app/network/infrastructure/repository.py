@@ -16,7 +16,7 @@ def init_schema():
             """CREATE TABLE IF NOT EXISTS daily_unifi (
                 date TEXT PRIMARY KEY,
                 usage_bytes REAL,
-                speed_dl REAL,
+                speed_dl REAL,      -- vestigial: never written nor read
                 latency_ms REAL,
                 isp_pct REAL,
                 wifi_pct REAL,

@@ -18,9 +18,8 @@ def enabled() -> bool:
 
 from app.crypto.command import init_schema, start  # noqa: E402
 from app.crypto.query import attach, status  # noqa: E402
-from app.crypto.rules import build_crypto_panel  # noqa: E402
 
 __all__ = [
     "enabled", "init_schema", "start", "attach", "status",
-    "ENABLED", "API_URL", "API_TOKEN", "build_crypto_panel",
+    "ENABLED", "API_URL", "API_TOKEN",
 ]

@@ -72,16 +72,6 @@ def get_cached_days(start: str, end: str) -> list[dict]:
         return [{"date": r[0], "hc_kwh": r[1], "hp_kwh": r[2], "talon_w": r[3]} for r in cur.fetchall()]
 
 
-def upsert_days(days: list[dict]):
-    now = datetime.now(PARIS_TZ).isoformat()
-    with transaction() as conn:
-        for d in days:
-            conn.execute(
-                "INSERT OR REPLACE INTO daily_consumption (date, hc_kwh, hp_kwh, talon_w, fetched_at) VALUES (?, ?, ?, ?, ?)",
-                (d["date"], d["hc_kwh"], d["hp_kwh"], d.get("talon_w"), now),
-            )
-
-
 def upsert_day(date: str, hc_kwh: float, hp_kwh: float, talon_w):
     """Single-day upsert — the integrator's 30s persist."""
     now = datetime.now(PARIS_TZ).isoformat()
