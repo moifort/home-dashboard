@@ -15,11 +15,12 @@ lives here.
 import os
 
 from app.system.config import MQTT_HOST
+from app.module.format import env_float
 
 TOPIC = os.environ.get("LINKY_MQTT_TOPIC", "zigbee2mqtt/linky")
-PRICE_HP = float(os.environ.get("PRICE_HP", "0.2065"))
-PRICE_HC = float(os.environ.get("PRICE_HC", "0.1579"))
-PRICE_ABO_MONTHLY = float(os.environ.get("PRICE_ABO_MONTHLY", "15.65"))
+PRICE_HP = env_float("PRICE_HP", 0.2065)
+PRICE_HC = env_float("PRICE_HC", 0.1579)
+PRICE_ABO_MONTHLY = env_float("PRICE_ABO_MONTHLY", 15.65)
 
 ENABLED = bool(MQTT_HOST) and bool(TOPIC)
 

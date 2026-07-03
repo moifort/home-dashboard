@@ -4,7 +4,24 @@ Used by every domain's alerts.py: small parsers (display string -> float) and
 money/figure formatters (French decimal comma, Arial-safe thousands), plus the
 AlertRule namedtuple the aggregator (app.alerts) collects from each domain.
 """
+import logging
+import os
 from collections import namedtuple
+
+logger = logging.getLogger(__name__)
+
+
+def env_float(name: str, default: float) -> float:
+    """A float env var, falling back to `default` when unset, empty or
+    malformed (with a warning) — a bad value must not crash the import."""
+    raw = os.environ.get(name, "")
+    if not raw.strip():
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        logger.warning("Invalid %s=%r, using default %s", name, raw, default)
+        return default
 
 # An alert rule contributed by a domain. `fn(data) -> (message, figure[, money])
 # | None`; `board` is the status-board section label it belongs to; higher

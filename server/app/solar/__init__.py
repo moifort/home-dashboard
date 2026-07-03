@@ -9,13 +9,15 @@ whole folder to drop solar.
 """
 import os
 
+from app.module.format import env_float
+
 EMAIL = os.environ.get("ECOFLOW_EMAIL", "")
 PASSWORD = os.environ.get("ECOFLOW_PASSWORD", "")
 DEVICE_SN = os.environ.get("ECOFLOW_DEVICE_SN", "")
 API_HOST = os.environ.get("ECOFLOW_API_HOST", "api-e.ecoflow.com")
 # Electricity price used to value the produced solar energy (own copy so the
 # domain stays self-contained and removable).
-PRICE_HP = float(os.environ.get("PRICE_HP", "0.2065"))
+PRICE_HP = env_float("PRICE_HP", 0.2065)
 
 ENABLED = bool(EMAIL and PASSWORD and DEVICE_SN)
 

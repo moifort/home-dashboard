@@ -25,10 +25,10 @@ configure, and the threshold replaces it.
 """
 import logging
 import os
-import unicodedata
 from collections import namedtuple
 
 from app.system.config import MQTT_HOST
+from app.module.sensors import parse_entries, slugify as _slugify, topic_suffixed_slug
 
 from app.plants import command as _command
 from app.plants import query as _query
@@ -37,14 +37,6 @@ from app.plants.infrastructure import repository
 logger = logging.getLogger(__name__)
 
 Sensor = namedtuple("Sensor", "slug topic name threshold")
-
-
-def _slugify(name: str) -> str:
-    """Lowercase, accent-stripped, space-collapsed slug for storage keys."""
-    ascii_name = (
-        unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
-    )
-    return "-".join(ascii_name.lower().split())
 
 
 def _parse_threshold(text: str):
@@ -80,28 +72,12 @@ def _parse_sensors(raw: str, default_threshold=None) -> list:
     per-topic suffix so two plants never share a row. No grouping/summing (states,
     not counters)."""
     sensors = []
-    seen_topics = set()
     seen_slugs = set()
-    for entry in raw.split(";"):
-        entry = entry.strip()
-        if not entry:
-            continue
-        if ":" not in entry:
-            logger.warning("PLANTS_SENSORS entry ignored (no ':' topic/name): %r", entry)
-            continue
-        topic, rest = entry.split(":", 1)
-        topic = topic.strip()
+    for topic, rest in parse_entries(raw, "PLANTS_SENSORS"):
         name, threshold = _split_name_threshold(rest, default_threshold)
-        if not topic or not name:
-            logger.warning("PLANTS_SENSORS entry ignored (empty topic or name): %r", entry)
-            continue
-        if topic in seen_topics:
-            logger.warning("PLANTS_SENSORS duplicate topic %r ignored: %r", topic, entry)
-            continue
         slug = _slugify(name)
         if slug in seen_slugs:
-            slug = f"{slug}-{_slugify(topic.replace('/', ' '))}"
-        seen_topics.add(topic)
+            slug = topic_suffixed_slug(name, topic)
         seen_slugs.add(slug)
         sensors.append(Sensor(slug, topic, name, threshold))
     return sensors

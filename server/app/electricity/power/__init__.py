@@ -18,13 +18,13 @@ members of a multi-topic group get a per-topic suffix so they never collide.
 """
 import logging
 import os
-import unicodedata
 from collections import Counter, namedtuple
 from datetime import datetime, timedelta
 
 from app.system.config import MQTT_HOST, MQTT_PASSWORD, MQTT_PORT, MQTT_USERNAME, PARIS_TZ
 from app.module.format import format_energy_kwh
 from app.module.integrator import DailyEnergyIntegrator
+from app.module.sensors import parse_entries, slugify as _slugify, topic_suffixed_slug
 from app.electricity import is_off_peak
 from app.electricity.power.infrastructure import repository
 from app.electricity.power.infrastructure.mqtt import PowerMqttListener
@@ -32,14 +32,6 @@ from app.electricity.power.infrastructure.mqtt import PowerMqttListener
 logger = logging.getLogger(__name__)
 
 Sensor = namedtuple("Sensor", "slug topic name")
-
-
-def _slugify(name: str) -> str:
-    """Lowercase, accent-stripped, space-collapsed slug for storage keys."""
-    ascii_name = (
-        unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
-    )
-    return "-".join(ascii_name.lower().split())
 
 
 def _parse_sensors(raw: str) -> list:
@@ -51,35 +43,13 @@ def _parse_sensors(raw: str) -> list:
     collide. The group total is the sum of its members, so which member owns which
     slug is irrelevant to the displayed value.
     """
-    parsed = []  # (topic, name) in declared order, deduped by topic
-    seen_topics = set()
-    for entry in raw.split(";"):
-        entry = entry.strip()
-        if not entry:
-            continue
-        if ":" not in entry:
-            logger.warning("POWER_SENSORS entry ignored (no ':' topic/name): %r", entry)
-            continue
-        topic, name = entry.split(":", 1)
-        topic, name = topic.strip(), name.strip()
-        if not topic or not name:
-            logger.warning("POWER_SENSORS entry ignored (empty topic or name): %r", entry)
-            continue
-        if topic in seen_topics:
-            logger.warning("POWER_SENSORS duplicate topic %r ignored: %r", topic, entry)
-            continue
-        seen_topics.add(topic)
-        parsed.append((topic, name))
-
+    parsed = parse_entries(raw, "POWER_SENSORS")  # (topic, name), deduped by topic
     name_counts = Counter(name for _, name in parsed)
-    sensors = []
-    for topic, name in parsed:
-        if name_counts[name] > 1:
-            slug = f"{_slugify(name)}-{_slugify(topic.replace('/', ' '))}"
-        else:
-            slug = _slugify(name)
-        sensors.append(Sensor(slug, topic, name))
-    return sensors
+    return [
+        Sensor(topic_suffixed_slug(name, topic) if name_counts[name] > 1 else _slugify(name),
+               topic, name)
+        for topic, name in parsed
+    ]
 
 
 def _groups(sensors: list) -> list:

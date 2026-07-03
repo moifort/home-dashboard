@@ -9,10 +9,11 @@ Remove the whole folder to drop the water reading.
 import os
 
 from app.system.config import MQTT_HOST
+from app.module.format import env_float
 
 # Broker host/port/credentials are shared (system.config); this domain owns its topic.
 TOPIC = os.environ.get("WATER_TOPIC", "")
-PRICE_M3 = float(os.environ.get("WATER_PRICE_M3", "0") or 0)
+PRICE_M3 = env_float("WATER_PRICE_M3", 0.0)
 
 ENABLED = bool(MQTT_HOST) and bool(TOPIC)
 
