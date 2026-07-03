@@ -803,8 +803,6 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
                 y += row_h
                 cx = x
                 first = True
-                if y > max_y:
-                    return y
             if not first:
                 cx += space_w
             for t, fk in atom:
@@ -813,6 +811,23 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
             first = False
         return y + row_h
 
+    def wrap_height(atoms):
+        """The height wrap_atoms would use for these atoms (same line breaking)."""
+        cx = x
+        first = True
+        lines = 1
+        for atom in atoms:
+            w = sum(draw.textlength(t, font=fonts[fk]) for t, fk in atom)
+            if not first and cx + space_w + w > x + width:
+                lines += 1
+                cx = x
+                first = True
+            if not first:
+                cx += space_w
+            cx += w
+            first = False
+        return lines * row_h
+
     if not rows:
         y = section_title("Alertes", region_top)
         wrap_atoms([[(w, "regular")] for w in "Tout va bien".split()], BLACK, y)
@@ -820,21 +835,36 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
 
     # Single "Alertes" section: one title + separator, then every active item
     # flattened across domains (build_board already ordered the rows — most
-    # problems first — and the items within each row by severity).
+    # problems first — and the items within each row by severity). A negative
+    # alert is written entirely in red, a positive note all black; figures
+    # follow the house rule (bold number, regular glued unit) via num_atom.
     y = section_title("Alertes", region_top)
+    items = []
     for r in rows:
-        # A negative alert is written entirely in red, a positive note all black;
-        # figures follow the house rule (bold number, regular glued unit) via
-        # num_atom.
         for message, figure, money, good in r["items"]:
-            if y > max_y:
-                return
-            color = BLACK if good else RED
             atoms = [[(w, "regular")] for w in message.split()]
             if figure:
                 atoms.append(num_atom(figure))
             atoms += [num_atom(w) for w in money.split()]
-            y = wrap_atoms(atoms, color, y)
+            items.append((atoms, BLACK if good else RED))
+
+    # Overflow policy: only items that fit ENTIRELY are drawn; the rest are
+    # summarised by one "+N" row (never a silent truncation). The cut is
+    # measured first, backing off until the "+N" row itself fits.
+    heights = [wrap_height(atoms) for atoms, _ in items]
+    drawn, end_y = 0, y
+    while drawn < len(items) and end_y + heights[drawn] - row_h <= max_y:
+        end_y += heights[drawn]
+        drawn += 1
+    if drawn < len(items):
+        while drawn > 0 and end_y > max_y:  # make room for the "+N" row
+            drawn -= 1
+            end_y -= heights[drawn]
+
+    for atoms, color in items[:drawn]:
+        y = wrap_atoms(atoms, color, y)
+    if drawn < len(items) and y <= max_y:
+        draw.text((x, y), f"+{len(items) - drawn}", fill=BLACK, font=fonts["bold"])
 
 
 def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
