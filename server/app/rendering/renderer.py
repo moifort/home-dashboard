@@ -6,6 +6,8 @@ the right column stacks the Crypto panel over the UniFi "Réseau" panel.
 """
 import os
 import re
+from functools import partial
+
 from PIL import Image, ImageDraw, ImageFont
 
 WIDTH = 1360
@@ -91,6 +93,49 @@ def _title_sep_y(draw, fonts, top) -> int:
     """y of the 1px separator under a title band anchored at `top` — the shared
     metric that keeps every panel's title/separator on the same line."""
     return top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+
+
+# Glued-segment helpers, in two metric families that must NOT be merged: the
+# bottom table advances by textbbox ink width (int, unrounded x), the gutter and
+# Réseau panels by textlength advance width (float, x rounded at each draw).
+# Unifying the metric would shift pixels. Panels bind draw/fonts via partial.
+def _put_ink(draw, fonts, segments, sx, sy):
+    """Draw (text, font_key, color) segments glued left-to-right, advancing by
+    each segment's textbbox ink width."""
+    cx = sx
+    for text, font_key, color in segments:
+        font = fonts[font_key]
+        draw.text((cx, sy), text, fill=color, font=font)
+        box = draw.textbbox((0, 0), text, font=font)
+        cx += box[2] - box[0]
+
+
+def _segw_ink(draw, fonts, segments) -> int:
+    """Total textbbox ink width of glued segments."""
+    return sum(draw.textbbox((0, 0), t, font=fonts[fk])[2]
+               - draw.textbbox((0, 0), t, font=fonts[fk])[0] for t, fk, _ in segments)
+
+
+def _put_adv(draw, fonts, segments, sx, sy):
+    """Draw (text, font_key, color) segments glued left-to-right, advancing by
+    textlength; each draw x is rounded. Returns the (float) end x."""
+    cx = sx
+    for text, fk, color in segments:
+        draw.text((round(cx), sy), text, fill=color, font=fonts[fk])
+        cx += draw.textlength(text, font=fonts[fk])
+    return cx
+
+
+def _segw_adv(draw, fonts, segments) -> float:
+    """Total textlength advance width of glued segments."""
+    return sum(draw.textlength(t, font=fonts[fk]) for t, fk, _ in segments)
+
+
+def _row_adv(draw, fonts, x, right, left, right_segs, sy):
+    """A panel row: label segments left at `x`, value segments right-aligned to
+    `right` (advance metric family)."""
+    _put_adv(draw, fonts, left, x, sy)
+    _put_adv(draw, fonts, right_segs, right - _segw_adv(draw, fonts, right_segs), sy)
 
 
 def render_dashboard(data: dict) -> Image.Image:
@@ -492,17 +537,8 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
     hc_x = x + round(width * BOTTOM_COL_HC)  # left edge of the HC % column
     text_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
-    def seg_w(segments):
-        return sum(draw.textbbox((0, 0), t, font=fonts[fk])[2]
-                   - draw.textbbox((0, 0), t, font=fonts[fk])[0] for t, fk, _ in segments)
-
-    def put(segments, sx, sy):
-        cx = sx
-        for text, font_key, color in segments:
-            font = fonts[font_key]
-            draw.text((cx, sy), text, fill=color, font=font)
-            box = draw.textbbox((0, 0), text, font=font)
-            cx += box[2] - box[0]
+    seg_w = partial(_segw_ink, draw, fonts)
+    put = partial(_put_ink, draw, fonts)
 
     def spark(values, sy):
         """7 thin bars normalised to this row's own max, grown up from the text
@@ -553,17 +589,7 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
     right = x + width
-
-    def put(segments, sx, sy):
-        cx = sx
-        for text, fk, color in segments:
-            draw.text((round(cx), sy), text, fill=color, font=fonts[fk])
-            cx += draw.textlength(text, font=fonts[fk])
-
-    def row(left, right_segs, sy):  # label left, value right-aligned to the edge
-        put(left, x, sy)
-        rw = sum(draw.textlength(t, font=fonts[fk]) for t, fk, _ in right_segs)
-        put(right_segs, right - rw, sy)
+    row = partial(_row_adv, draw, fonts, x, right)  # label left, value right-aligned
 
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
 
@@ -641,12 +667,7 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
     sep_y = _title_sep_y(draw, fonts, stats_top)
     _draw_stats_bar(draw, fonts, [[("Plantes", "bold", BLACK)]], x, stats_top, width, sep_y)
 
-    def put(segments, sx, sy):
-        cx = sx
-        for text, fk, color in segments:
-            draw.text((round(cx), sy), text, fill=color, font=fonts[fk])
-            cx += draw.textlength(text, font=fonts[fk])
-        return cx
+    put = partial(_put_adv, draw, fonts)
 
     def spark(values, sy, spark_left):
         """Thin bars on the absolute 0-100% moisture scale, grown up from the
@@ -810,19 +831,7 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
     width = BANNER_W
     x = WIDTH - CHART_LEFT - width
     right = x + width
-
-    def seg_w(segments):
-        return sum(draw.textlength(t, font=fonts[fk]) for t, fk, _ in segments)
-
-    def put(segments, sx, sy):
-        cx = sx
-        for text, fk, color in segments:
-            draw.text((round(cx), sy), text, fill=color, font=fonts[fk])
-            cx += draw.textlength(text, font=fonts[fk])
-
-    def row(left, right_segs, sy):  # label left, value right-aligned to the edge
-        put(left, x, sy)
-        put(right_segs, right - seg_w(right_segs), sy)
+    row = partial(_row_adv, draw, fonts, x, right)  # label left, value right-aligned
 
     line_h = draw.textbbox((0, 0), "Xg", font=fonts["bold"])[3]
     row_h = line_h + 3
