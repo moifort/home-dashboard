@@ -26,7 +26,18 @@ def png_to_epd_buffer(png_bytes: bytes, mode: str = "bw", dither: str = "none") 
     return _convert_4color(img)
 
 
+def _pack_2bpp(codes: np.ndarray) -> bytes:
+    """Pack a HEIGHT×WIDTH array of 2-bit color codes into the EPD buffer:
+    4 pixels per byte, first pixel in the two most significant bits."""
+    grouped = codes.reshape(-1, 4).astype(np.uint16)
+    shifts = np.array([6, 4, 2, 0], dtype=np.uint16)
+    return (grouped << shifts).sum(axis=1).astype(np.uint8).tobytes()
+
+
 def _floyd_steinberg(gray: np.ndarray) -> np.ndarray:
+    # Left as a per-pixel loop on purpose: error diffusion is sequential (each
+    # pixel depends on its neighbours' propagated error) and this path is off
+    # the production route (/display uses mode="4color").
     img = gray.astype(np.float32)
     h, w = img.shape
     for y in range(h):
@@ -68,31 +79,21 @@ def _convert_bw(img: Image.Image, dither: str = "none") -> bytes:
     else:
         bw = ((gray >= 128) * 255).astype(np.uint8)
 
-    buf = bytearray(BUFFER_SIZE)
-    for y in range(HEIGHT):
-        for x in range(WIDTH):
-            color = WHITE if bw[y, x] >= 128 else BLACK
-            idx = (y * WIDTH + x) // 4
-            shift = 6 - (x % 4) * 2
-            buf[idx] |= color << shift
-    return bytes(buf)
+    return _pack_2bpp((bw >= 128).astype(np.uint8))  # WHITE=1 / BLACK=0
 
 
 def _convert_4color(img: Image.Image) -> bytes:
-    pixels = img.convert("RGB").load()
-    buf = bytearray(BUFFER_SIZE)
-    for y in range(HEIGHT):
-        for x in range(WIDTH):
-            r, g, b = pixels[x, y]
-            if r > 180 and g < 100 and b < 100:
-                color = RED
-            elif r > 180 and g > 180 and b < 100:
-                color = YELLOW
-            elif r * 0.299 + g * 0.587 + b * 0.114 > 128:
-                color = WHITE
-            else:
-                color = BLACK
-            idx = (y * WIDTH + x) // 4
-            shift = 6 - (x % 4) * 2
-            buf[idx] |= color << shift
-    return bytes(buf)
+    rgb = np.asarray(img.convert("RGB"))
+    r = rgb[..., 0].astype(np.int16)
+    g = rgb[..., 1].astype(np.int16)
+    b = rgb[..., 2].astype(np.int16)
+    # float64 luma matches the scalar Python arithmetic bit for bit.
+    luma = r * 0.299 + g * 0.587 + b * 0.114
+
+    # Same classification priority as the original per-pixel chain (red wins
+    # over white on a bright red): later assignments overwrite earlier ones.
+    codes = np.full((HEIGHT, WIDTH), BLACK, dtype=np.uint8)
+    codes[luma > 128] = WHITE
+    codes[(r > 180) & (g > 180) & (b < 100)] = YELLOW
+    codes[(r > 180) & (g < 100) & (b < 100)] = RED
+    return _pack_2bpp(codes)
