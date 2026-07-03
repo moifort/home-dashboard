@@ -13,6 +13,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
 DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+MONTHS_FR = ["janv.", "févr.", "mars", "avr.", "mai", "juin",
+             "juil.", "août", "sept.", "oct.", "nov.", "déc."]
 
 # Screen-refresh schedule (see app/schedule.py). The ESP32 wakes every
 # SCREEN_REFRESH_INTERVAL_MIN minutes (clock-aligned, must match REFRESH_INTERVAL_MIN

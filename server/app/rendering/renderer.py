@@ -78,7 +78,10 @@ INTRADAY_GAP = 4  # gap between the bars' baseline and the strip
 INTRADAY_MAX_W = int(os.environ.get("INTRADAY_MAX_W", "3000"))  # W (mean PAPP) at full height
 INTRADAY_SOLAR_MAX_W = int(os.environ.get("INTRADAY_SOLAR_MAX_W", "800"))  # W (mean PV) at full height
 INTRADAY_WATER_MAX_L = int(os.environ.get("INTRADAY_WATER_MAX_L", "150"))  # L per 4h bucket at full height
-SOLAR_HEIGHT = HEIGHT // 2 - 24  # divider for the right column (Crypto top / Réseau bottom)
+# Divider for the right column (Crypto top / Réseau bottom): raised above the
+# mid-screen so the trading grid stays compact and the Réseau panel gains two
+# client rows (top-5 per network instead of top-4).
+SOLAR_HEIGHT = HEIGHT // 2 - 56
 WATER_SPLIT = HEIGHT // 2  # center column split: Eau (top half) over Solaire (bottom half)
 
 COL_GAP = 8  # écart horizontal entre les colonnes packées (Solaire/EDF, Eau, Crypto)
@@ -147,6 +150,13 @@ def _spark_bars(draw, left, baseline, values, height_of):
             continue
         bx = left + j * (SPARK_BAR_W + SPARK_BAR_GAP)
         draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
+
+
+def _underline_weekend(draw, d, lx, lw, text_bottom):
+    """Underline a chart day label when the day is a Saturday/Sunday — keyed on
+    the day name (not the drawn text, so a weekend "Auj." is underlined too)."""
+    if d.get("day", "").lower() in ("sam", "dim"):
+        draw.line([(lx, text_bottom + 2), (lx + lw - 1, text_bottom + 2)], fill=BLACK, width=1)
 
 
 def _draw_zero_baseline(draw, cx, baseline_y):
@@ -448,12 +458,20 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
     max_l = max(valid, default=1) or 1
     col_width = BAR_WIDTH + BAR_GAP
 
+    # Average reference line, same treatment as the EDF/Solar charts.
+    avg_l = water_stats.get("avg_l")
+    if avg_l and 0 < avg_l <= max_l:
+        avg_y = baseline_y - round(avg_l / max_l * bar_max_height)
+        _dashed_h_line(draw, region_left, region_left + len(water_days) * col_width - BAR_GAP, avg_y)
+
     for i, d in enumerate(water_days):
         cx = region_left + i * col_width
         label_text = "Auj." if d.get("today") else d.get("day", "").lower()
         lbox = draw.textbbox((0, 0), label_text, font=font_label)
-        draw.text((cx + (BAR_WIDTH - (lbox[2] - lbox[0])) // 2, strip_baseline + 4),
-                  label_text, fill=BLACK, font=font_label)
+        lw = lbox[2] - lbox[0]
+        lx = cx + (BAR_WIDTH - lw) // 2
+        draw.text((lx, strip_baseline + 4), label_text, fill=BLACK, font=font_label)
+        _underline_weekend(draw, d, lx, lw, strip_baseline + 4 + label_h)
 
         # The day's intraday profile, bar-wide under the bar (drawn even on an
         # N/A day — a daily-total gap can still have samples).
@@ -506,8 +524,14 @@ def _build_bottom_rows(data) -> list:
         v = sensor.get("avg_kwh")
         return v if v is not None else float("-inf")  # "N/A" (pas d'historique) → en bas
 
+    # A sensor with no recent data at all (no average window, nothing yesterday)
+    # would render a full row of em dashes — hide it until it reports again.
+    def _has_data(sensor):
+        return sensor.get("avg_kwh") is not None or sensor.get("yesterday_text") != "—"
+
     rows = []
-    sensors = sorted(data.get("power_sensors", []), key=_sensor_avg, reverse=True)
+    sensors = sorted((s for s in data.get("power_sensors", []) if _has_data(s)),
+                     key=_sensor_avg, reverse=True)
     for sensor in sensors:
         hc_pct = sensor.get("hc_pct")
         # A sensor without HC history yet shows an em dash — the value exists
@@ -524,8 +548,13 @@ def _build_bottom_rows(data) -> list:
         ))
     talon = data.get("talon")
     if talon:
+        # The name cell carries the talon's yearly price tag ("Talon 460€/an"):
+        # the figure that turns an abstract W value into a standby-waste bill.
+        name_segs = [("Talon", "bold", BLACK)]
+        if talon.get("annual_text"):
+            name_segs += [(" " + talon["annual_text"], "bold", BLACK), ("€/an", "regular", BLACK)]
         rows.append((
-            [("Talon", "bold", BLACK)],
+            name_segs,
             [(talon.get("yesterday_text", "0"), "bold", BLACK), ("W", "regular", BLACK)],
             [(talon.get("avg_text", "0"), "bold", BLACK), ("W", "regular", BLACK)],
             [_trend(talon.get("trend_pct", 0), True)],
@@ -611,7 +640,12 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
 
     stats_top = region_top + CHART_TOP
     sep_y = _title_sep_y(draw, fonts, stats_top)
-    _draw_stats_bar(draw, fonts, [[("Home", "bold", BLACK)]], x, stats_top, width, sep_y)
+    # Title band: "Home" left, today's date right-aligned ("mar. 2 juin") — the
+    # only date on the whole screen, so a stale render is immediately visible.
+    title = [[("Home", "bold", BLACK)]]
+    if home.get("date_text"):
+        title.append([(home["date_text"], "regular", BLACK)])
+    _draw_stats_bar(draw, fonts, title, x, stats_top, width, sep_y)
 
     y = sep_y + 4
     schedule = [
@@ -868,7 +902,7 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
     """Draw the "Réseau" panel in the bottom-right column (under the crypto grid):
     a title banner with internet/Wi-Fi health (each with a ▲▼ trend), detail rows
     (latency, Wi-Fi signal, data usage — values with their unit in regular weight,
-    glued to the bold number), then a top-4 clients mini-table per
+    glued to the bold number), then a top-5 clients mini-table per
     network (main Wi-Fi first, then IoT) with its client count."""
     width = BANNER_W
     x = WIDTH - CHART_LEFT - width
@@ -925,9 +959,9 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
               y, unifi.get("usage_trend"), neutral=True)
     y += row_h + 4
 
-    # --- Top-4 clients per network (main Wi-Fi first, then IoT): a header
+    # --- Top-5 clients per network (main Wi-Fi first, then IoT): a header
     # (name + "· aujourd'hui" period tag + count) over a separator, then up to
-    # four "name … traffic" rows. The traffic is each client's current-session
+    # five "name … traffic" rows. The traffic is each client's current-session
     # rx+tx, so it reads as today's usage — hence the "aujourd'hui" tag.
     for key in ("main", "iot"):
         net = unifi.get(key) or {}
@@ -940,7 +974,7 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
         hdr_y = y + line_h + 3
         draw.line([(x, hdr_y), (right - 1, hdr_y)], fill=BLACK, width=1)
         y = hdr_y + 5
-        for name, traffic in rows[:4]:
+        for name, traffic in rows[:5]:
             if y + line_h > region_bottom:
                 break
             row([(name, "regular", BLACK)], [(traffic, "bold", BLACK), ("Go", "regular", BLACK)], y)
@@ -1032,6 +1066,14 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
     separator_y = _title_sep_y(draw, fonts, stats_top)
     bar_max_height = max(20, baseline_y - separator_y - value_h - 14)
 
+    # Average reference line: a fine dashed line at the recent daily average,
+    # drawn before the bars (visible in the gaps and over short bars) so each
+    # day reads above/below normal without comparing the figures.
+    avg = stats.get("avg_kwh") if stats else None
+    if avg and 0 < avg <= max_kwh:
+        avg_y = baseline_y - round(avg / max_kwh * bar_max_height)
+        _dashed_h_line(draw, region_left, region_left + chart_width, avg_y)
+
     # --- Bars ---
     for i, d in enumerate(days):
         cx = region_left + i * col_width
@@ -1039,7 +1081,9 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
 
         lbox = draw.textbbox((0, 0), label_text, font=font_label)
         lw = lbox[2] - lbox[0]
-        draw.text((cx + (BAR_WIDTH - lw) // 2, strip_baseline + 4), label_text, fill=BLACK, font=font_label)
+        lx = cx + (BAR_WIDTH - lw) // 2
+        draw.text((lx, strip_baseline + 4), label_text, fill=BLACK, font=font_label)
+        _underline_weekend(draw, d, lx, lw, strip_baseline + 4 + label_h)
 
         # The day's intraday profile, bar-wide under the bar (drawn even on an
         # N/A day — a daily-total gap can still have samples).

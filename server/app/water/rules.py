@@ -95,6 +95,7 @@ def build_water_panel(rows: list[dict], now: datetime, price_m3: float,
 
     water_stats = {
         "avg_text": f"{avg_recent:.0f}" if avg_recent is not None else "N/A",
+        "avg_l": round(avg_recent, 1) if avg_recent is not None else None,  # numeric, for the chart's average line
         "avg_pct": trend_pct,
         "month_total_text": f"{month_total_m3:.2f}" if month_total_m3 is not None else "N/A",
         "cost_text": f"{month_total_m3 * price_m3:.2f}"

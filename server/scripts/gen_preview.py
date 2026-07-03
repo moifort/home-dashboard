@@ -219,6 +219,7 @@ data["power_sensors"] += [s for s in _extra_sensors if s["name"] not in _have]
 # that predates it, inject representative values so the bottom Talon row shows.
 if data.get("talon", {}).get("yesterday_text") in (None, "N/A", "—"):
     data["talon"] = {"yesterday_text": "318", "avg_text": "305", "avg_w": 305, "trend_pct": -4.0,
+                     "annual_text": "527",
                      "spark": [298, 312, 305, 330, 321, 309, 318]}
 
 # The UniFi panel needs live gateway credentials we don't have here; inject a
@@ -232,10 +233,10 @@ if "unifi" not in data:
         "usage_hier": "18,0", "usage_mois": "117,5", "usage_trend": 8.0,
         "iot": {"label": "Iotchoum", "count": 13, "top": [
             ("Salon 8d:f7", "0,5"), ("Cuisine 8a:8b", "0,5"), ("Chambre Minipc Bureau", "0,4"),
-            ("Bureau 7c:2a", "0,3")]},
-        "main": {"label": "Atchoum", "count": 4, "top": [
+            ("Bureau 7c:2a", "0,3"), ("Entrée 3f:91", "0,2")]},
+        "main": {"label": "Atchoum", "count": 5, "top": [
             ("MacBookPro Tibo", "15,5"), ("MacBookPro Lamia", "3,4"), ("iPhone Tibo", "0,8"),
-            ("iPad Lamia", "0,6")]},
+            ("iPad Lamia", "0,6"), ("Apple TV", "0,4")]},
     }
 
 # The water meter needs a live MQTT broker we don't have here; inject a

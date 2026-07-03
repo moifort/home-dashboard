@@ -47,13 +47,21 @@ def build_core(days: list[dict], now: datetime, price_hp: float, price_hc: float
     return {
         "days": result,
         "stats": _compute_stats(current_week, prev_weeks, price_hp, price_hc, price_abo_monthly),
-        "talon": _compute_talon(current_week, prev_weeks),
+        "talon": _compute_talon(current_week, prev_weeks, price_hp, price_hc),
     }
 
 
-def _compute_talon(current: list[dict], previous: list[dict]) -> dict:
+# The talon runs 24/7; without the learned tariff windows at hand, price its
+# year at the typical HC share of a day (2×4h off-peak windows).
+TALON_HC_HOURS = 8
+
+
+def _compute_talon(current: list[dict], previous: list[dict],
+                   price_hp: float, price_hc: float) -> dict:
     """Baseline-power panel: yesterday's talon, the recent daily average and its
-    trend. A rising talon means more standby waste, so it reads as bad (red)."""
+    trend. A rising talon means more standby waste, so it reads as bad (red).
+    Also prices the average talon over a year ('460€/an') — the figure that
+    makes standby waste concrete."""
     def _vals(days):
         return [d["talon_w"] for d in days if d.get("talon_w") is not None]
 
@@ -70,11 +78,17 @@ def _compute_talon(current: list[dict], previous: list[dict]) -> dict:
     last7 = [d.get("talon_w") for d in current[-7:]]
     spark = [None] * (7 - len(last7)) + last7
 
+    # Annual cost of the average talon: kW × (HC hours at HC price + the rest
+    # at HP price) × 365 — an estimate, so it displays whole euros.
+    annual_eur = (avg / 1000) * (TALON_HC_HOURS * price_hc
+                                 + (24 - TALON_HC_HOURS) * price_hp) * 365 if cur else None
+
     # "—" = the figure exists but isn't initialised yet (no talon recorded).
     return {
         "yesterday_text": f"{round(yesterday)}" if yesterday is not None else "—",
         "avg_text": f"{round(avg)}" if cur else "—",
         "avg_w": round(avg) if cur else None,
+        "annual_text": f"{round(annual_eur)}" if annual_eur is not None else None,
         "trend_pct": trend_pct,
         "spark": spark,
     }

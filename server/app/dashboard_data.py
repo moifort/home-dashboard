@@ -7,9 +7,15 @@ from datetime import datetime
 
 from app import alerts as alerts_engine
 from app import battery
-from app.system.config import PARIS_TZ
+from app.system.config import DAYS_FR, MONTHS_FR, PARIS_TZ
 from app.registry import CORE, OPTIONAL
 from app.system.scheduler import current_screen_refresh, next_screen_refresh, next_screen_wake
+
+
+def _date_text(now: datetime) -> str:
+    """Today as 'mar. 2 juin' — French, lowercase (e-paper rule), no locale
+    dependency (Docker images ship C.UTF-8 only)."""
+    return f"{DAYS_FR[now.weekday()].lower()}. {now.day} {MONTHS_FR[now.month - 1]}"
 
 
 def _attach_battery(home: dict, now: datetime) -> None:
@@ -48,6 +54,7 @@ def build_home_live(now: datetime) -> dict:
     from scratch — without this the tariff attached by build_dashboard_data
     would be wiped and never reach the screen)."""
     home = {
+        "date_text": _date_text(now),
         "last_text": f"{now:%H:%M}",
         "next_text": f"{next_screen_wake(now):%H:%M}",
     }
@@ -65,6 +72,7 @@ def build_dashboard_data(days: list[dict]) -> dict:
     # boundary math so the displayed times match the firmware's wake schedule.
     this_refresh = current_screen_refresh(now)
     data["home"] = {
+        "date_text": _date_text(now),
         "last_text": f"{this_refresh:%H:%M}",
         "next_text": f"{next_screen_refresh(this_refresh):%H:%M}",
     }

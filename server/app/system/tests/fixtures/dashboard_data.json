@@ -632,6 +632,7 @@
       "since_unit": "j",
       "since_value": "4"
     },
+    "date_text": "mar. 2 juin",
     "last_text": "14:00",
     "next_text": "16:00",
     "tariff": [
@@ -1247,6 +1248,7 @@
     "hc_ratio_pct": -14
   },
   "talon": {
+    "annual_text": "527",
     "avg_text": "316",
     "avg_w": 316,
     "spark": [
@@ -1778,6 +1780,7 @@
     }
   ],
   "water_stats": {
+    "avg_l": 143.3,
     "avg_pct": -1,
     "avg_text": "120",
     "cost_text": "1.19",
