@@ -30,8 +30,7 @@ CHART_BOTTOM = MARGIN  # screen bottom margin
 DIVIDER_GAP = 8  # spacing kept on each side of the mid-screen divider (not a screen margin)
 BAR_WIDTH = 28
 BAR_GAP = 16
-STATS_FONT_SIZE = 13
-VALUE_FONT_SIZE = 13
+STATS_FONT_SIZE = 13  # titles, values and bar figures all share the bold 13px
 LABEL_FONT_SIZE = 12
 # No energy threshold anywhere: a chart day is N/A only when it carries no data
 # at all (null/zero total — a meter gap, a day the inverter never reported).
@@ -138,6 +137,32 @@ def _row_adv(draw, fonts, x, right, left, right_segs, sy):
     _put_adv(draw, fonts, right_segs, right - _segw_adv(draw, fonts, right_segs), sy)
 
 
+def _spark_bars(draw, left, baseline, values, height_of):
+    """Thin sparkline bars grown up from `baseline`, one per value at the shared
+    3px/2px pitch. `height_of(v)` returns the bar height, or None to leave a gap
+    — the callers own the normalisation (row-max vs absolute 0-100)."""
+    for j, v in enumerate(values):
+        h = height_of(v)
+        if h is None:
+            continue
+        bx = left + j * (SPARK_BAR_W + SPARK_BAR_GAP)
+        draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
+
+
+def _draw_zero_baseline(draw, cx, baseline_y):
+    """The flat 1px baseline mark shared by zero-value and N/A chart days."""
+    draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
+
+
+def _draw_na_marker(draw, cx, baseline_y, font_value):
+    """A no-data chart day: the zero baseline plus a centred N/A label."""
+    _draw_zero_baseline(draw, cx, baseline_y)
+    box = draw.textbbox((0, 0), "N/A", font=font_value)
+    draw.text((cx + (BAR_WIDTH - (box[2] - box[0])) // 2,
+               baseline_y - (box[3] - box[1]) - 6),
+              "N/A", fill=BLACK, font=font_value)
+
+
 def render_dashboard(data: dict) -> Image.Image:
     img = Image.new("RGB", (WIDTH, HEIGHT), "white")
     draw = ImageDraw.Draw(img)
@@ -146,7 +171,6 @@ def render_dashboard(data: dict) -> Image.Image:
     fonts = {
         "regular": ImageFont.truetype(FONT_PATH, STATS_FONT_SIZE),
         "bold": ImageFont.truetype(FONT_BOLD_PATH, STATS_FONT_SIZE),
-        "value": ImageFont.truetype(FONT_BOLD_PATH, VALUE_FONT_SIZE),
         "label": ImageFont.truetype(FONT_PATH, LABEL_FONT_SIZE),
     }
 
@@ -390,7 +414,7 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
     daily-litres bars (single full-black bars, value in L on top, day label below).
     Mirrors the EDF/Solar look; sits in its own column so it never overlaps the
     Crypto panel anchored to the right edge."""
-    font_value = fonts["value"]
+    font_value = fonts["bold"]
     font_label = fonts["label"]
 
     # Butt up against the Solar chart (which hugs the left edge for BANNER_W)
@@ -434,15 +458,11 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
         # N/A day — a daily-total gap can still have samples).
         buckets = _intraday_buckets(d.get("intraday") or [], agg="sum")
         if buckets:
-            _draw_intraday(draw, cx, strip_baseline, buckets, INTRADAY_WATER_MAX_L,
-                           today=bool(d.get("today")))
+            _draw_intraday(draw, cx, strip_baseline, buckets, INTRADAY_WATER_MAX_L)
 
         litres = d.get("liters")
         if litres is None:
-            draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
-            nbox = draw.textbbox((0, 0), "N/A", font=font_value)
-            draw.text((cx + (BAR_WIDTH - (nbox[2] - nbox[0])) // 2, baseline_y - (nbox[3] - nbox[1]) - 6),
-                      "N/A", fill=BLACK, font=font_value)
+            _draw_na_marker(draw, cx, baseline_y, font_value)
             continue
 
         bar_h = round((litres / max_l) * bar_max_height)
@@ -450,7 +470,7 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
             draw.rectangle([cx, baseline_y - bar_h, cx + BAR_WIDTH - 1, baseline_y - 1], fill=BLACK)
         else:
             # Zero value: draw a baseline line, same marker as N/A.
-            draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
+            _draw_zero_baseline(draw, cx, baseline_y)
         val_text = f"{litres:.0f}"
         vbox = draw.textbbox((0, 0), val_text, font=font_value)
         draw.text((cx + (BAR_WIDTH - (vbox[2] - vbox[0])) // 2, baseline_y - bar_h - (vbox[3] - vbox[1]) - 10),
@@ -547,13 +567,8 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
             return
         present = [v for v in values if v]          # positives only
         max_v = max(present) if present else 0
-        baseline = sy + text_h
-        for j, v in enumerate(values):
-            if not v:                                # None or 0 -> no bar
-                continue
-            bx = spark_left + j * (SPARK_BAR_W + SPARK_BAR_GAP)
-            h = max(1, round(v / max_v * SPARK_MAX_H))
-            draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
+        _spark_bars(draw, spark_left, sy + text_h, values,
+                    lambda v: max(1, round(v / max_v * SPARK_MAX_H)) if v else None)
 
     # Title row above the separator (section-title band): abbreviated column
     # names, capitalised, each sharing its column's anchor and alignment.
@@ -673,13 +688,9 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
         """Thin bars on the absolute 0-100% moisture scale, grown up from the
         text baseline. Missing days leave a gap; present days draw at least a
         1px tick (a bone-dry day stays visible)."""
-        baseline = sy + line_h
-        for j, v in enumerate(values):
-            if v is None:
-                continue
-            bx = spark_left + j * (SPARK_BAR_W + SPARK_BAR_GAP)
-            h = max(1, round(min(v, 100) / 100 * SPARK_MAX_H))
-            draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
+        _spark_bars(draw, spark_left, sy + line_h, values,
+                    lambda v: None if v is None
+                    else max(1, round(min(v, 100) / 100 * SPARK_MAX_H)))
 
     # The watering drop matches the name's cap height and sits on its baseline,
     # rather than spanning the whole line (descender included), which looked big.
@@ -930,13 +941,12 @@ def _intraday_buckets(values, agg="mean"):
     return out
 
 
-def _draw_intraday(draw, cx, strip_baseline, buckets, ceiling, today=False):
+def _draw_intraday(draw, cx, strip_baseline, buckets, ceiling):
     """One day's intraday mini bar-graph: INTRADAY_BARS sparkline-style bars
     (same 3px/2px geometry as the bottom-table sparklines) grown up from
     `strip_baseline`. A None or zero bucket leaves a gap; only positive
     buckets draw a bar. Heights are normalised to the chart's fixed
-    `ceiling`; values above it clip to the full INTRADAY_H. `today` is kept
-    for signature stability (no longer affects drawing)."""
+    `ceiling`; values above it clip to the full INTRADAY_H."""
     for i, v in enumerate(buckets):
         if not v:                                # None or 0 -> no bar
             continue
@@ -949,7 +959,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
     if not days:
         return
 
-    font_value = fonts["value"]
+    font_value = fonts["bold"]
     font_label = fonts["label"]
     # No energy threshold: every positive value draws its bar, however small —
     # only a null day (no data) shows the N/A marker.
@@ -1003,15 +1013,10 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
         # The day's intraday profile, bar-wide under the bar (drawn even on an
         # N/A day — a daily-total gap can still have samples).
         if has_intraday and d.get("_intraday_buckets"):
-            _draw_intraday(draw, cx, strip_baseline, d["_intraday_buckets"], intraday_ceiling,
-                           today=bool(d.get("today")))
+            _draw_intraday(draw, cx, strip_baseline, d["_intraday_buckets"], intraday_ceiling)
 
         if d["_na"]:
-            draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
-            na_box = draw.textbbox((0, 0), "N/A", font=font_value)
-            na_w = na_box[2] - na_box[0]
-            na_h = na_box[3] - na_box[1]
-            draw.text((cx + (BAR_WIDTH - na_w) // 2, baseline_y - na_h - 6), "N/A", fill=BLACK, font=font_value)
+            _draw_na_marker(draw, cx, baseline_y, font_value)
             continue
 
         total = _bar_total(d, mode)
@@ -1019,7 +1024,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
 
         if total_h <= 0:
             # Zero value: draw a baseline line, same marker as N/A.
-            draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
+            _draw_zero_baseline(draw, cx, baseline_y)
         elif mode == "production":
             # Single full-black bar (no split data).
             draw.rectangle([cx, baseline_y - total_h, cx + BAR_WIDTH - 1, baseline_y - 1], fill=BLACK)
