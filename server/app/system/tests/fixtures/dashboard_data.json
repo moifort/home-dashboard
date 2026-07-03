@@ -634,6 +634,10 @@
     },
     "date_text": "mar. 2 juin",
     "last_text": "14:00",
+    "net_cost": {
+      "mtd_text": "3",
+      "proj_text": "56"
+    },
     "next_text": "16:00",
     "tariff": [
       {
@@ -1236,6 +1240,8 @@
     "autonomy_pct": 51,
     "avg_kwh": 8.4,
     "avg_kwh_pct": 45,
+    "month_savings_complete_eur": 0.54,
+    "month_savings_eur": 1.18,
     "savings_eur": 8.4,
     "total_kwh": 67.2
   },
@@ -1245,7 +1251,9 @@
     "avg_price": 2.08,
     "avg_price_pct": -3,
     "hc_ratio": 42.2,
-    "hc_ratio_pct": -14
+    "hc_ratio_pct": -14,
+    "month_cost_complete_eur": 2.05,
+    "month_cost_eur": 3.34
   },
   "talon": {
     "annual_text": "527",
@@ -1784,6 +1792,8 @@
     "avg_pct": -1,
     "avg_text": "120",
     "cost_text": "1.19",
+    "month_cost_complete_eur": 0.37,
+    "month_cost_eur": 1.19,
     "month_total_text": "0.30"
   }
 }

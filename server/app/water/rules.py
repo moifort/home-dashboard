@@ -92,6 +92,13 @@ def build_water_panel(rows: list[dict], now: datetime, price_m3: float,
         month_total_m3 = max(0.0, idx_now - idx_month_start)
     else:
         month_total_m3 = None
+    # Same volume on complete days only (up to yesterday's index) — feeds the
+    # home net-cost projection, which must not extrapolate a partial day.
+    idx_yesterday = _index_asof(rows, (today - timedelta(days=1)).strftime("%Y-%m-%d"))
+    if idx_yesterday is not None and idx_month_start is not None:
+        month_complete_m3 = max(0.0, idx_yesterday - idx_month_start)
+    else:
+        month_complete_m3 = None
 
     water_stats = {
         "avg_text": f"{avg_recent:.0f}" if avg_recent is not None else "N/A",
@@ -100,5 +107,10 @@ def build_water_panel(rows: list[dict], now: datetime, price_m3: float,
         "month_total_text": f"{month_total_m3:.2f}" if month_total_m3 is not None else "N/A",
         "cost_text": f"{month_total_m3 * price_m3:.2f}"
         if (month_total_m3 is not None and price_m3 > 0) else None,
+        # Numeric month costs for the home net-cost line (None when unpriced).
+        "month_cost_eur": round(month_total_m3 * price_m3, 2)
+        if (month_total_m3 is not None and price_m3 > 0) else None,
+        "month_cost_complete_eur": round(month_complete_m3 * price_m3, 2)
+        if (month_complete_m3 is not None and price_m3 > 0) else None,
     }
     return {"water_days": water_days, "water_stats": water_stats}

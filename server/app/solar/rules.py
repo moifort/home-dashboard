@@ -48,6 +48,14 @@ def build_production_panel(prod_by_date: dict, now: datetime, consumption_days: 
 
     stats = _compute_production_stats(recent, previous, price_hp)
     stats["autonomy_pct"] = _compute_autonomy(production_days, consumption_days)
+    # Month-to-date savings (self-consumed PV at HP price) + the complete-days
+    # figure (up to yesterday) for the home net-cost projection.
+    first = today.replace(day=1).strftime("%Y-%m-%d")
+    today_str = today.strftime("%Y-%m-%d")
+    month = {ds: kwh for ds, kwh in prod_by_date.items() if first <= ds <= today_str}
+    stats["month_savings_eur"] = round(sum(month.values()) * price_hp, 2)
+    stats["month_savings_complete_eur"] = round(
+        sum(kwh for ds, kwh in month.items() if ds < today_str) * price_hp, 2)
     return {"production_days": production_days, "production_stats": stats}
 
 

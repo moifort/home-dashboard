@@ -44,7 +44,7 @@ def build_fresh(now: datetime) -> dict:
     resilient crypto/UniFi panels, which omit themselves on failure), then the
     Home panel is overridden with the real pull moment + the device's next wake."""
     data = dashboard.build_dashboard_data(CORE.load_days())
-    data["home"] = dashboard.build_home_live(now)
+    data["home"] = dashboard.build_home_live(now, data)
     return data
 
 

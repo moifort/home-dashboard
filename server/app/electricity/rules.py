@@ -44,10 +44,33 @@ def build_core(days: list[dict], now: datetime, price_hp: float, price_hc: float
             "intraday": (papp_profiles or {}).get(d["date"]),
         })
 
+    stats = _compute_stats(current_week, prev_weeks, price_hp, price_hc, price_abo_monthly)
+    stats.update(_month_cost(days, now, price_hp, price_hc, price_abo_monthly))
     return {
         "days": result,
-        "stats": _compute_stats(current_week, prev_weeks, price_hp, price_hc, price_abo_monthly),
+        "stats": stats,
         "talon": _compute_talon(current_week, prev_weeks, price_hp, price_hc),
+    }
+
+
+def _month_cost(days: list[dict], now: datetime, price_hp: float, price_hc: float,
+                price_abo_monthly: float) -> dict:
+    """Month-to-date electricity cost (consumption at HC/HP prices + the
+    subscription prorated per elapsed day), plus the same figure on complete
+    days only (up to yesterday) — the clean base for an end-of-month projection
+    (today's partial row would drag it down)."""
+    first = now.strftime("%Y-%m-01")
+    today = now.strftime("%Y-%m-%d")
+    daily_abo = price_abo_monthly / 30.44
+
+    def _cost(rows):
+        return sum(r["hc_kwh"] * price_hc + r["hp_kwh"] * price_hp for r in rows)
+
+    month_rows = [d for d in days if first <= d["date"] <= today]
+    complete_rows = [d for d in month_rows if d["date"] < today]
+    return {
+        "month_cost_eur": round(_cost(month_rows) + daily_abo * now.day, 2),
+        "month_cost_complete_eur": round(_cost(complete_rows) + daily_abo * (now.day - 1), 2),
     }
 
 

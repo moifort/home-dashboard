@@ -667,6 +667,16 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
         else:
             batt_segs = days
         row([("Batt.", "regular", BLACK)], batt_segs, y)
+    net = home.get("net_cost")
+    if net:
+        y += line_h
+        # The month's net home bill (elec + water − solar) and its end-of-month
+        # projection: "58€ ► ~87€" (bold figures, regular glue — house rule).
+        segs = [(net["mtd_text"], "bold", BLACK), ("€", "regular", BLACK)]
+        if net.get("proj_text"):
+            segs += [(" ► ~", "regular", BLACK),
+                     (net["proj_text"], "bold", BLACK), ("€", "regular", BLACK)]
+        row([("Coût mois", "regular", BLACK)], segs, y)
     for line in home.get("tariff") or []:
         y += line_h
         rng = [(line["start_text"], "bold", BLACK),
