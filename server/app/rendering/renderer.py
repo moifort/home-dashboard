@@ -390,9 +390,10 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
                 cy = max(plot_top, ny - ch - 6)
                 draw.text((cx, cy), ctext, fill=BLACK, font=value_font)
 
-    # --- Warning markers: a full-yellow ▲ right after each skipped level's
-    # Y-axis price label (insufficient-funds, half-spacing or max-orders —
-    # mirrors the iOS grid badges). Flat fill, no outline.
+    # --- Warning markers: a yellow ▲ outlined in black right after each skipped
+    # level's Y-axis price label (insufficient-funds, half-spacing or max-orders
+    # — mirrors the iOS grid badges). The outline keeps the marker visible on
+    # the panel: flat yellow on white has almost no contrast on the e-paper.
     seen_y = set()
     for skip in skips:
         price = skip.get("price")
@@ -404,7 +405,7 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
         seen_y.add(y)
         draw.polygon(
             [(marker_cx, y - half), (marker_cx - half, y + half), (marker_cx + half, y + half)],
-            fill=YELLOW,
+            fill=YELLOW, outline=BLACK,
         )
 
 
