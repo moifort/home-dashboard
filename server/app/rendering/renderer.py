@@ -30,8 +30,9 @@ CHART_BOTTOM = MARGIN  # screen bottom margin
 DIVIDER_GAP = 8  # spacing kept on each side of the mid-screen divider (not a screen margin)
 BAR_WIDTH = 28
 BAR_GAP = 16
-STATS_FONT_SIZE = 13  # titles, values and bar figures all share the bold 13px
-LABEL_FONT_SIZE = 12
+TITLE_FONT_SIZE = 16  # panel titles (EDF, Solaire, Eau, Crypto, Réseau, Home…)
+STATS_FONT_SIZE = 13  # values and bar figures
+LABEL_FONT_SIZE = 12  # day labels, grid price labels
 # No energy threshold anywhere: a chart day is N/A only when it carries no data
 # at all (null/zero total — a meter gap, a day the inverter never reported).
 MAX_DAYS = 9  # reference column count for the stats banner width
@@ -90,8 +91,9 @@ PANEL_LEFT = WIDTH - CHART_LEFT - 3 * BANNER_W - 2 * COL_GAP
 
 def _title_sep_y(draw, fonts, top) -> int:
     """y of the 1px separator under a title band anchored at `top` — the shared
-    metric that keeps every panel's title/separator on the same line."""
-    return top + draw.textbbox((0, 0), "X", font=fonts["bold"])[3] + 8
+    metric that keeps every panel's title/separator on the same line. Sized on
+    the title font: the band must clear the 16px panel titles."""
+    return top + draw.textbbox((0, 0), "X", font=fonts["title"])[3] + 8
 
 
 # Glued-segment helpers, in two metric families that must NOT be merged: the
@@ -169,6 +171,7 @@ def render_dashboard(data: dict) -> Image.Image:
     draw.fontmode = "1"
 
     fonts = {
+        "title": ImageFont.truetype(FONT_BOLD_PATH, TITLE_FONT_SIZE),
         "regular": ImageFont.truetype(FONT_PATH, STATS_FONT_SIZE),
         "bold": ImageFont.truetype(FONT_BOLD_PATH, STATS_FONT_SIZE),
         "label": ImageFont.truetype(FONT_PATH, LABEL_FONT_SIZE),
@@ -267,7 +270,7 @@ def _draw_right_banner(draw, fonts, items, region_top) -> int:
 def _draw_crypto_banner(draw, fonts, crypto, region_top) -> int:
     profit_color = BLACK if crypto.get("profit_positive", True) else RED
     items = [
-        [("Crypto", "bold", BLACK)],
+        [("Crypto", "title", BLACK)],
         # Profit grouped behind a "Profits" label: signed % return + signed amount.
         [("Profits ", "regular", profit_color), (crypto.get("pct_text", "0"), "bold", profit_color),
          ("% ", "regular", profit_color), (crypto.get("profit_text", ""), "bold", profit_color)],
@@ -425,7 +428,7 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
     # Stats banner anchored at the top of the region (same look as chart titles).
     stats_top = region_top + CHART_TOP
     separator_y = _title_sep_y(draw, fonts, stats_top)
-    items = [[("Eau", "bold", BLACK)],
+    items = [[("Eau", "title", BLACK)],
              [(water_stats.get("avg_text", "N/A"), "bold", BLACK), ("L/j ", "regular", BLACK),
               _trend(water_stats.get("avg_pct", 0), True)],
              [(water_stats.get("month_total_text", "N/A"), "bold", BLACK), ("m³", "regular", BLACK)]]
@@ -611,7 +614,7 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
 
     stats_top = region_top + CHART_TOP
     sep_y = _title_sep_y(draw, fonts, stats_top)
-    _draw_stats_bar(draw, fonts, [[("Home", "bold", BLACK)]], x, stats_top, width, sep_y)
+    _draw_stats_bar(draw, fonts, [[("Home", "title", BLACK)]], x, stats_top, width, sep_y)
 
     y = sep_y + 4
     schedule = [
@@ -681,7 +684,7 @@ def _draw_plants_panel(draw, fonts, plants, region_top) -> int:
 
     stats_top = region_top
     sep_y = _title_sep_y(draw, fonts, stats_top)
-    _draw_stats_bar(draw, fonts, [[("Plantes", "bold", BLACK)]], x, stats_top, width, sep_y)
+    _draw_stats_bar(draw, fonts, [[("Plantes", "title", BLACK)]], x, stats_top, width, sep_y)
 
     put = partial(_put_adv, draw, fonts)
 
@@ -771,7 +774,7 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
 
     def section_title(label, y):
         """Draw a domain title + its 1px separator; return the y of the first row."""
-        draw.text((x, y), label, fill=BLACK, font=fonts["bold"])
+        draw.text((x, y), label, fill=BLACK, font=fonts["title"])
         sep = _title_sep_y(draw, fonts, y)
         draw.line([(x, sep), (x + width - 1, sep)], fill=BLACK, width=1)
         return sep + 4
@@ -862,9 +865,9 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
 
     isp_color = RED if unifi.get("isp_bad") else BLACK
     wifi_color = RED if unifi.get("wifi_bad") else BLACK
-    sep_y = region_top + line_h + 5
+    sep_y = _title_sep_y(draw, fonts, region_top)
     title_items = [
-        [("Réseau", "bold", BLACK)],
+        [("Réseau", "title", BLACK)],
         health(unifi.get("isp_name", ""), unifi.get("isp_pct", 0), isp_color,
                unifi.get("isp_trend"), invert_bad=False),
         health("WiFi", unifi.get("wifi_pct", 0), wifi_color,
@@ -1075,7 +1078,7 @@ def _build_consumption_items(stats):
         return "—" if v is None else str(v)
 
     return [
-        [("EDF", "bold", BLACK)],
+        [("EDF", "title", BLACK)],
         [(_v('avg_kwh'), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), True)],
         [("HC ", "regular", BLACK), (_v('hc_ratio'), "bold", BLACK), ("% ", "regular", BLACK),
@@ -1097,7 +1100,7 @@ def _build_production_items(stats):
     # Solar: more is better, so a rising trend is good (black), falling is bad (red).
     # Talon sits to the left of Total.
     return [
-        [("Solaire", "bold", BLACK)],
+        [("Solaire", "title", BLACK)],
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
         talon,
@@ -1127,10 +1130,15 @@ def _draw_stats_bar(draw, fonts, items, x, y, width, line_y):
     else:
         gap = 0
 
+    # Baseline-align mixed sizes: a 13px value next to the 16px title is shifted
+    # down by the ascent difference so both sit on the same text baseline.
+    max_ascent = max(font.getmetrics()[0]
+                     for item_parts, _ in rendered for _, font, _, _ in item_parts)
+
     cx = x
     for item_parts, item_w in rendered:
         for text, font, color, w in item_parts:
-            draw.text((cx, y), text, fill=color, font=font)
+            draw.text((cx, y + max_ascent - font.getmetrics()[0]), text, fill=color, font=font)
             cx += w
         cx += gap
 
