@@ -152,13 +152,6 @@ def _spark_bars(draw, left, baseline, values, height_of):
         draw.rectangle([bx, baseline - h, bx + SPARK_BAR_W - 1, baseline - 1], fill=BLACK)
 
 
-def _underline_weekend(draw, d, lx, lw, text_bottom):
-    """Underline a chart day label when the day is a Saturday/Sunday — keyed on
-    the day name (not the drawn text, so a weekend "Auj." is underlined too)."""
-    if d.get("day", "").lower() in ("sam", "dim"):
-        draw.line([(lx, text_bottom + 2), (lx + lw - 1, text_bottom + 2)], fill=BLACK, width=1)
-
-
 def _draw_zero_baseline(draw, cx, baseline_y):
     """The flat 1px baseline mark shared by zero-value and N/A chart days."""
     draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
@@ -471,7 +464,6 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
         lw = lbox[2] - lbox[0]
         lx = cx + (BAR_WIDTH - lw) // 2
         draw.text((lx, strip_baseline + 4), label_text, fill=BLACK, font=font_label)
-        _underline_weekend(draw, d, lx, lw, strip_baseline + 4 + label_h)
 
         # The day's intraday profile, bar-wide under the bar (drawn even on an
         # N/A day — a daily-total gap can still have samples).
@@ -904,8 +896,8 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
             items.append((atoms, BLACK if good else RED))
 
     # Overflow policy: only items that fit ENTIRELY are drawn; the rest are
-    # summarised by one "+N" row (never a silent truncation). The cut is
-    # measured first, backing off until the "+N" row itself fits.
+    # summarised by one "+N autre(s) alerte(s)" row (never a silent truncation).
+    # The cut is measured first, backing off until that row itself fits.
     heights = [wrap_height(atoms) for atoms, _ in items]
     drawn, end_y = 0, y
     while drawn < len(items) and end_y + heights[drawn] - row_h <= max_y:
@@ -919,7 +911,9 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     for atoms, color in items[:drawn]:
         y = wrap_atoms(atoms, color, y)
     if drawn < len(items) and y <= max_y:
-        draw.text((x, y), f"+{len(items) - drawn}", fill=BLACK, font=fonts["bold"])
+        n = len(items) - drawn
+        noun = "autre alerte" if n == 1 else "autres alertes"
+        wrap_atoms([[(f"+{n}", "bold")]] + [[(w, "regular")] for w in noun.split()], BLACK, y)
 
 
 def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
@@ -1107,7 +1101,6 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
         lw = lbox[2] - lbox[0]
         lx = cx + (BAR_WIDTH - lw) // 2
         draw.text((lx, strip_baseline + 4), label_text, fill=BLACK, font=font_label)
-        _underline_weekend(draw, d, lx, lw, strip_baseline + 4 + label_h)
 
         # The day's intraday profile, bar-wide under the bar (drawn even on an
         # N/A day — a daily-total gap can still have samples).

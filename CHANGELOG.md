@@ -1,6 +1,9 @@
 # Changelog
 
-## 2026-07-03
+## 2026-07-04
+
+- **`EDF`/`Eau`/`Solaire`: the weekend day-label underline is gone**: the `sam`/`dim` labels no longer carry the 1px underline added in the glanceability pass. It read as an unexplained mark under every weekend column without earning its ink, so it was dropped from all three charts (the `_underline_weekend` helper is removed). Render golden re-baselined, preview regenerated; no new environment variable.
+- **`Alertes`: the overflow row spells itself out**: the truncation indicator was a bare bold `+N`, which gave no clue what it counted. It now reads `+N autre alerte` / `+N autres alertes` (the number bold, the rest regular, still a single line at the panel width), so a truncated board says plainly how many more alerts are hidden. No new environment variable; goldens unchanged (the fixture does not overflow).
 
 - **`Home`: net month cost with an end-of-month projection**: a new `Coût mois 58€ ► ~87€` line consolidates the euros previously scattered across three panels into the one figure that matters: what the home costs this month, net (grid electricity at HC/HP prices + prorated subscription + water, minus solar savings). The projection extrapolates complete days only (a partial today would drag it down) and hides on the 1st of the month. Composed from the month figures each enabled domain attaches, so a disabled domain simply contributes nothing. Goldens re-baselined; no new environment variable.
 - **`Home`: live snapshot lines**: the screen was entirely historical; the panel now shows `Conso 850W (HP)` (the meter's instantaneous draw + the current tariff period, straight from the live PTEC) and `Solaire 320W` (the inverter's last heartbeat). A line hides when its source has no sample fresher than 15 minutes, so a dead stream never shows stale watts. The values are as of the render, i.e. the device's last wake. No new environment variable; goldens unchanged.
