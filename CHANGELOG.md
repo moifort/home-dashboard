@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-12
+
+- **`Home`: the subscription share is broken out of the month cost**: the `Coût mois` line hid the fixed part inside its total; it now reads `58€ ► ~87€ (8€ abo)`, surfacing the electricity subscription accrued so far this month (`PRICE_ABO_MONTHLY` prorated over the elapsed days, the same basis as the total). It stays a single line at the panel width, number bold and the rest regular. Goldens re-baselined, preview regenerated; no new environment variable.
+- **`Réseau`: the IoT SSID shows a sixth client**: the panel's last mini-table (the IoT network, `Iotchoum`) was capped at its five busiest clients, leaving the bottom of the screen empty when the main Wi-Fi is light. It now lists up to six, filling the gutter down to the screen edge (the main Wi-Fi keeps its top-5, and the existing bottom guard still prevents overflow). Goldens re-baselined, preview regenerated; no new environment variable.
+
 ## 2026-07-04
 
 - **`EDF`/`Eau`/`Solaire`: the weekend day-label underline is gone**: the `sam`/`dim` labels no longer carry the 1px underline added in the glanceability pass. It read as an unexplained mark under every weekend column without earning its ink, so it was dropped from all three charts (the `_underline_weekend` helper is removed). Render golden re-baselined, preview regenerated; no new environment variable.
