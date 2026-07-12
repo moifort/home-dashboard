@@ -607,6 +607,7 @@
     "date_text": "mar. 2 juin",
     "last_text": "14:00",
     "net_cost": {
+      "abo_text": "1",
       "mtd_text": "3",
       "proj_text": "56"
     },
@@ -1230,6 +1231,7 @@
     "avg_price_pct": -3,
     "hc_ratio": 42.2,
     "hc_ratio_pct": -14,
+    "month_abo_eur": 1.03,
     "month_cost_complete_eur": 2.05,
     "month_cost_eur": 3.34
   },
@@ -1269,6 +1271,14 @@
         [
           "Bureau 7c:2a",
           "0,3"
+        ],
+        [
+          "Entrée 3f:91",
+          "0,2"
+        ],
+        [
+          "Capteur 2b:14",
+          "0,1"
         ]
       ]
     },
@@ -1279,7 +1289,7 @@
     "latency_trend": 12.0,
     "latency_val": "2",
     "main": {
-      "count": 4,
+      "count": 2,
       "label": "Atchoum",
       "top": [
         [
@@ -1289,14 +1299,6 @@
         [
           "MacBookPro Lam…",
           "3,4"
-        ],
-        [
-          "iPhone Tibo",
-          "0,8"
-        ],
-        [
-          "iPad Lamia",
-          "0,6"
         ]
       ]
     },

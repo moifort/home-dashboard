@@ -57,6 +57,11 @@ def _attach_net_cost(home: dict, data: dict, now: datetime) -> None:
         month_days = (now.replace(month=now.month % 12 + 1, day=1,
                                   year=now.year + (now.month == 12)) - timedelta(days=1)).day
         entry["proj_text"] = f"{round(net_complete / elapsed * month_days)}"
+    # The subscription's month-to-date share (electricity-only), broken out of
+    # the total so the render can read "58€ ► ~87€ (8€ abo)".
+    abo = (data.get("stats") or {}).get("month_abo_eur")
+    if abo:
+        entry["abo_text"] = f"{round(abo)}"
     home["net_cost"] = entry
 
 

@@ -238,10 +238,9 @@ if "unifi" not in data:
         "usage_hier": "18,0", "usage_mois": "117,5", "usage_trend": 8.0,
         "iot": {"label": "Iotchoum", "count": 13, "top": [
             ("Salon 8d:f7", "0,5"), ("Cuisine 8a:8b", "0,5"), ("Chambre Minipc Bureau", "0,4"),
-            ("Bureau 7c:2a", "0,3"), ("Entrée 3f:91", "0,2")]},
-        "main": {"label": "Atchoum", "count": 5, "top": [
-            ("MacBookPro Tibo", "15,5"), ("MacBookPro Lamia", "3,4"), ("iPhone Tibo", "0,8"),
-            ("iPad Lamia", "0,6"), ("Apple TV", "0,4")]},
+            ("Bureau 7c:2a", "0,3"), ("Entrée 3f:91", "0,2"), ("Capteur 2b:14", "0,1")]},
+        "main": {"label": "Atchoum", "count": 2, "top": [
+            ("MacBookPro Tibo", "15,5"), ("MacBookPro Lamia", "3,4")]},
     }
 
 # The water meter needs a live MQTT broker we don't have here; inject a

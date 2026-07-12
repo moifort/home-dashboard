@@ -79,8 +79,8 @@ INTRADAY_MAX_W = int(os.environ.get("INTRADAY_MAX_W", "3000"))  # W (mean PAPP) 
 INTRADAY_SOLAR_MAX_W = int(os.environ.get("INTRADAY_SOLAR_MAX_W", "800"))  # W (mean PV) at full height
 INTRADAY_WATER_MAX_L = int(os.environ.get("INTRADAY_WATER_MAX_L", "150"))  # L per 4h bucket at full height
 # Divider for the right column (Crypto top / Réseau bottom): raised above the
-# mid-screen so the trading grid stays compact and the Réseau panel gains two
-# client rows (top-5 per network instead of top-4).
+# mid-screen so the trading grid stays compact and the Réseau panel gains client
+# rows (main Wi-Fi top-5, then IoT top-6 to fill the bottom gutter).
 SOLAR_HEIGHT = HEIGHT // 2 - 56
 WATER_SPLIT = HEIGHT // 2  # center column split: Eau (top half) over Solaire (bottom half)
 
@@ -668,6 +668,10 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
         if net.get("proj_text"):
             segs += [(" ► ~", "regular", BLACK),
                      (net["proj_text"], "bold", BLACK), ("€", "regular", BLACK)]
+        # Break out the fixed subscription share: "… (8€ abo)" (number bold, glued).
+        if net.get("abo_text"):
+            segs += [(" (", "regular", BLACK), (net["abo_text"], "bold", BLACK),
+                     ("€ abo)", "regular", BLACK)]
         row([("Coût mois", "regular", BLACK)], segs, y)
     # Live snapshot: the meter's instantaneous draw with the current tariff
     # period, and the live PV watts. Absent lines mean no fresh sample.
@@ -992,7 +996,9 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
         hdr_y = y + line_h + 3
         draw.line([(x, hdr_y), (right - 1, hdr_y)], fill=BLACK, width=1)
         y = hdr_y + 5
-        for name, traffic in rows[:5]:
+        # IoT is the last section: allow a 6th client to fill the bottom gutter.
+        cap = 6 if key == "iot" else 5
+        for name, traffic in rows[:cap]:
             if y + line_h > region_bottom:
                 break
             row([(name, "regular", BLACK)], [(traffic, "bold", BLACK), ("Go", "regular", BLACK)], y)

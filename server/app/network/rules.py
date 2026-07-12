@@ -52,14 +52,14 @@ def _client_bytes(c: dict) -> int:
     return int((c.get("rx_bytes", 0) or 0) + (c.get("tx_bytes", 0) or 0))
 
 
-def _network(clients: list, ssid: str, label: str) -> dict:
-    """Client count + top-5 by total traffic for one SSID (wireless only)."""
+def _network(clients: list, ssid: str, label: str, cap: int = 5) -> dict:
+    """Client count + top-`cap` by total traffic for one SSID (wireless only)."""
     members = [c for c in clients if not c.get("is_wired") and c.get("essid") == ssid]
     members.sort(key=_client_bytes, reverse=True)
     top = [
         (_short(c.get("display_name") or c.get("hostname") or c.get("mac", "?")),
          _gb(_client_bytes(c)))
-        for c in members[:5]
+        for c in members[:cap]
     ]
     return {"label": label, "count": len(members), "top": top}
 
@@ -131,7 +131,9 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
         "latency_val": str(latency_ms), "latency_trend": None,
         "usage_hier": _gb(yesterday_bytes), "usage_mois": _gb(rolling_bytes),
         "usage_trend": usage_trend,
-        "iot": _network(clients, ssids["iot"], ssids["iot"] or "IoT"),
+        # IoT is the last section on screen: one extra row (top-6) fills the
+        # bottom gutter without overflowing (the render still guards region_bottom).
+        "iot": _network(clients, ssids["iot"], ssids["iot"] or "IoT", cap=6),
         "main": _network(clients, ssids["main"], ssids["main"] or "Perso"),
         # Raw values snapshotted by attach() to compute the 7-day trends.
         "_snap": {

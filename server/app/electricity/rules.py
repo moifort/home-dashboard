@@ -58,7 +58,8 @@ def _month_cost(days: list[dict], now: datetime, price_hp: float, price_hc: floa
     """Month-to-date electricity cost (consumption at HC/HP prices + the
     subscription prorated per elapsed day), plus the same figure on complete
     days only (up to yesterday) — the clean base for an end-of-month projection
-    (today's partial row would drag it down)."""
+    (today's partial row would drag it down). Also exposes the subscription's
+    own month-to-date share so the render can break it out of the total."""
     first = now.strftime("%Y-%m-01")
     today = now.strftime("%Y-%m-%d")
     daily_abo = price_abo_monthly / 30.44
@@ -71,6 +72,7 @@ def _month_cost(days: list[dict], now: datetime, price_hp: float, price_hc: floa
     return {
         "month_cost_eur": round(_cost(month_rows) + daily_abo * now.day, 2),
         "month_cost_complete_eur": round(_cost(complete_rows) + daily_abo * (now.day - 1), 2),
+        "month_abo_eur": round(daily_abo * now.day, 2),
     }
 
 
