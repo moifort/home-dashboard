@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-18
+
+- **`Réseau`: the IoT SSID shows a seventh client**: the last mini-table (the IoT network, `Iotchoum`) was capped at six clients and still left a sliver of empty screen under it. It now lists up to seven, which needed 6px back from the panel's internal spacing (the gap under the usage row, under each section separator and between the two sections) — the last row now ends 5px above the screen edge instead of overflowing it. The main Wi-Fi keeps its top-5 and the bottom guard still prevents overflow. Goldens re-baselined, preview regenerated; no new environment variable.
+- **Bottom table: the `Hier` (yesterday) column becomes `€/mois`**: each plug row (and `Talon`) opened on yesterday's kWh — a single noisy day, already readable in the row's sparkline. It now shows what the row costs per month: the recent 9-day daily average priced over a mean calendar month (30.44 d) at the meter's own tariffs, split at the group's measured off-peak share (`PRICE_HC`/`PRICE_HP`); with no HC history yet, everything is priced at the peak rate. `Talon` reuses its yearly estimate divided by 12. Amounts read with one decimal below 10 € (`2,4€`) and whole euros above (`16€`). Yesterday's figure stays in the data (it still feeds the alerts). Goldens re-baselined, preview regenerated; no new environment variable.
+
 ## 2026-07-12
 
 - **`Home`: the subscription share is broken out of the month cost**: the `Coût mois` line hid the fixed part inside its total; it now reads `58€ ► ~87€ (8€ abo)`, surfacing the electricity subscription accrued so far this month (`PRICE_ABO_MONTHLY` prorated over the elapsed days, the same basis as the total). It stays a single line at the panel width, number bold and the rest regular. Goldens re-baselined, preview regenerated; no new environment variable.

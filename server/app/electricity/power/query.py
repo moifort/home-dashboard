@@ -8,8 +8,10 @@ repository. SENSORS/ENABLED are read through the package at call time so tests
 from datetime import datetime, timedelta
 
 from app.system.config import PARIS_TZ
-from app.module.format import format_energy_kwh
+from app.module.format import format_cost_eur, format_energy_kwh
 from app.electricity.power.infrastructure import repository
+
+DAYS_PER_MONTH = 30.44  # mean calendar month, as used for the subscription share
 
 
 def _merged_by_date(slugs: list, start: str, end: str) -> dict:
@@ -54,8 +56,9 @@ def _group_spark(slugs: list, today, today_str: str) -> list:
     return [by_date.get((today - timedelta(days=n)).strftime("%Y-%m-%d")) for n in range(7, 0, -1)]
 
 
-def _group_stats(slugs: list, today, today_str: str) -> dict:
-    """Yesterday's kWh, recent daily average and trend for one group (summed).
+def _group_stats(slugs: list, today, today_str: str,
+                 price_hc: float, price_hp: float) -> dict:
+    """Yesterday's kWh, recent daily average, monthly cost and trend for one group.
 
     Unlike the Linky data (whose API can return garbage), a plug's reading is
     trusted as-is — every recorded day counts toward the average (no near-zero
@@ -83,11 +86,22 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
     avg_prev = sum(prev) / len(prev) if prev else 0.0
     trend_pct = round((avg - avg_prev) / avg_prev * 100) if avg_prev > 0 else 0
 
+    hc_pct = _hc_pct(slugs, nine_ago, today_str)
+
+    # What the group costs in a month at the meter's own tariffs: the recent
+    # daily average priced over a mean calendar month, split at the group's
+    # measured off-peak share. With no HC split on record yet (pre-deploy
+    # history), everything is priced at the peak rate — the honest upper bound.
+    hc_share = hc_pct / 100 if hc_pct is not None else 0.0
+    kwh_price = hc_share * price_hc + (1 - hc_share) * price_hp
+    cost_text = format_cost_eur(avg * DAYS_PER_MONTH * kwh_price) if past else "—"
+
     # "—" with the unit kept = the figure exists but isn't initialised yet.
     yesterday_text, yesterday_unit = (
         format_energy_kwh(yesterday_kwh, "") if yesterday_kwh is not None else ("—", "kWh"))
     avg_text, avg_unit = format_energy_kwh(avg, "/j") if past else ("—", "kWh/j")
     return {
+        "cost_text": cost_text,  # €/month at the HC/HP mix, for the bottom table
         "yesterday_text": yesterday_text,
         "yesterday_unit": yesterday_unit,
         "yesterday_kwh": yesterday_kwh,  # numeric, for the peak-hours alert
@@ -96,7 +110,7 @@ def _group_stats(slugs: list, today, today_str: str) -> dict:
         "avg_unit": avg_unit,
         "avg_kwh": avg if past else None,  # numeric (kWh) for sorting + alert money
         "trend_pct": trend_pct,
-        "hc_pct": _hc_pct(slugs, nine_ago, today_str),  # int 0..100 or None (no HC info yet)
+        "hc_pct": hc_pct,  # int 0..100 or None (no HC info yet)
         # Prior-period HC share (same window as the trend) for the alert that
         # spots a plug drifting out of the off-peak hours.
         "hc_pct_prev": _hc_pct(slugs, prev_start, nine_ago),
@@ -111,13 +125,13 @@ def attach(data: dict):
     Integrated from each device's reported power (no energy counter); history
     starts at first connection (no backfill).
     """
-    from app.electricity import power
+    from app.electricity import PRICE_HC, PRICE_HP, power
 
     now = datetime.now(PARIS_TZ)
     today = now.date()
     today_str = today.strftime("%Y-%m-%d")
     data["power_sensors"] = [
-        {"name": name, **_group_stats(slugs, today, today_str)}
+        {"name": name, **_group_stats(slugs, today, today_str, PRICE_HC, PRICE_HP)}
         for name, slugs in power._groups(power.SENSORS)
     ]
 

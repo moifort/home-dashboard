@@ -5,6 +5,7 @@ talon (baseline-power) panel from a list of cached days.
 """
 from datetime import datetime, timedelta
 
+from app.module.format import format_cost_eur
 from app.system.config import DAYS_FR
 
 
@@ -114,6 +115,8 @@ def _compute_talon(current: list[dict], previous: list[dict],
         "avg_text": f"{round(avg)}" if cur else "—",
         "avg_w": round(avg) if cur else None,
         "annual_text": f"{round(annual_eur)}" if annual_eur is not None else None,
+        # Same estimate spread over a month, for the bottom table's cost column.
+        "cost_text": format_cost_eur(annual_eur / 12) if annual_eur is not None else "—",
         "trend_pct": trend_pct,
         "spark": spark,
     }

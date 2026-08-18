@@ -105,7 +105,7 @@ WATER_PRICE_M3=4.30                    # €/m³ (0 = hide cost)
 <details>
 <summary><b>Power sensors (Cumulus, washing machine)</b></summary>
 
-Any Zigbee2MQTT / ESPHome device reporting only instantaneous power (W). Each becomes a row in the bottom table, integrated into daily kWh. Declare them all in one variable as `topic:Display Name`, `;`-separated. Topics sharing the same label get summed into one row (e.g. every plug in a `Salon`).
+Any Zigbee2MQTT / ESPHome device reporting only instantaneous power (W). Each becomes a row in the bottom table, integrated into daily kWh: what it costs per month (`€/mois`, the recent daily average priced over a mean month at its own off-peak/peak mix), its `kWh/j` daily average with a trend, its off-peak share and a 7-day sparkline. Declare them all in one variable as `topic:Display Name`, `;`-separated. Topics sharing the same label get summed into one row (e.g. every plug in a `Salon`).
 
 ```env
 POWER_SENSORS=zigbee2mqtt/cumulus:Cumulus;zigbee2mqtt/washing_machine:Lave-linge

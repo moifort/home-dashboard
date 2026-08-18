@@ -56,6 +56,13 @@ def format_energy_kwh(kwh, period):
     return f"{kwh:.1f}", f"kWh{period}"
 
 
+def format_cost_eur(eur):
+    """Adaptive text for a monthly cost on the bottom table: one decimal (French
+    comma) below 10 €, whole euros above — a cheap plug reads '2,4' instead of
+    collapsing to '2', while a heavy one stays uncluttered ('16')."""
+    return f"{eur:.1f}".replace(".", ",") if eur < 10 else f"{round(eur)}"
+
+
 def _eur(value):
     """Euro amount with a French decimal comma, e.g. 0.39 -> '0,39'."""
     return f"{abs(value):.2f}".replace(".", ",")

@@ -131,9 +131,9 @@ def build_unifi_panel(raw: dict, ssids: dict) -> dict | None:
         "latency_val": str(latency_ms), "latency_trend": None,
         "usage_hier": _gb(yesterday_bytes), "usage_mois": _gb(rolling_bytes),
         "usage_trend": usage_trend,
-        # IoT is the last section on screen: one extra row (top-6) fills the
+        # IoT is the last section on screen: two extra rows (top-7) fill the
         # bottom gutter without overflowing (the render still guards region_bottom).
-        "iot": _network(clients, ssids["iot"], ssids["iot"] or "IoT", cap=6),
+        "iot": _network(clients, ssids["iot"], ssids["iot"] or "IoT", cap=7),
         "main": _network(clients, ssids["main"], ssids["main"] or "Perso"),
         # Raw values snapshotted by attach() to compute the 7-day trends.
         "_snap": {

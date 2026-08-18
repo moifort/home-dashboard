@@ -39,9 +39,9 @@ MAX_DAYS = 9  # reference column count for the stats banner width
 # grid, the bottom table and the Réseau panel share it.
 BANNER_W = MAX_DAYS * (BAR_WIDTH + BAR_GAP) - BAR_GAP
 WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto grid
-# Table under the EDF chart: a section-title header row (Hier | Moy. | HC)
+# Table under the EDF chart: a section-title header row (€/mois | Moy. | HC)
 # above the separator line — same band as the Solaire title opposite — then
-# a grid (name | yesterday | avg | trend | HC% | sparkline), stacking the
+# a grid (name | monthly cost | avg | trend | HC% | sparkline), stacking the
 # Cumulus/Lave-linge/Talon rows below. Anchored at the center-column mid-height
 # split, mirroring the solar banner geometry.
 BOTTOM_ROW_H = 17  # vertical pitch between table rows
@@ -58,10 +58,10 @@ SPARK_W = SPARK_BARS * (SPARK_BAR_W + SPARK_BAR_GAP) - SPARK_BAR_GAP  # = 33
 SPARK_COL_W = SPARK_W + 12  # = 45
 SPARK_MAX_H = 11  # tallest bar (px), grown up from the row's text baseline
 # Bottom-table column anchors as fractions of the table width: name (left),
-# yesterday kWh (left), kWh/j (right edge), trend (left, glued to kWh/j),
+# monthly cost (left), kWh/j (right edge), trend (left, glued to kWh/j),
 # HC % (left); the sparkline owns the right edge. The columns are spread out
 # except avg+trend, which read as one glued block.
-BOTTOM_COL_HIER = 0.30   # left edge of the yesterday-kWh column
+BOTTOM_COL_COST = 0.30   # left edge of the €/month column
 BOTTOM_COL_AVG_R = 0.60   # right edge of the "kWh/j" column (right-aligned)
 BOTTOM_COL_TREND = 0.615  # left edge of the trend column (glued after kWh/j)
 BOTTOM_COL_HC = 0.78     # left edge of the HC % column
@@ -80,7 +80,7 @@ INTRADAY_SOLAR_MAX_W = int(os.environ.get("INTRADAY_SOLAR_MAX_W", "800"))  # W (
 INTRADAY_WATER_MAX_L = int(os.environ.get("INTRADAY_WATER_MAX_L", "150"))  # L per 4h bucket at full height
 # Divider for the right column (Crypto top / Réseau bottom): raised above the
 # mid-screen so the trading grid stays compact and the Réseau panel gains client
-# rows (main Wi-Fi top-5, then IoT top-6 to fill the bottom gutter).
+# rows (main Wi-Fi top-5, then IoT top-7 to fill the bottom gutter).
 SOLAR_HEIGHT = HEIGHT // 2 - 56
 WATER_SPLIT = HEIGHT // 2  # center column split: Eau (top half) over Solaire (bottom half)
 
@@ -509,9 +509,10 @@ def _fit_text(draw, text, font, max_w) -> str:
 def _build_bottom_rows(data) -> list:
     """Assemble the bottom table rows: each configured power sensor (Cumulus,
     Lave-linge, …) then Talon (core Linky, always shown). Each row is a 6-column
-    tuple (name, yesterday, avg, trend, spark, hc_pct) — a rising value reads as
-    bad (red) for these consumption-style metrics; `spark` is the row's 7-day
-    series; `hc_pct` is the off-peak share (None hides the cell, always for Talon)."""
+    tuple (name, cost, avg, trend, spark, hc_pct) — a rising value reads as
+    bad (red) for these consumption-style metrics; `cost` is what the row costs
+    per month at the HC/HP mix; `spark` is the row's 7-day series; `hc_pct` is
+    the off-peak share (None hides the cell, always for Talon)."""
     def _sensor_avg(sensor):
         v = sensor.get("avg_kwh")
         return v if v is not None else float("-inf")  # "N/A" (pas d'historique) → en bas
@@ -532,7 +533,7 @@ def _build_bottom_rows(data) -> list:
                   if hc_pct is not None else [("—", "regular", BLACK)])
         rows.append((
             [(_short_name(sensor.get("name", "")), "bold", BLACK)],
-            [(sensor.get("yesterday_text", "0"), "bold", BLACK), (sensor.get("yesterday_unit", "kWh"), "regular", BLACK)],
+            [(sensor.get("cost_text", "—"), "bold", BLACK), ("€", "regular", BLACK)],
             [(sensor.get("avg_text", "0"), "bold", BLACK), (sensor.get("avg_unit", "kWh/j"), "regular", BLACK)],
             [_trend(sensor.get("trend_pct", 0), True)],
             sensor.get("spark"),
@@ -547,7 +548,7 @@ def _build_bottom_rows(data) -> list:
             name_segs += [(" " + talon["annual_text"], "bold", BLACK), ("€/an", "regular", BLACK)]
         rows.append((
             name_segs,
-            [(talon.get("yesterday_text", "0"), "bold", BLACK), ("W", "regular", BLACK)],
+            [(talon.get("cost_text", "—"), "bold", BLACK), ("€", "regular", BLACK)],
             [(talon.get("avg_text", "0"), "bold", BLACK), ("W", "regular", BLACK)],
             [_trend(talon.get("trend_pct", 0), True)],
             talon.get("spark"),
@@ -558,10 +559,10 @@ def _build_bottom_rows(data) -> list:
 
 def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
     """Draw the table under the EDF chart as its own section: a title row naming
-    the columns (Hier / Moy. / HC) above a 1px separator — same band and
+    the columns (€/mois / Moy. / HC) above a 1px separator — same band and
     separator y as the Solaire banner opposite (`region_top` is the mid-height
     split) — then a 6-column grid with one row per metric: name (left),
-    yesterday kWh (left), kWh/j (right), trend (left, glued to kWh/j), HC %
+    monthly cost (left), kWh/j (right), trend (left, glued to kWh/j), HC %
     (left), and a 7-day sparkline hugging the right edge (no surrounding box)."""
     width = BANNER_W
     x = PANEL_LEFT
@@ -573,7 +574,7 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
     # Sparkline column owns the table's right edge; the bars are centred inside
     # it, leaving a small margin on each side (the column is wider than the graph).
     spark_left = x + width - SPARK_COL_W + (SPARK_COL_W - SPARK_W) // 2
-    hier_x = x + round(width * BOTTOM_COL_HIER)
+    cost_x = x + round(width * BOTTOM_COL_COST)
     avg_r = x + round(width * BOTTOM_COL_AVG_R)  # right edge of the kWh/j column
     trend_x = x + round(width * BOTTOM_COL_TREND)
     hc_x = x + round(width * BOTTOM_COL_HC)  # left edge of the HC % column
@@ -595,16 +596,16 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
     # Title row above the separator (section-title band): abbreviated column
     # names, capitalised, each sharing its column's anchor and alignment.
     # Nothing over the name column, the trend or the sparkline.
-    put([("Hier", "regular", BLACK)], hier_x, header_y)
+    put([("€/mois", "regular", BLACK)], cost_x, header_y)
     moy = [("Moy.", "regular", BLACK)]
     put(moy, avg_r - seg_w(moy), header_y)
     put([("HC", "regular", BLACK)], hc_x, header_y)
 
     for i, row in enumerate(rows):
         ry = y0 + i * BOTTOM_ROW_H
-        name, hier, avg, trend, series, hc_seg = row
+        name, cost, avg, trend, series, hc_seg = row
         put(name, x, ry)                      # col 1: name, left
-        put(hier, hier_x, ry)                 # col 2: yesterday kWh, left
+        put(cost, cost_x, ry)                 # col 2: €/month, left
         put(avg, avg_r - seg_w(avg), ry)      # col 3: kWh/j, right
         put(trend, trend_x, ry)               # col 4: trend, left (glued)
         if hc_seg:                            # col 5: HC %, left (None on Talon)
@@ -924,8 +925,8 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
     """Draw the "Réseau" panel in the bottom-right column (under the crypto grid):
     a title banner with internet/Wi-Fi health (each with a ▲▼ trend), detail rows
     (latency, Wi-Fi signal, data usage — values with their unit in regular weight,
-    glued to the bold number), then a top-5 clients mini-table per
-    network (main Wi-Fi first, then IoT) with its client count."""
+    glued to the bold number), then a clients mini-table per network (main
+    Wi-Fi top-5 first, then IoT top-7) with its client count."""
     width = BANNER_W
     x = WIDTH - CHART_LEFT - width
     right = x + width
@@ -979,7 +980,7 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
               [(unifi.get("usage_hier", ""), "bold", BLACK), ("/", "regular", BLACK),
                (unifi.get("usage_mois", ""), "bold", BLACK), ("Go", "regular", BLACK)],
               y, unifi.get("usage_trend"), neutral=True)
-    y += row_h + 4
+    y += row_h + 2
 
     # --- Top-5 clients per network (main Wi-Fi first, then IoT): a header
     # (name + "· aujourd'hui" period tag + count) over a separator, then up to
@@ -995,15 +996,15 @@ def _draw_unifi_panel(draw, fonts, unifi, region_top, region_bottom) -> None:
             [(str(count), "bold", BLACK), (" clients", "regular", BLACK)], y)
         hdr_y = y + line_h + 3
         draw.line([(x, hdr_y), (right - 1, hdr_y)], fill=BLACK, width=1)
-        y = hdr_y + 5
-        # IoT is the last section: allow a 6th client to fill the bottom gutter.
-        cap = 6 if key == "iot" else 5
+        y = hdr_y + 4
+        # IoT is the last section: allow a 7th client to fill the bottom gutter.
+        cap = 7 if key == "iot" else 5
         for name, traffic in rows[:cap]:
             if y + line_h > region_bottom:
                 break
             row([(name, "regular", BLACK)], [(traffic, "bold", BLACK), ("Go", "regular", BLACK)], y)
             y += row_h
-        y += 4
+        y += 2
 
 
 def _bar_total(d: dict, mode: str) -> float:

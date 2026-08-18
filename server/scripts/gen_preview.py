@@ -190,10 +190,10 @@ for i, d in enumerate(data.get("production_days", [])):
 if not data.get("power_sensors"):
     data["power_sensors"] = [
         {"name": "Cumulus", "yesterday_text": "2.4", "yesterday_unit": "kWh", "avg_text": "3.1",
-         "avg_unit": "kWh/j", "trend_pct": 4.5, "hc_pct": 78,
+         "avg_unit": "kWh/j", "cost_text": "16", "trend_pct": 4.5, "hc_pct": 78,
          "spark": [3.4, 2.9, 3.1, 1.8, 3.0, 2.6, 2.4]},
         {"name": "Lave-linge", "yesterday_text": "0.8", "yesterday_unit": "kWh", "avg_text": "0.9",
-         "avg_unit": "kWh/j", "trend_pct": -5.0, "hc_pct": 31,
+         "avg_unit": "kWh/j", "cost_text": "5,2", "trend_pct": -5.0, "hc_pct": 31,
          "spark": [0.9, 1.3, 0.7, None, 1.1, 0.6, 0.8]},
     ]
 
@@ -201,20 +201,25 @@ if not data.get("power_sensors"):
 # fuller table: more rows, varied magnitudes (kWh and Wh), HC% spread.
 _extra_sensors = [
     {"name": "Machine à laver", "yesterday_text": "1.1", "yesterday_unit": "kWh",
-     "avg_text": "0.9", "avg_unit": "kWh/j", "avg_kwh": 0.9, "trend_pct": -5.0, "hc_pct": 72,
+     "avg_text": "0.9", "avg_unit": "kWh/j", "avg_kwh": 0.9, "cost_text": "4,7",
+     "trend_pct": -5.0, "hc_pct": 72,
      "spark": [0.9, 1.3, 0.7, None, 1.1, 0.6, 1.1]},
     {"name": "Serveur", "yesterday_text": "2.9", "yesterday_unit": "kWh",
-     "avg_text": "2.8", "avg_unit": "kWh/j", "avg_kwh": 2.8, "trend_pct": 1.2, "hc_pct": 35,
+     "avg_text": "2.8", "avg_unit": "kWh/j", "avg_kwh": 2.8, "cost_text": "16",
+     "trend_pct": 1.2, "hc_pct": 35,
      "spark": [2.8, 2.7, 2.9, 2.8, 2.8, 2.9, 2.9]},
     {"name": "Salon", "yesterday_text": "640", "yesterday_unit": "Wh",
-     "avg_text": "710", "avg_unit": "Wh/j", "avg_kwh": 0.71, "trend_pct": 8.3, "hc_pct": 22,
+     "avg_text": "710", "avg_unit": "Wh/j", "avg_kwh": 0.71, "cost_text": "4,2",
+     "trend_pct": 8.3, "hc_pct": 22,
      "spark": [0.6, 0.8, 0.7, 0.9, 0.5, 0.8, 0.64]},
     {"name": "Imprimante 3D", "yesterday_text": "450", "yesterday_unit": "Wh",
-     "avg_text": "380", "avg_unit": "Wh/j", "avg_kwh": 0.38, "trend_pct": -12.0, "hc_pct": 5,
+     "avg_text": "380", "avg_unit": "Wh/j", "avg_kwh": 0.38, "cost_text": "2,4",
+     "trend_pct": -12.0, "hc_pct": 5,
      "spark": [0.2, None, 0.5, 0.4, 0.3, 0.6, 0.45]},
     # A >15-char name to exercise the bottom-table ellipsis truncation.
     {"name": "Imp. 3D, chargeurs, lampe", "yesterday_text": "520", "yesterday_unit": "Wh",
-     "avg_text": "460", "avg_unit": "Wh/j", "avg_kwh": 0.46, "trend_pct": 6.0, "hc_pct": 12,
+     "avg_text": "460", "avg_unit": "Wh/j", "avg_kwh": 0.46, "cost_text": "2,8",
+     "trend_pct": 6.0, "hc_pct": 12,
      "spark": [0.4, 0.5, None, 0.4, 0.6, 0.5, 0.52]},
 ]
 _have = {s.get("name") for s in data.get("power_sensors", [])}
@@ -224,7 +229,7 @@ data["power_sensors"] += [s for s in _extra_sensors if s["name"] not in _have]
 # that predates it, inject representative values so the bottom Talon row shows.
 if data.get("talon", {}).get("yesterday_text") in (None, "N/A", "—"):
     data["talon"] = {"yesterday_text": "318", "avg_text": "305", "avg_w": 305, "trend_pct": -4.0,
-                     "annual_text": "527",
+                     "annual_text": "527", "cost_text": "44",
                      "spark": [298, 312, 305, 330, 321, 309, 318]}
 
 # The UniFi panel needs live gateway credentials we don't have here; inject a
@@ -238,7 +243,8 @@ if "unifi" not in data:
         "usage_hier": "18,0", "usage_mois": "117,5", "usage_trend": 8.0,
         "iot": {"label": "Iotchoum", "count": 13, "top": [
             ("Salon 8d:f7", "0,5"), ("Cuisine 8a:8b", "0,5"), ("Chambre Minipc Bureau", "0,4"),
-            ("Bureau 7c:2a", "0,3"), ("Entrée 3f:91", "0,2"), ("Capteur 2b:14", "0,1")]},
+            ("Bureau 7c:2a", "0,3"), ("Entrée 3f:91", "0,2"), ("Capteur 2b:14", "0,1"),
+            ("Caméra 6b:22", "0,1")]},
         "main": {"label": "Atchoum", "count": 2, "top": [
             ("MacBookPro Tibo", "15,5"), ("MacBookPro Lamia", "3,4")]},
     }
