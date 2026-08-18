@@ -239,7 +239,7 @@ def render_dashboard(data: dict) -> Image.Image:
     # it, in that order (same gutter, Home → Plantes → Alertes).
     home = data.get("home")
     if home:
-        home_bottom = _draw_home_panel(draw, fonts, home, region_top=0)
+        home_bottom = _draw_home_panel(draw, fonts, home, data.get("talon"), region_top=0)
         top = home_bottom + 5
         plants = data.get("plants")
         if plants:
@@ -507,12 +507,12 @@ def _fit_text(draw, text, font, max_w) -> str:
 
 
 def _build_bottom_rows(data) -> list:
-    """Assemble the bottom table rows: each configured power sensor (Cumulus,
-    Lave-linge, …) then Talon (core Linky, always shown). Each row is a 6-column
-    tuple (name, cost, avg, trend, spark, hc_pct) — a rising value reads as
-    bad (red) for these consumption-style metrics; `cost` is what the row costs
-    per month at the HC/HP mix; `spark` is the row's 7-day series; `hc_pct` is
-    the off-peak share (None hides the cell, always for Talon)."""
+    """Assemble the bottom table rows: one per configured power sensor (Cumulus,
+    Lave-linge, …). Each row is a 6-column tuple (name, cost, avg, trend, spark,
+    hc_pct) — a rising value reads as bad (red) for these consumption-style
+    metrics; `cost` is what the row costs per month at the HC/HP mix; `spark` is
+    the row's 7-day series; `hc_pct` is the off-peak share (None hides the cell).
+    The talon has its own line in the Home panel, not a row here."""
     def _sensor_avg(sensor):
         v = sensor.get("avg_kwh")
         return v if v is not None else float("-inf")  # "N/A" (pas d'historique) → en bas
@@ -528,7 +528,7 @@ def _build_bottom_rows(data) -> list:
     for sensor in sensors:
         hc_pct = sensor.get("hc_pct")
         # A sensor without HC history yet shows an em dash — the value exists
-        # but isn't initialised; the Talon row (None below) never gets one.
+        # but isn't initialised.
         hc_seg = ([(f"{hc_pct}", "bold", BLACK), ("%", "regular", BLACK)]
                   if hc_pct is not None else [("—", "regular", BLACK)])
         rows.append((
@@ -538,21 +538,6 @@ def _build_bottom_rows(data) -> list:
             [_trend(sensor.get("trend_pct", 0), True)],
             sensor.get("spark"),
             hc_seg,
-        ))
-    talon = data.get("talon")
-    if talon:
-        # The name cell carries the talon's yearly price tag ("Talon 460€/an"):
-        # the figure that turns an abstract W value into a standby-waste bill.
-        name_segs = [("Talon", "bold", BLACK)]
-        if talon.get("annual_text"):
-            name_segs += [(" " + talon["annual_text"], "bold", BLACK), ("€/an", "regular", BLACK)]
-        rows.append((
-            name_segs,
-            [(talon.get("cost_text", "—"), "bold", BLACK), ("€", "regular", BLACK)],
-            [(talon.get("avg_text", "0"), "bold", BLACK), ("W", "regular", BLACK)],
-            [_trend(talon.get("trend_pct", 0), True)],
-            talon.get("spark"),
-            None,
         ))
     return rows
 
@@ -608,19 +593,20 @@ def _draw_bottom_table(draw, fonts, rows, region_top) -> None:
         put(cost, cost_x, ry)                 # col 2: €/month, left
         put(avg, avg_r - seg_w(avg), ry)      # col 3: kWh/j, right
         put(trend, trend_x, ry)               # col 4: trend, left (glued)
-        if hc_seg:                            # col 5: HC %, left (None on Talon)
+        if hc_seg:                            # col 5: HC %, left (None hides it)
             put(hc_seg, hc_x, ry)
         spark(series, ry)                     # col 6: sparkline, right edge
 
     draw.line([(x, line_y), (x + width - 1, line_y)], fill=BLACK, width=1)
 
 
-def _draw_home_panel(draw, fonts, home, region_top) -> int:
+def _draw_home_panel(draw, fonts, home, talon, region_top) -> int:
     """Draw the "Home" panel in the empty top-left gutter (left of the packed
     Solar/EDF column): a title banner with a 1px separator, then one line per
     item — label (regular) left, value right-aligned. Line 1: the screen-refresh
     schedule as "HH:MM ► HH:MM" (this refresh and the next, bold times, regular
-    arrow). Then one line per completed tariff window (grouped HC lines then HP, as
+    arrow), then the battery, the month's net cost and the standby talon
+    ("305W (527€/an)"). Then one line per completed tariff window (grouped HC lines then HP, as
     each completes live): the period label left ("HC"/"HP"), the window as
     "HH:MM ► HH:MM" right (bold times, regular arrow — same style as the schedule
     line). Mirrors the other panels."""
@@ -674,20 +660,17 @@ def _draw_home_panel(draw, fonts, home, region_top) -> int:
             segs += [(" (", "regular", BLACK), (net["abo_text"], "bold", BLACK),
                      ("€ abo)", "regular", BLACK)]
         row([("Coût mois", "regular", BLACK)], segs, y)
-    # Live snapshot: the meter's instantaneous draw with the current tariff
-    # period, and the live PV watts. Absent lines mean no fresh sample.
-    live = home.get("live_grid")
-    if live:
+    # Standby baseline: the recent daily average talon and what it costs over a
+    # year ("305W (527€/an)") — the two figures that turn standby waste into a
+    # bill. Lives here rather than in the bottom table, which carries no Talon
+    # row any more. Absent until a first talon is on record.
+    if talon and talon.get("avg_w") is not None:
         y += line_h
-        segs = [(live["watts_text"], "bold", BLACK), ("W", "regular", BLACK)]
-        if live.get("period"):
-            segs.append((f" ({live['period']})", "regular", BLACK))
-        row([("Conso", "regular", BLACK)], segs, y)
-    pv = home.get("live_solar")
-    if pv:
-        y += line_h
-        row([("Solaire", "regular", BLACK)],
-            [(pv["watts_text"], "bold", BLACK), ("W", "regular", BLACK)], y)
+        segs = [(talon.get("avg_text", "0"), "bold", BLACK), ("W", "regular", BLACK)]
+        if talon.get("annual_text"):
+            segs += [(" (", "regular", BLACK), (talon["annual_text"], "bold", BLACK),
+                     ("€/an)", "regular", BLACK)]
+        row([("Talon", "regular", BLACK)], segs, y)
     for line in home.get("tariff") or []:
         y += line_h
         rng = [(line["start_text"], "bold", BLACK),

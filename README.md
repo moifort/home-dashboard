@@ -16,8 +16,8 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 | Panel | What you see |
 |-------|--------------|
 | **Electricity** (core) | Last 9 days + live of consumption as stacked off-peak/peak bars, with a dashed average line. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
-| **Home** | Today's date, the screen refresh schedule, the month's net home cost with its end-of-month projection and the subscription share broken out (electricity + water minus solar, `Coût mois 58€ ► ~87€ (8€ abo)`), the live meter draw with the current tariff period (`Conso 850W (HP)`), live solar watts, and the learned HC/HP windows. |
-| **Plugs & baseline power** | One row per power sensor you add (water heater, washing machine...) with its daily kWh and off-peak share, plus the home's permanent standby draw in watts and what it costs per year. |
+| **Home** | Today's date, the screen refresh schedule, the month's net home cost with its end-of-month projection and the subscription share broken out (electricity + water minus solar, `Coût mois 58€ ► ~87€ (8€ abo)`), the home's standby baseline with its yearly bill (`Talon 305W (527€/an)`), and the learned HC/HP windows. |
+| **Plugs** | One row per power sensor you add (water heater, washing machine...) with its monthly cost, daily average and off-peak share. The home's permanent standby draw (talon) has its own line in the `Home` panel. |
 | **Solar** | Daily solar production from an EcoFlow PowerStream: average, autonomy (share of the home's consumption the panels covered), period total and money saved. |
 | **Water** | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
 | **Plants** | One card per soil sensor: moisture, temperature, light, the time since its last reading, a 10-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |

@@ -80,11 +80,6 @@ data["home"].setdefault("battery", {
     "avg_text": "4j 16h", "record_text": "5j 10h", "cycles": 3,
 })
 
-# No live MQTT streams here; inject the Home live-snapshot lines (instantaneous
-# meter draw + current period, live PV watts).
-data["home"].setdefault("live_grid", {"watts_text": "850", "period": "HP"})
-data["home"].setdefault("live_solar", {"watts_text": "320"})
-
 # The dev DB may hold no Linky history (build_core always emits the 9 calendar
 # days, data or not); inject a representative EDF stacked HC/HP week whenever
 # no complete day carries data so the preview shows a full consumption chart.
@@ -226,7 +221,7 @@ _have = {s.get("name") for s in data.get("power_sensors", [])}
 data["power_sensors"] += [s for s in _extra_sensors if s["name"] not in _have]
 
 # The talon needs the new talon_w column populated (one fetch cycle). On a dev DB
-# that predates it, inject representative values so the bottom Talon row shows.
+# that predates it, inject representative values so the Home panel's Talon line shows.
 if data.get("talon", {}).get("yesterday_text") in (None, "N/A", "—"):
     data["talon"] = {"yesterday_text": "318", "avg_text": "305", "avg_w": 305, "trend_pct": -4.0,
                      "annual_text": "527", "cost_text": "44",

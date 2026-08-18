@@ -695,6 +695,7 @@
       "avg_kwh": 2.533333333333333,
       "avg_text": "2.5",
       "avg_unit": "kWh/j",
+      "cost_text": "14",
       "hc_pct": 49,
       "hc_pct_prev": 48,
       "name": "Cumulus",
@@ -717,6 +718,7 @@
       "avg_kwh": 0.9666666666666666,
       "avg_text": "967",
       "avg_unit": "Wh/j",
+      "cost_text": "5,7",
       "hc_pct": 25,
       "hc_pct_prev": 70,
       "name": "Lave-linge",
@@ -739,6 +741,7 @@
       "avg_kwh": 2.1166666666666667,
       "avg_text": "2.1",
       "avg_unit": "kWh/j",
+      "cost_text": "12",
       "hc_pct": 48,
       "hc_pct_prev": 46,
       "name": "Salon",
@@ -1239,6 +1242,7 @@
     "annual_text": "527",
     "avg_text": "316",
     "avg_w": 316,
+    "cost_text": "44",
     "spark": [
       309.0,
       313.0,
@@ -1278,6 +1282,10 @@
         ],
         [
           "Capteur 2b:14",
+          "0,1"
+        ],
+        [
+          "Caméra 6b:22",
           "0,1"
         ]
       ]
