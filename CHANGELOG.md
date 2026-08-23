@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-23
+
+- **Crypto grid: the price line stops at the grid bounds, and validated cycles are plotted**: a price leaving the grid was clamped onto the nearest bound, so a stretch spent below the grid drew as a flat line glued to the bottom axis — read as a $0 price for the whole period. The series is now cut on the bound (linear interpolation on the crossing) and the out-of-band part is simply not drawn, leaving a gap that says "the price left the grid"; the `now` marker keeps its clamped position, parked under its price label, which is exactly what shows the price is out of bounds. On top of that, every **validated cycle** (a completed round-trip) now gets a dot on the chart, placed on the leg executed last (a cycle opened by an inventory sell closes on its buy-back) — black for a winning cycle, red for a losing one, mirroring the iOS `GridSnapshotCard`. The grid query pulls `trades(limit: 100)`; cycles outside the displayed window or outside the grid bounds are dropped like the line. Goldens re-baselined, preview regenerated; no new environment variable.
+
 ## 2026-08-18
 
 - **`Home`: the talon replaces the two live lines**: the panel's `Conso 850W (HP)` and `Solaire 320W` lines showed the instantaneous draw at the moment of the render — a number already stale by the time the e-paper refreshes, and the one figure nobody can act on. They are gone; in their place a single `Talon 305W (527€/an)` line pairs the recent daily average standby draw with what it costs over a year (8h HC + 16h HP blend), i.e. the money actually worth chasing. The `Talon` row disappears from the bottom table, which is now strictly one row per power sensor. The domains' `live_power()` helpers stay in place, simply unused by the render. Goldens re-baselined, preview regenerated; no new environment variable.

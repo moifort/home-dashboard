@@ -16,6 +16,50 @@ USER_AGENT = "linky-dashboard/1.0 (github.com/thibaut-mottet/dashboard)"
 PLACEMENT_MAX_AGE_S = 5 * 60
 
 
+def _parse_iso(value) -> datetime | None:
+    """Parse an ISO 8601 timestamp from the bot, or None when it is unusable."""
+    if not value:
+        return None
+    try:
+        ts = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        logger.warning("Crypto timestamp unparseable: %s", value)
+        return None
+    # The bot always sends a zone; a bare timestamp is read as UTC rather than
+    # as the container's local time (which would shift the plotted cycles).
+    return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+
+
+def _parse_cycles(trades: list | None) -> list[dict]:
+    """Validated cycles to plot on the grid: one point per completed trade.
+
+    The point sits on the leg executed last — a cycle opened by an inventory
+    sell closes on the buy-back, not on the sell (mirrors the iOS
+    GridSnapshotCard). Times are epoch seconds, the same scale as the price-line
+    points, so the renderer places both on one axis. A cycle whose legs carry no
+    fill is dropped: without a fill price there is nothing to place.
+    """
+    cycles = []
+    for trade in trades or []:
+        if trade.get("status") != "completed":
+            continue
+        legs = []
+        for leg in (trade.get("buyOrder"), trade.get("sellOrder")):
+            filled = _parse_iso((leg or {}).get("filledAt"))
+            price = (leg or {}).get("price")
+            if filled is not None and price is not None:
+                legs.append((filled.timestamp(), float(price)))
+        if not legs:
+            continue
+        closed_at, price = max(legs)
+        cycles.append({
+            "time": closed_at,
+            "price": price,
+            "profit": float(trade.get("profitUsdc") or 0),
+        })
+    return cycles
+
+
 def _parse_skips(placement: dict | None) -> list[dict]:
     """Extract the skipped-level warning markers from a placementStatus block.
 
@@ -25,15 +69,9 @@ def _parse_skips(placement: dict | None) -> list[dict]:
     if not placement:
         return []
 
-    cycle_at = placement.get("cycleAt")
-    if cycle_at:
-        try:
-            ts = datetime.fromisoformat(str(cycle_at).replace("Z", "+00:00"))
-            age = (datetime.now(timezone.utc) - ts).total_seconds()
-            if age > PLACEMENT_MAX_AGE_S:
-                return []
-        except ValueError:
-            logger.warning("Crypto placement cycleAt unparseable: %s", cycle_at)
+    ts = _parse_iso(placement.get("cycleAt"))
+    if ts and (datetime.now(timezone.utc) - ts).total_seconds() > PLACEMENT_MAX_AGE_S:
+        return []
 
     skips = []
     for lvl in placement.get("skippedLevels") or []:
@@ -88,7 +126,7 @@ def fetch_crypto_stats(url: str, token: str = "", timeout: float = 5) -> dict | 
 
 
 def fetch_crypto_grid(url: str, token: str = "", timeout: float = 5) -> dict | None:
-    """Fetch the grid snapshot (config + current price + 7-day price line).
+    """Fetch the grid snapshot (config, current price, 7-day price line, cycles).
 
     Returns a render-ready dict, or None on any error (the grid is omitted).
     """
@@ -123,5 +161,6 @@ def fetch_crypto_grid(url: str, token: str = "", timeout: float = 5) -> dict | N
         "current_price": float(current) if current is not None else None,
         "current_price_text": f"${_grouped(current)}" if current is not None else "",
         "points": points,
+        "cycles": _parse_cycles(data.get("trades")),
         "skips": _parse_skips(data.get("placementStatus")),
     }

@@ -278,12 +278,20 @@ if "crypto" not in data:
         "alpha_text": "+5", "alpha_positive": True, "sandbox": False,
     }
 if "crypto_grid" not in data:
-    _grid_prices = [98000, 99500, 101000, 100200, 99800, 100800,
-                    102000, 101200, 100500, 101800, 102500, 101500]
+    # The dip to 94 800 leaves the grid: the line is cut on the lower bound
+    # and picks back up when the price returns, never flattened onto the axis.
+    _grid_prices = [98000, 99500, 101000, 100200, 95500, 94800,
+                    99500, 102000, 101200, 100500, 101800, 101500]
     data["crypto_grid"] = {
         "lower": 96000.0, "upper": 104000.0, "levels": 8,
         "current_price": 101500.0, "current_price_text": "$101 500",
         "points": [(i, float(p)) for i, p in enumerate(_grid_prices)],
+        # Validated cycles, on grid levels: two winners (black), one loser (red).
+        "cycles": [
+            {"time": 1.5, "price": 100571.4, "profit": 11.2},
+            {"time": 7.4, "price": 101714.3, "profit": 9.8},
+            {"time": 10.2, "price": 102857.1, "profit": -4.5},
+        ],
         "skips": [{"price": 97000.0, "side": "buy", "kind": "insufficient_funds"}],
     }
 

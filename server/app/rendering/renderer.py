@@ -299,10 +299,52 @@ def _grid_label(price: float) -> str:
     return f"${price:,.0f}".replace(",", chr(32))
 
 
+def _clip_to_band(points, lower, upper) -> list:
+    """Split a (t, price) series into the runs that stay inside [lower, upper].
+
+    A price outside the grid bounds has no place on the chart: clamping it would
+    glue the line to the axis, which reads as a flat "0" over the whole period.
+    Segments leaving the band are cut on the boundary instead (linear
+    interpolation on t), so an out-of-grid excursion leaves a gap.
+    """
+    runs, run = [], []
+
+    def inside(p):
+        return lower <= p <= upper
+
+    def crossing(t1, p1, t2, p2, bound):
+        """The t at which the segment reaches `bound` (p1 != p2 by construction)."""
+        return t1 + (bound - p1) * (t2 - t1) / (p2 - p1)
+
+    for (t1, p1), (t2, p2) in zip(points, points[1:]):
+        if inside(p1):
+            if not run:
+                run = [(t1, p1)]
+            if inside(p2):
+                run.append((t2, p2))
+                continue
+            bound = upper if p2 > upper else lower
+            run.append((crossing(t1, p1, t2, p2, bound), bound))
+            runs.append(run)
+            run = []
+        elif inside(p2):
+            bound = upper if p1 > upper else lower
+            run = [(crossing(t1, p1, t2, p2, bound), bound), (t2, p2)]
+        elif (p1 < lower and p2 > upper) or (p1 > upper and p2 < lower):
+            # Both ends outside, opposite sides: the segment crosses the whole band.
+            first, second = (lower, upper) if p1 < lower else (upper, lower)
+            runs.append([(crossing(t1, p1, t2, p2, first), first),
+                         (crossing(t1, p1, t2, p2, second), second)])
+    if run:
+        runs.append(run)
+    return runs
+
+
 def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
     """Render the trading grid snapshot under the Crypto banner (top-right):
     horizontal dashed grid levels with left price labels, the price line over
-    the period, and a 'now' marker dot with the current price. Black & white."""
+    the period (cut on the bounds, never flattened onto the axis), a dot per
+    validated cycle, and a 'now' marker with the current price."""
     lower = grid.get("lower")
     upper = grid.get("upper")
     levels = grid.get("levels", 0)
@@ -375,13 +417,31 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
         def time_x(t):
             return round(plot_left + (t - t0) / t_span * plot_w)
 
-        line = [(time_x(t), clamp_y(p)) for t, p in points]
-        if len(line) > 1:
-            draw.line(line, fill=BLACK, width=1)
+        # Only the parts of the series inside the grid are drawn: a price that
+        # left the bounds is cut off (_clip_to_band) rather than flattened onto
+        # the axis, which would read as a zero price over that stretch.
+        for run in _clip_to_band(points, lower, upper):
+            if len(run) > 1:
+                draw.line([(time_x(t), price_y(p)) for t, p in run], fill=BLACK, width=1)
+
+        # --- Completed trades: one dot per validated cycle, placed on the leg
+        # that closed it. Black on a winning cycle, red on a losing one; cycles
+        # outside the window or outside the grid are dropped like the line above.
+        for cycle in grid.get("cycles") or []:
+            ct, cp = cycle.get("time"), cycle.get("price")
+            if ct is None or cp is None:
+                continue
+            if not (t0 <= ct <= t_last) or not (lower <= cp <= upper):
+                continue
+            cx_, cy_ = time_x(ct), price_y(cp)
+            fill = RED if cycle.get("profit", 0) < 0 else BLACK
+            draw.ellipse([cx_ - 2, cy_ - 2, cx_ + 2, cy_ + 2], fill=fill)
 
         current = grid.get("current_price")
         if current is not None:
             nx = time_x(t_last)
+            # The marker stays clamped even out of bounds: parked on the edge
+            # under its price label, it is exactly what says "the price left the grid".
             ny = clamp_y(current)
             draw.ellipse([nx - 3, ny - 3, nx + 3, ny + 3], fill=BLACK)
             # Current price label, centered above the dot, kept inside the region.

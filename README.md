@@ -21,7 +21,7 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 | **Solar** | Daily solar production from an EcoFlow PowerStream: average, autonomy (share of the home's consumption the panels covered), period total and money saved. |
 | **Water** | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
 | **Plants** | One card per soil sensor: moisture, temperature, light, the time since its last reading, a 10-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |
-| **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot. |
+| **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot: the price line over the period (cut off while the price sits outside the grid) and a dot per validated cycle, black on a win, red on a loss. |
 | **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients per network. |
 | **Device battery** | Estimated charge % and days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
 | **Alerts**  | Anomalies to act on, each with its € impact: consumption or standby spikes, a probable water leak, the water heater running on peak hours, a plug drifting out of off-peak, a solar disconnect, a new device on the network. Plus one event note: a broken solar production record. |
