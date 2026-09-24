@@ -1113,8 +1113,8 @@
   ],
   "production_stats": {
     "autonomy_pct": 51,
-    "avg_kwh": 8.4,
-    "avg_kwh_pct": -8,
+    "avg_kwh": 9.2,
+    "avg_kwh_pct": 0,
     "month_savings_complete_eur": 0.54,
     "month_savings_eur": 1.18,
     "savings_eur": 13.9,

@@ -32,7 +32,8 @@ def build_production_panel(prod_by_date: dict, now: datetime, consumption_days: 
     """
     today = now.date()
     production_days = []
-    recent = []
+    complete = []  # the 8 finished days: the average/trend window
+    shown = []     # the 9 bars, today included: the total
     for i in range(8, -1, -1):
         d = today - timedelta(days=i)
         ds = d.strftime("%Y-%m-%d")
@@ -40,13 +41,15 @@ def build_production_panel(prod_by_date: dict, now: datetime, consumption_days: 
         production_days.append({"day": DAYS_FR[d.weekday()], "date": ds, "pv_kwh": pv,
                                 "today": d == today,
                                 "intraday": (pv_profiles or {}).get(ds)})
-        recent.append({"pv_kwh": pv})
+        if d != today:
+            complete.append({"pv_kwh": pv})
+        shown.append({"pv_kwh": pv})
 
     previous = [{"pv_kwh": prod_by_date[ds]}
                 for i in range(36, 8, -1)
                 if (ds := (today - timedelta(days=i)).strftime("%Y-%m-%d")) in prod_by_date]
 
-    stats = _compute_production_stats(recent, previous, price_hp)
+    stats = _compute_production_stats(complete, shown, previous, price_hp)
     stats["autonomy_pct"] = _compute_autonomy(production_days, consumption_days)
     # Month-to-date savings (self-consumed PV at HP price) + the complete-days
     # figure (up to yesterday) for the home net-cost projection.
@@ -82,7 +85,11 @@ def _compute_autonomy(production_days: list[dict], consumption_days: list | None
     return round(pv_sum / (grid_sum + pv_sum) * 100)
 
 
-def _compute_production_stats(current: list[dict], previous: list[dict], price_hp: float) -> dict:
+def _compute_production_stats(current: list[dict], shown: list[dict], previous: list[dict],
+                              price_hp: float) -> dict:
+    """Average and trend on complete days only (`current`): today's partial
+    production would drag the average down all day and redden the trend every
+    morning, as on the EDF chart. The total covers the 9 shown bars (`shown`)."""
     def _avg(days):
         # No energy threshold — a null day means "no data", any real production
         # counts toward the average, however small.
@@ -96,7 +103,7 @@ def _compute_production_stats(current: list[dict], previous: list[dict], price_h
     has_prev = avg_kwh_prev > 0
 
     pct = round((avg_kwh - avg_kwh_prev) / avg_kwh_prev * 100) if has_prev else 0
-    total = sum(d["pv_kwh"] for d in current)
+    total = sum(d["pv_kwh"] for d in shown)
     return {
         "avg_kwh": round(avg_kwh, 1),
         "avg_kwh_pct": pct,
