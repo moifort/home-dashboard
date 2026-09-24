@@ -121,6 +121,13 @@ void DEV_SPI_Write_nByte(UBYTE *pData, UDOUBLE len)
 
 void DEV_Module_Exit(void)
 {
+    // Pull every signal line low before cutting the panel's rail: a line left
+    // HIGH would feed the unpowered driver ICs through their protection diodes.
+    digitalWrite(EPD_DC_PIN , LOW);
+    digitalWrite(EPD_CS_M_PIN , LOW);
+    digitalWrite(EPD_CS_S_PIN , LOW);
+    digitalWrite(EPD_MOSI_PIN , LOW);
+    digitalWrite(EPD_SCK_PIN , LOW);
     digitalWrite(EPD_PWR_PIN , LOW);
     digitalWrite(EPD_RST_PIN , LOW);
 }

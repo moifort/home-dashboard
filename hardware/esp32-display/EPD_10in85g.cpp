@@ -123,6 +123,15 @@ static void EPD_10in85g_SendData_ALL(UBYTE Data)
 function :	Wait until the busy_pin goes LOW
 parameter:
 ******************************************************************************/
+// Sticky: set by any BUSY wait that times out, so the caller can tell a refresh
+// that never completed from a clean one (the vendor API returns void).
+static bool busyTimedOut = false;
+
+bool EPD_10in85g_BusyTimedOut(void)
+{
+    return busyTimedOut;
+}
+
 void EPD_10in85g_ReadBusy(void)
 {
     Serial.print("BUSY wait...");
@@ -133,6 +142,7 @@ void EPD_10in85g_ReadBusy(void)
 			break;
 		if(millis() - start > 60000) {
 			Serial.println("TIMEOUT (60s)");
+			busyTimedOut = true;
 			return;
 		}
 		DEV_Delay_ms(10);

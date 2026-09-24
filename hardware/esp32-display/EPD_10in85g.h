@@ -51,6 +51,7 @@ void EPD_10in85g_Display(const UBYTE *Image);
 void EPD_10in85g_Display_2(const UBYTE *Image);
 void EPD_10in85g_DisplayPart(const UBYTE *Image, UWORD xstart, UWORD ystart, UWORD image_width, UWORD image_heigh);
 void EPD_10in85g_Sleep(void);
+bool EPD_10in85g_BusyTimedOut(void);
 
 
 #endif

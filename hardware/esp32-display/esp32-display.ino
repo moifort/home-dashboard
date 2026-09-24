@@ -250,6 +250,15 @@ void setup() {
 
     free(buf);
 
+    // The panel never reported ready: the image may be half-drawn, so retry
+    // soon instead of leaving it up for a whole interval.
+    if (EPD_10in85g_BusyTimedOut()) {
+        WiFi.disconnect(true);
+        DEV_Module_Exit();
+        deepSleepRetry("EPD busy timeout");
+        return;
+    }
+
     failCount = 0;  // clean cycle — back to the normal aligned schedule
     uint64_t sleepUs = computeSleepUs();
 
