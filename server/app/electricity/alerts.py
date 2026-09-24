@@ -36,7 +36,7 @@ def _elec_rise(data):
     if pct is not None and pct >= ELEC_RISE_PCT:
         avg_price = stats.get("avg_price")
         money = _money(False, avg_price * pct / 100) if avg_price else ""
-        return ("Forte hausse de consommation", f"{round(pct)}%/j", money)
+        return ("Conso en hausse", f"{round(pct)}%/j", money)
     return None
 
 
@@ -46,7 +46,7 @@ def _hc_drop(data):
     if pct is not None and pct <= -HC_DROP_PTS:
         avg_kwh = stats.get("avg_kwh")
         money = _money(False, avg_kwh * abs(pct) / 100 * (PRICE_HP - PRICE_HC)) if avg_kwh else ""
-        return ("Heures creuses en forte baisse", f"{round(abs(pct))}%", money)
+        return ("HC en baisse", f"{round(abs(pct))}%", money)
     return None
 
 
@@ -56,7 +56,7 @@ def _talon_rise(data):
     if pct is not None and pct >= TALON_RISE_PCT:
         avg_w = talon.get("avg_w")
         money = _money(False, avg_w * pct / 100 * 24 / 1000 * PRICE_HP) if avg_w else ""
-        return ("Consommation de veille en hausse", f"{round(pct)}%", money)
+        return ("Veille en hausse", f"{round(pct)}%", money)
     return None
 
 
@@ -66,7 +66,7 @@ def _cumulus_rise(data):
     if pct is not None and pct >= CUMULUS_RISE_PCT:
         avg = cumulus.get("avg_kwh")
         money = _money(False, avg * pct / 100 * PRICE_HC) if avg else ""
-        return ("Forte consommation du cumulus", f"{round(pct)}%", money)
+        return ("Cumulus en hausse", f"{round(pct)}%", money)
     return None
 
 
@@ -86,7 +86,7 @@ def _prise_hc_drop(data):
         s, drop = worst
         avg = s.get("avg_kwh")
         money = _money(False, avg * drop / 100 * (PRICE_HP - PRICE_HC)) if avg else ""
-        return (f"Heures creuses {s.get('name', '')} en baisse", f"{round(drop)}pts", money)
+        return (f"HC {s.get('name', '')} en baisse", f"{round(drop)}pts", money)
     return None
 
 
@@ -102,7 +102,7 @@ def _cumulus_hp(data):
     hp_kwh = max(0.0, total - hc)
     share = hp_kwh / total * 100
     if share >= CUMULUS_HP_SHARE_PCT:
-        return ("Cumulus chauffé en heures pleines", f"{round(share)}%",
+        return ("Cumulus en HP", f"{round(share)}%",
                 _money(False, hp_kwh * (PRICE_HP - PRICE_HC), unit="€"))
     return None
 

@@ -4,13 +4,13 @@
       "alert": true,
       "items": [
         [
-          "Forte hausse de consommation",
+          "Conso en hausse",
           "15%/j",
           "dépense 0,31€/j",
           false
         ],
         [
-          "Heures creuses en forte baisse",
+          "HC en baisse",
           "14%",
           "dépense 0,06€/j",
           false
@@ -24,13 +24,13 @@
       "alert": true,
       "items": [
         [
-          "Cumulus chauffé en heures pleines",
+          "Cumulus en HP",
           "40%",
           "dépense 0,06€",
           false
         ],
         [
-          "Heures creuses Lave-linge en baisse",
+          "HC Lave-linge en baisse",
           "45pts",
           "dépense 0,02€/j",
           false
@@ -44,7 +44,7 @@
       "alert": true,
       "items": [
         [
-          "Fuite d'eau probable",
+          "Fuite d'eau",
           "240 L",
           "dépense 0,95€",
           false

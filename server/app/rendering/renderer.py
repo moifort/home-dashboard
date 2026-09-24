@@ -44,6 +44,7 @@ WARN_MARKER_W = 8  # base width of the yellow ▲ warning marker on the crypto g
 # a grid (name | monthly cost | avg | trend | HC% | sparkline), stacking the
 # Cumulus/Lave-linge/Talon rows below. Anchored at the center-column mid-height
 # split, mirroring the solar banner geometry.
+TARIFF_STRIP_H = 18  # Home 24h HC strip: bar + ticks + now marker
 BOTTOM_ROW_H = 17  # vertical pitch between table rows
 BOTTOM_TEXT_GAP = 6  # first row below the separator
 # Per-row 7-day sparkline, hugging the table's right edge: 7 thin black bars
@@ -157,13 +158,10 @@ def _draw_zero_baseline(draw, cx, baseline_y):
     draw.line([(cx, baseline_y - 1), (cx + BAR_WIDTH - 1, baseline_y - 1)], fill=BLACK, width=1)
 
 
-def _draw_na_marker(draw, cx, baseline_y, font_value):
-    """A no-data chart day: the zero baseline plus a centred N/A label."""
-    _draw_zero_baseline(draw, cx, baseline_y)
-    box = draw.textbbox((0, 0), "N/A", font=font_value)
-    draw.text((cx + (BAR_WIDTH - (box[2] - box[0])) // 2,
-               baseline_y - (box[3] - box[1]) - 6),
-              "N/A", fill=BLACK, font=font_value)
+def _draw_na_marker(draw, cx, baseline_y):
+    """A no-data chart day: a discreet dotted baseline (a real zero keeps the
+    solid one), so empty days never outweigh the bars that carry data."""
+    _dashed_h_line(draw, cx, cx + BAR_WIDTH - 1, baseline_y - 1, on=1, off=2)
 
 
 def render_dashboard(data: dict) -> Image.Image:
@@ -424,9 +422,42 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
             if len(run) > 1:
                 draw.line([(time_x(t), price_y(p)) for t, p in run], fill=BLACK, width=1)
 
+        # Where the price leaves the band, a small arrow on the edge says so
+        # (▼ under the bottom level, ▲ over the top one) instead of a silent cut.
+        for (ta, pa), (tb, pb) in zip(points, points[1:]):
+            for bound, below in ((lower, True), (upper, False)):
+                inside_a = pa >= bound if below else pa <= bound
+                inside_b = pb >= bound if below else pb <= bound
+                if inside_a and not inside_b:
+                    tx = time_x(ta + (tb - ta) * (bound - pa) / (pb - pa))
+                    by = price_y(bound)
+                    if below:
+                        draw.polygon([(tx - 3, by + 2), (tx + 3, by + 2), (tx, by + 6)], fill=BLACK)
+                    else:
+                        draw.polygon([(tx - 3, by - 2), (tx + 3, by - 2), (tx, by - 6)], fill=BLACK)
+
+        current = grid.get("current_price")
+        if current is not None:
+            nx = time_x(t_last)
+            # The marker stays clamped even out of bounds: parked on the edge
+            # under its price label, it is exactly what says "the price left the grid".
+            ny = clamp_y(current)
+            draw.ellipse([nx - 3, ny - 3, nx + 3, ny + 3], fill=BLACK)
+            ctext = grid.get("current_price_text", "")
+            if ctext:
+                cw = draw.textlength(ctext, font=value_font)
+                ch = draw.textbbox((0, 0), ctext, font=value_font)[3]
+                # Above the dot, right-aligned on it, on a white pad so no
+                # dotted grid level runs through the figures.
+                cx = max(plot_left, min(round(nx - cw + 4), region_right - cw))
+                cy = max(region_top, ny - ch - 5)
+                draw.rectangle([cx - 2, cy, cx + cw + 1, cy + ch], fill="white")
+                draw.text((cx, cy), ctext, fill=BLACK, font=value_font)
+
         # --- Completed trades: one dot per validated cycle, placed on the leg
         # that closed it. Black on a winning cycle, red on a losing one; cycles
         # outside the window or outside the grid are dropped like the line above.
+        # Drawn after the price label so its white pad never hides a dot.
         for cycle in grid.get("cycles") or []:
             ct, cp = cycle.get("time"), cycle.get("price")
             if ct is None or cp is None:
@@ -436,22 +467,6 @@ def _draw_crypto_grid(draw, fonts, grid, region_top, region_bottom) -> None:
             cx_, cy_ = time_x(ct), price_y(cp)
             fill = RED if cycle.get("profit", 0) < 0 else BLACK
             draw.ellipse([cx_ - 2, cy_ - 2, cx_ + 2, cy_ + 2], fill=fill)
-
-        current = grid.get("current_price")
-        if current is not None:
-            nx = time_x(t_last)
-            # The marker stays clamped even out of bounds: parked on the edge
-            # under its price label, it is exactly what says "the price left the grid".
-            ny = clamp_y(current)
-            draw.ellipse([nx - 3, ny - 3, nx + 3, ny + 3], fill=BLACK)
-            # Current price label, centered above the dot, kept inside the region.
-            ctext = grid.get("current_price_text", "")
-            if ctext:
-                cw = draw.textlength(ctext, font=value_font)
-                ch = draw.textbbox((0, 0), ctext, font=value_font)[3]
-                cx = max(plot_left, min(round(nx - cw / 2), region_right - cw))
-                cy = max(plot_top, ny - ch - 6)
-                draw.text((cx, cy), ctext, fill=BLACK, font=value_font)
 
     # --- Warning markers: a yellow ▲ outlined in black right after each skipped
     # level's Y-axis price label (insufficient-funds, half-spacing or max-orders
@@ -533,7 +548,7 @@ def _draw_water_chart(draw, fonts, water_days, water_stats, region_top, region_b
 
         litres = d.get("liters")
         if litres is None:
-            _draw_na_marker(draw, cx, baseline_y, font_value)
+            _draw_na_marker(draw, cx, baseline_y)
             continue
 
         bar_h = round((litres / max_l) * bar_max_height)
@@ -666,10 +681,9 @@ def _draw_home_panel(draw, fonts, home, talon, region_top) -> int:
     item — label (regular) left, value right-aligned. Line 1: the screen-refresh
     schedule as "HH:MM ► HH:MM" (this refresh and the next, bold times, regular
     arrow), then the battery, the month's net cost and the standby talon
-    ("305W (527€/an)"). Then one line per completed tariff window (grouped HC lines then HP, as
-    each completes live): the period label left ("HC"/"HP"), the window as
-    "HH:MM ► HH:MM" right (bold times, regular arrow — same style as the schedule
-    line). Mirrors the other panels."""
+    ("305W (527€/an)"). Then the off-peak windows seen live on one "HC" line
+    ("23:32►05:32  13:00►15:00", HP being their complement) over a 24h strip
+    that places them in the day, with a ▲ at the current refresh time."""
     width = PANEL_LEFT - CHART_LEFT - COL_GAP
     x = CHART_LEFT
     right = x + width
@@ -731,13 +745,55 @@ def _draw_home_panel(draw, fonts, home, talon, region_top) -> int:
             segs += [(" (", "regular", BLACK), (talon["annual_text"], "bold", BLACK),
                      ("€/an)", "regular", BLACK)]
         row([("Talon", "regular", BLACK)], segs, y)
+    # Tariff: the HC windows on one line (HP is their complement), then a 24h
+    # strip (HC filled black) with a ▲ under the current refresh time.
+    hc_windows, period = [], ""
     for line in home.get("tariff") or []:
+        period = line["period"] or period
+        if period == "HC":
+            hc_windows.append((line["start_text"], line["end_text"]))
+    if hc_windows:
         y += line_h
-        rng = [(line["start_text"], "bold", BLACK),
-               (" ► ", "regular", BLACK),
-               (line["end_text"], "bold", BLACK)]
-        row([(line["period"], "regular", BLACK)], rng, y)
+        segs = []
+        for i, (a, b) in enumerate(hc_windows):
+            if i:
+                segs.append(("  ", "regular", BLACK))
+            segs += [(a, "bold", BLACK), ("►", "regular", BLACK), (b, "bold", BLACK)]
+        row([("HC", "regular", BLACK)], segs, y)
+        y += line_h + 2
+        _draw_tariff_strip(draw, x, right, y, hc_windows, home.get("last_text"))
+        y += TARIFF_STRIP_H - line_h
     return y + line_h  # bottom of the panel content (for the Alerts panel below)
+
+
+def _draw_tariff_strip(draw, left, right, top, hc_windows, now_text):
+    """A 24h bar from midnight to midnight: HC windows filled black, HP white
+    inside a 1px frame, 6h ticks under it and a ▲ under the current time. A
+    window crossing midnight is drawn as its two halves."""
+    def minutes(t):
+        h, m = t.split(":")
+        return int(h) * 60 + int(m)
+
+    x0, x1 = left, right - 1
+    h = 7
+    span = x1 - x0
+
+    def mx(m):
+        return round(x0 + m / 1440 * span)
+
+    draw.rectangle([x0, top, x1, top + h], outline=BLACK)
+    for a, b in hc_windows:
+        ma, mb = minutes(a), minutes(b)
+        parts = [(ma, mb)] if ma < mb else [(ma, 1440), (0, mb)]
+        for pa, pb in parts:
+            draw.rectangle([mx(pa), top, mx(pb), top + h], fill=BLACK)
+    for hr in (6, 12, 18):
+        tx = mx(hr * 60)
+        draw.line([(tx, top + h + 1), (tx, top + h + 2)], fill=BLACK)
+    if now_text:
+        nx = mx(minutes(now_text))
+        ty = top + h + 2
+        draw.polygon([(nx, ty), (nx - 3, ty + 4), (nx + 3, ty + 4)], fill=BLACK)
 
 
 def _draw_water_drop(draw, cx, top, w, h, fill):
@@ -854,8 +910,9 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     """Draw the alert status board in the top-left gutter, under the Home panel.
     All active alerts share a single "Alertes" section: a bold title with a 1px
     separator (same look as the other panel titles) over its lines — one per
-    active item (label + unit black, the ▲/▼ arrow + number bold, red for a
-    problem, black for a positive note). Items are listed domain by domain in
+    active item (message left, figures right-aligned, red for a problem, black
+    for a positive note; word-wrapped only when it does not fit one line). The
+    active count sits right-aligned on the title. Items are listed domain by domain in
     build_board order (most problems first), problems before positive notes.
     Capped by the screen bottom so it never writes out of the region; falls back
     to a "Tout va bien" line when nothing is active."""
@@ -867,9 +924,14 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     max_y = HEIGHT - CHART_BOTTOM - line_h
     space_w = draw.textlength(" ", font=fonts["regular"])
 
-    def section_title(label, y):
-        """Draw a domain title + its 1px separator; return the y of the first row."""
+    def section_title(label, y, count=0):
+        """Draw a domain title + its 1px separator; return the y of the first row.
+        A non-zero `count` is right-aligned on the title line."""
         draw.text((x, y), label, fill=BLACK, font=fonts["bold"])
+        if count:
+            ct = str(count)
+            draw.text((round(x + width - draw.textlength(ct, font=fonts["bold"])), y),
+                      ct, fill=RED, font=fonts["bold"])
         sep = _title_sep_y(draw, fonts, y)
         draw.line([(x, sep), (x + width - 1, sep)], fill=BLACK, width=1)
         return sep + 4
@@ -906,23 +968,6 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
             first = False
         return y + row_h
 
-    def wrap_height(atoms):
-        """The height wrap_atoms would use for these atoms (same line breaking)."""
-        cx = x
-        first = True
-        lines = 1
-        for atom in atoms:
-            w = sum(draw.textlength(t, font=fonts[fk]) for t, fk in atom)
-            if not first and cx + space_w + w > x + width:
-                lines += 1
-                cx = x
-                first = True
-            if not first:
-                cx += space_w
-            cx += w
-            first = False
-        return lines * row_h
-
     if not rows:
         y = section_title("Alertes", region_top)
         wrap_atoms([[(w, "regular")] for w in "Tout va bien".split()], BLACK, y)
@@ -933,20 +978,45 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
     # problems first — and the items within each row by severity). A negative
     # alert is written entirely in red, a positive note all black; figures
     # follow the house rule (bold number, regular glued unit) via num_atom.
-    y = section_title("Alertes", region_top)
+    n_items = sum(len(r["items"]) for r in rows)
+    y = section_title("Alertes", region_top, n_items)
     items = []
     for r in rows:
         for message, figure, money, good in r["items"]:
-            atoms = [[(w, "regular")] for w in message.split()]
+            # One line per alert when it fits: message left, figures right
+            # ("Conso en hausse … 15%/j 0,31€/j"). The money verb is dropped,
+            # the colour already says cost (red) or saving (black).
+            amount = money.split(" ", 1)[1] if " " in money else money
+            right = []
             if figure:
-                atoms.append(num_atom(figure))
-            atoms += [num_atom(w) for w in money.split()]
-            items.append((atoms, BLACK if good else RED))
+                right += num_atom(figure.replace(" ", ""))
+            if amount:
+                if right:
+                    right.append(("  ", "regular"))
+                right += num_atom(amount)
+            # Too long for one line: message on its own (clipped to the width),
+            # figures right-aligned on the line below.
+            msg_w = draw.textlength(message, font=fonts["regular"])
+            right_w = sum(draw.textlength(t, font=fonts[fk]) for t, fk in right)
+            one_line = msg_w + 8 + right_w <= width
+            if not one_line:
+                message = _fit_text(draw, message, fonts["regular"], width)
+            items.append((message, right, right_w, one_line, BLACK if good else RED))
 
     # Overflow policy: only items that fit ENTIRELY are drawn; the rest are
     # summarised by one "+N autre(s) alerte(s)" row (never a silent truncation).
     # The cut is measured first, backing off until that row itself fits.
-    heights = [wrap_height(atoms) for atoms, _ in items]
+    def draw_item(message, right, right_w, one_line, color, y):
+        draw.text((x, y), message, fill=color, font=fonts["regular"])
+        if not one_line:
+            y += row_h
+        cx = x + width - right_w
+        for t, fk in right:
+            draw.text((round(cx), y), t, fill=color, font=fonts[fk])
+            cx += draw.textlength(t, font=fonts[fk])
+        return y + row_h
+
+    heights = [row_h if item[3] else 2 * row_h for item in items]
     drawn, end_y = 0, y
     while drawn < len(items) and end_y + heights[drawn] - row_h <= max_y:
         end_y += heights[drawn]
@@ -956,8 +1026,8 @@ def _draw_alerts_panel(draw, fonts, rows, region_top) -> None:
             drawn -= 1
             end_y -= heights[drawn]
 
-    for atoms, color in items[:drawn]:
-        y = wrap_atoms(atoms, color, y)
+    for item in items[:drawn]:
+        y = draw_item(*item, y)
     if drawn < len(items) and y <= max_y:
         n = len(items) - drawn
         noun = "autre alerte" if n == 1 else "autres alertes"
@@ -1158,7 +1228,7 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
             _draw_intraday(draw, cx, strip_baseline, d["_intraday_buckets"], intraday_ceiling)
 
         if d["_na"]:
-            _draw_na_marker(draw, cx, baseline_y, font_value)
+            _draw_na_marker(draw, cx, baseline_y)
             continue
 
         total = _bar_total(d, mode)
@@ -1181,6 +1251,10 @@ def _draw_chart(draw, fonts, days, stats, region_top, region_height, mode, regio
                 bar_bottom -= hp_h
             if hc_h > 0:
                 hc_top = bar_bottom - hc_h
+                # HC: vertical 1px hatching (reads as grey) under a 2px cap, so the
+                # stacked bar reads as one block: HP solid, HC hatched.
+                for hx in range(cx, cx + BAR_WIDTH, 2):
+                    draw.line([(hx, hc_top), (hx, bar_bottom - 1)], fill=BLACK)
                 draw.rectangle([cx, hc_top, cx + BAR_WIDTH - 1, hc_top + 1], fill=BLACK)
 
         val_text = f"{total:.2f}" if mode == "production" else f"{total:.1f}"
@@ -1242,7 +1316,7 @@ def _build_production_items(stats):
         [(str(stats.get('avg_kwh', 0)), "bold", BLACK), ("kWh/j ", "regular", BLACK),
          _trend(stats.get("avg_kwh_pct", 0), False)],
         autonomy,
-        [("Total ", "regular", BLACK), (str(stats.get('total_kwh', 0)), "bold", BLACK),
+        [("9j ", "regular", BLACK), (str(stats.get('total_kwh', 0)), "bold", BLACK),
          ("kWh   ", "regular", BLACK), (str(stats.get('savings_eur', 0)), "bold", BLACK),
          ("€", "regular", BLACK)],
     ]

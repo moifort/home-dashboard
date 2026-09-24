@@ -10,7 +10,7 @@ WIFI_PCT_MIN = 90         # unifi.wifi_pct < -> WiFi dégradé
 def _net_usage(data):
     pct = (data.get("unifi") or {}).get("usage_trend")
     if pct is not None and pct >= NET_USAGE_RISE_PCT:
-        return ("Forte consommation Internet", f"{round(pct)}%/j")
+        return ("Conso Internet", f"{round(pct)}%/j")
     return None
 
 
@@ -21,14 +21,14 @@ def _isp_bad(data):
     pct = unifi.get("isp_pct")
     has_pct = isinstance(pct, (int, float))
     if unifi.get("isp_bad") or (has_pct and pct < ISP_PCT_MIN):
-        return ("Connexion Internet dégradée", f"{round(pct)}%" if has_pct else "")
+        return ("Internet dégradé", f"{round(pct)}%" if has_pct else "")
     return None
 
 
 def _latency(data):
     ms = _to_float((data.get("unifi") or {}).get("latency_val"))
     if ms is not None and ms > LATENCY_MS_MAX:
-        return ("Latence réseau élevée", f"{round(ms)} ms")
+        return ("Latence élevée", f"{round(ms)} ms")
     return None
 
 

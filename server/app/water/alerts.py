@@ -21,7 +21,7 @@ def _water_leak(data):
         cost = _to_float(stats.get("cost_text"))
         m3 = _to_float(stats.get("month_total_text"))
         money = f"dépense {_eur(excess / 1000 * (cost / m3))}€" if (cost and m3 and m3 > 0) else ""
-        return ("Fuite d'eau probable", f"{round(excess)} L", money)
+        return ("Fuite d'eau", f"{round(excess)} L", money)
     return None
 
 

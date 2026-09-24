@@ -4,13 +4,13 @@
       "alert": true,
       "items": [
         [
-          "Cumulus chauffé en heures pleines",
+          "Cumulus en HP",
           "40%",
           "dépense 0,06€",
           false
         ],
         [
-          "Heures creuses Lave-linge en baisse",
+          "HC Lave-linge en baisse",
           "45pts",
           "dépense 0,02€/j",
           false

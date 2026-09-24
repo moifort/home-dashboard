@@ -9,7 +9,7 @@ SOLAR_DROP_PCT = 30       # production_stats.avg_kwh_pct <= -this -> chute
 def _solar_off(data):
     finished = [d for d in (data.get("production_days") or []) if not d.get("today")]
     if finished and finished[-1].get("pv_kwh", 0) == 0:
-        return ("Panneaux solaires déconnectés ?", "0 kWh")
+        return ("Solaire déconnecté ?", "0 kWh")
     return None
 
 
@@ -22,7 +22,7 @@ def _solar_drop(data):
     if pct is not None and pct <= -SOLAR_DROP_PCT:
         avg = stats.get("avg_kwh")
         money = _money(False, avg * abs(pct) / 100 * PRICE_HP) if avg else ""
-        return ("Production solaire en baisse", f"{round(abs(pct))}%", money)
+        return ("Solaire en baisse", f"{round(abs(pct))}%", money)
     return None
 
 
@@ -32,7 +32,7 @@ def _solar_record(data):
     The record_kwh field is set by attach() once enough history exists."""
     kwh = (data.get("production_stats") or {}).get("record_kwh")
     if kwh:
-        return ("Record de production solaire", f"{kwh:.2f}kWh")
+        return ("Record solaire", f"{kwh:.2f}kWh")
     return None
 
 
