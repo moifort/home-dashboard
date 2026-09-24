@@ -15,16 +15,16 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 
 | Panel | What you see |
 |-------|--------------|
-| **Electricity** (core) | Last 9 days + live of consumption as stacked off-peak/peak bars, with a dashed average line. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
-| **Home** | Today's date, the screen refresh schedule, the month's net home cost with its end-of-month projection and the subscription share broken out (electricity + water minus solar, `Coût mois 58€ ► ~87€ (8€ abo)`), the home's standby baseline with its yearly bill (`Talon 305W (527€/an)`), and the learned HC/HP windows. |
+| **Electricity** (core) | Last 9 days + live of consumption as stacked bars (peak solid, off-peak hatched), with a dashed average line. Three headline stats (`kWh/j` daily average, `HC %` off-peak share, `€/j` daily cost), each with a 4-week trend. |
+| **Home** | Today's date, the screen refresh schedule, the month's net home cost with its end-of-month projection and the subscription share broken out (electricity + water minus solar, `Coût mois 58€ ► ~87€ (8€ abo)`), the home's standby baseline with its yearly bill (`Talon 305W (527€/an)`), and the off-peak windows learned from the meter on one `HC` line, over a 24h strip that places them in the day with a marker at the current time. |
 | **Plugs** | One row per power sensor you add (water heater, washing machine...) with its monthly cost, daily average and off-peak share. The home's permanent standby draw (talon) has its own line in the `Home` panel. |
 | **Solar** | Daily solar production from an EcoFlow PowerStream: average, autonomy (share of the home's consumption the panels covered), period total and money saved. |
 | **Water** | Daily water use in litres from an MQTT water meter, with month-to-date m³ and its cost. |
 | **Plants** | One card per soil sensor: moisture, temperature, light, the time since its last reading, a 10-day trend on moisture data, and a water-drop icon when moisture drops below your threshold. |
-| **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot: the price line over the period (cut off while the price sits outside the grid) and a dot per validated cycle, black on a win, red on a loss. |
+| **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot: the price line over the period (cut off while the price sits outside the grid, with an arrow where it leaves) and a dot per validated cycle, black on a win, red on a loss. |
 | **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients per network. |
 | **Device battery** | Estimated charge % and days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
-| **Alerts**  | Anomalies to act on, each with its € impact: consumption or standby spikes, a probable water leak, the water heater running on peak hours, a plug drifting out of off-peak, a solar disconnect, a new device on the network. Plus one event note: a broken solar production record. |
+| **Alerts**  | Anomalies to act on, one line each with its € impact and the active count on the title: consumption or standby spikes, a probable water leak, the water heater running on peak hours, a plug drifting out of off-peak, a solar disconnect, a new device on the network. Plus one event note: a broken solar production record. |
 
 ## Hardware
 
