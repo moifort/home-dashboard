@@ -39,3 +39,22 @@ def test_data_pipeline_golden(seeded_db, update_golden):
             fromfile="data.golden.json", tofile="actual", lineterm="",
         ))
         raise AssertionError("Data pipeline output changed:\n" + diff)
+
+
+def test_failing_optional_domain_is_skipped(seeded_db, monkeypatch):
+    """One optional domain raising in attach() drops only its own panel: the
+    rest of the dict still builds (no 503 for the whole screen)."""
+    from types import SimpleNamespace
+
+    from app import dashboard_data
+
+    def _boom(data):
+        data["broken_panel"] = "half-built"
+        raise ValueError("unexpected payload")
+
+    broken = SimpleNamespace(__name__="broken", enabled=lambda: True, attach=_boom)
+    monkeypatch.setattr(dashboard_data, "OPTIONAL", (broken, *dashboard_data.OPTIONAL))
+
+    data = build_dashboard_data(_read_all_days())
+    assert "broken_panel" not in data
+    assert data["days"] and "water_days" in data

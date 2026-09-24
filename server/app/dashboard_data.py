@@ -3,6 +3,7 @@
 Thin orchestrator. The core consumption days/stats come from the electricity
 domain; every optional domain contributes its own fields via attach().
 """
+import logging
 from datetime import datetime, timedelta
 
 from app import alerts as alerts_engine
@@ -10,6 +11,24 @@ from app import battery
 from app.system.config import DAYS_FR, MONTHS_FR, PARIS_TZ
 from app.registry import CORE, OPTIONAL
 from app.system.scheduler import current_screen_refresh, next_screen_refresh, next_screen_wake
+
+logger = logging.getLogger(__name__)
+
+
+def _attach_optional(data: dict) -> None:
+    """Let each enabled optional domain add its fields. A domain that raises is
+    skipped (logged) and its partial fields dropped: one broken optional panel
+    must never take the whole screen down with it."""
+    for integration in OPTIONAL:
+        if not integration.enabled():
+            continue
+        scratch = dict(data)
+        try:
+            integration.attach(scratch)
+        except Exception:
+            logger.exception("%s attach failed, panel skipped", integration.__name__)
+            continue
+        data.update(scratch)
 
 
 def _date_text(now: datetime) -> str:
@@ -114,9 +133,7 @@ def build_dashboard_data(days: list[dict]) -> dict:
     }
     _attach_tariff(data["home"])
     _attach_battery(data["home"], now)
-    for integration in OPTIONAL:
-        if integration.enabled():
-            integration.attach(data)
+    _attach_optional(data)
     # Net cost composes across domains, so it waits for every attach.
     _attach_net_cost(data["home"], data, now)
     # Alerts run last so every integration's trends are already attached.
