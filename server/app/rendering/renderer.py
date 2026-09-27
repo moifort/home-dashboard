@@ -164,7 +164,17 @@ def _draw_na_marker(draw, cx, baseline_y):
     _dashed_h_line(draw, cx, cx + BAR_WIDTH - 1, baseline_y - 1, on=1, off=2)
 
 
-def render_dashboard(data: dict) -> Image.Image:
+def render_dashboard(data: dict, ui: str = None, theme: str = None) -> Image.Image:
+    """Render the screen with the UI picked by DASHBOARD_UI (or `ui`)."""
+    from app.system import config
+    ui = ui or config.DASHBOARD_UI
+    if ui == "matrice":
+        from app.rendering.matrice import render_matrice
+        return render_matrice(data, theme or config.DASHBOARD_THEME)
+    return _render_classic(data)
+
+
+def _render_classic(data: dict) -> Image.Image:
     img = Image.new("RGB", (WIDTH, HEIGHT), "white")
     draw = ImageDraw.Draw(img)
     draw.fontmode = "1"
