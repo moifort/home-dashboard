@@ -187,7 +187,7 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 ### Design board
 - "The board" is the **Home Dashboard Board**, a Design (canvas) artifact that shows every screen: one row per data scenario (full data, no alert, each optional domain missing, crypto states, first day, missing days…), the classic UI next to the matrice UI, grouped in sub-sections. Its link and the session that created it are kept in Claude's memory, not in this public repo. That session is never deleted (an artifact goes with the session that published it).
 - Each artboard is the real server render, not a redrawing: `server/scripts/gen_board.py` mutates the frozen render fixture per scenario and writes the PNGs to `.claude/board/project/img/` (git-ignored, next to the artboard files and `canvas.json`).
-- **After any UI change**, regenerate and republish the PNGs so the board never lags the code: `cd server && uv run --with-requirements requirements.txt python scripts/gen_board.py`, then publish the changed `project/img/*.png` to the board.
+- **After any UI change**, regenerate and republish the PNGs so the board never lags the code: `cd server && uv run --no-project --with-requirements requirements.txt python scripts/gen_board.py`, then publish the changed `project/img/*.png` to the board.
 - A new data state worth looking at is a new scenario function in `gen_board.py` plus its two artboards (classic, matrice) on the canvas.
 
 ## Documentation language
