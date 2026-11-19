@@ -4,9 +4,11 @@ Usage (from the server/ directory): python3 scripts/gen_board.py [out_dir]
 
 Starts from the frozen render fixture (app/system/tests/fixtures/dashboard_data.json,
 so the output is deterministic), applies one small mutation per scenario, recomputes
-the alert board and renders the scenario with the classic UI and the matrice UI
-(light, plus dark for the reference scenarios). The PNGs feed the artboards of the
-"Home Dashboard Board" canvas; out_dir defaults to .claude/board/project/img.
+the alert board and renders the scenario with the classic UI, the matrice UI
+(light, plus dark for the reference scenarios) and the arcade UI. The home lab
+scenarios only exist in arcade, the one UI that shows it. The PNGs feed the
+artboards of the "Home Dashboard Board" canvas; out_dir defaults to
+.claude/board/project/img.
 """
 import copy
 import json
@@ -29,6 +31,7 @@ OPTIONAL_KEYS = {
     "network": ("unifi",),
     "plants": ("plants",),
     "power": ("power_sensors",),
+    "homelab": ("homelab",),
 }
 
 
@@ -208,6 +211,17 @@ def plantes_a_arroser(data):
         "last_seen_text": "2h", "spark": [48, 44, 39, 35, 30, 26, 21, 17, 12, 9]})
 
 
+def sans_home_lab(data):
+    _drop(data, "homelab")
+
+
+def pi_hors_ligne(data):
+    """One Pi stopped answering six hours ago, another one runs hot."""
+    down, hot = data["homelab"]["nodes"][1], data["homelab"]["nodes"][3]
+    down.update(online=False, cpu=down["cpu"][:18] + [None] * 6, temp=down["temp"][:18] + [None] * 6)
+    hot.update(temp_bad=True, temp=[t + 20 for t in hot["temp"]])
+
+
 # (sub-section, [scenario, ...]); the reference scenarios also get the dark theme.
 SECTIONS = [
     ("reference", [complet, tout_va_bien]),
@@ -218,8 +232,10 @@ SECTIONS = [
     ("electricite", [premier_jour, jours_manquants, debut_de_journee, batterie_faible,
                      beaucoup_de_prises]),
     ("reseau-plantes", [reseau_degrade, plantes_a_arroser]),
+    ("homelab", [sans_home_lab, pi_hors_ligne]),
 ]
 DARK = {"complet", "tout_va_bien"}
+ARCADE_ONLY = {"sans_home_lab", "pi_hors_ligne"}
 
 
 def main():
@@ -235,8 +251,11 @@ def main():
             variants = [("classic", None), ("matrice", "light")]
             if scenario.__name__ in DARK:
                 variants.append(("matrice", "dark"))
+            if scenario.__name__ in ARCADE_ONLY:
+                variants = []
+            variants.append(("arcade", None))
             for ui, theme in variants:
-                suffix = "classic" if ui == "classic" else f"matrice-{theme}"
+                suffix = ui if theme is None else f"{ui}-{theme}"
                 render_dashboard(data, ui=ui, theme=theme).save(out / f"{name}-{suffix}.png")
             alerts = [f"{r['label']}:{len(r['items'])}" for r in data["alert_board"]]
             print(f"{section:15} {name:24} alertes={alerts or 'aucune'}")

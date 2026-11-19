@@ -171,6 +171,9 @@ def render_dashboard(data: dict, ui: str = None, theme: str = None) -> Image.Ima
     if ui == "matrice":
         from app.rendering.matrice import render_matrice
         return render_matrice(data, theme or config.DASHBOARD_THEME)
+    if ui == "arcade":
+        from app.rendering.arcade import render_arcade
+        return render_arcade(data, theme or config.DASHBOARD_THEME or "dark")
     return _render_classic(data)
 
 

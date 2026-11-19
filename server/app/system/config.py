@@ -28,11 +28,12 @@ DATA_LEAD_MIN = int(os.environ.get("DATA_LEAD_MIN", "10"))
 # "next refresh" reflects the device's real next wake.
 SCREEN_WAKE_SKIP_MIN = int(os.environ.get("SCREEN_WAKE_SKIP_MIN", "5"))
 RENDER_MODE = os.environ.get("RENDER_MODE", "4color")
-# Screen UI: "classic" (the dense four-column layout) or "matrice" (dot-matrix,
-# rule-free). DASHBOARD_THEME only applies to matrice: "light" (black on white)
-# or "dark" (white on black). Unknown values fall back to the defaults.
+# Screen UI: "classic" (the dense four-column layout), "matrice" (dot-matrix,
+# rule-free) or "arcade" (pixel art, video-game HUD). DASHBOARD_THEME applies to
+# matrice and arcade: "light" (black on white) or "dark" (white on black). Left
+# empty, each UI keeps its own default: light for matrice, dark for arcade.
 DASHBOARD_UI = os.environ.get("DASHBOARD_UI", "classic").strip().lower()
-DASHBOARD_THEME = os.environ.get("DASHBOARD_THEME", "light").strip().lower()
+DASHBOARD_THEME = os.environ.get("DASHBOARD_THEME", "").strip().lower()
 DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")
 PORT = int(os.environ.get("PORT", "5000"))
 SAVE_PNG = os.environ.get("SAVE_PNG", "false").lower() == "true"

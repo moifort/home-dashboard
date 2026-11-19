@@ -11,6 +11,26 @@ frozen input of the layer-2 render golden.
 from app.alerts import build_board
 
 
+def _demo_homelab() -> dict:
+    """Home lab: no domain feeds it yet, so four example Pi. Each carries its last
+    24 hours, oldest first (the hour's highest CPU % and temperature in °C), plus
+    the current memory and disk use. The last column is the hour of the refresh."""
+    def day(base, spikes):  # spikes: {column: cpu %}
+        return [spikes.get(i, base + (i * 7) % 5) for i in range(24)]
+
+    nodes = [
+        ("pi-casa", 48, 37, day(8, {5: 41, 13: 87, 14: 52})),    # nightly backup
+        ("pi-dns", 22, 18, day(2, {})),
+        ("pi-nas", 61, 91, day(18, {12: 74, 13: 96, 14: 91, 15: 60})),
+        ("pi-lab", 35, 44, day(6, {0: 63, 1: 78, 2: 30})),
+    ]
+    return {"nodes": [{
+        "name": name, "online": True, "mem_pct": mem, "disk_pct": disk,
+        "disk_bad": disk >= 90, "temp_bad": False,
+        "cpu": cpu, "temp": [round(40 + c * 0.28) for c in cpu],
+    } for name, mem, disk, cpu in nodes]}
+
+
 def apply_demo_panels(data: dict) -> dict:
     """Inject the network-only panels + demo alert values onto a built data dict.
 
@@ -82,6 +102,8 @@ def apply_demo_panels(data: dict) -> dict:
         if s.get("name", "").lower() == "cumulus":
             s["trend_pct"] = -28                   # -> Cumulus: Conso ▼28%
             break
+
+    data.setdefault("homelab", _demo_homelab())
 
     data["alert_board"] = build_board(data)
     return data
