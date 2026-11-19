@@ -14,7 +14,7 @@ Layout (1360×480, 48px margins, 5 columns of 216px every 262px):
   header   date · current tariff period · refresh schedule
   row A    counters: électricité (last 24 h), eau, solaire, crypto, alertes
   row B    the house: maison, prises, plantes, réseau, écran
-  row C    home lab: one Pi per column, its last 24 hours (CPU, temperature)
+  row C    home lab: one server per column, its last 24 hours (CPU, memory)
 Absent domains leave their slot out; alertes, écran and the home lab title keep
 their column.
 """
@@ -514,15 +514,16 @@ def _draw_screen(pen, x, data):
 # ---- row C: the home lab ----------------------------------------------------
 
 def _draw_homelab(pen, data):
-    """One Pi per column with its last 24 hours: the hour's highest CPU load and
-    temperature, so a short spike stays visible. Memory and disk are figures."""
+    """One server per column with its last 24 hours: the hour's highest CPU and
+    memory use, so a short spike stays visible. The disk is a figure."""
     lab, home = data["homelab"], data.get("home") or {}
     nodes = (lab.get("nodes") or [])[:4]
     x, ink = XS[0], pen.ink
-    online = sum(1 for n in nodes if n.get("online", True))
-    all_up = online == len(nodes)
-    _title(pen, x, ROW_C, "rack", "home lab", None if all_up else RED)
-    w = _pix(pen.draw, x, ROW_C + 26, f"{online}/{len(nodes)}", 8, ink if all_up else RED)
+    online = lab.get("online", sum(1 for n in nodes if n.get("online", True)))
+    total = lab.get("total", len(nodes))
+    color = None if online == total else RED
+    _title(pen, x, ROW_C, "rack", "home lab", color)
+    w = _pix(pen.draw, x, ROW_C + 26, _figure(f"{online}/{total}"), 8, color or ink)
     pen.draw.text((x + w + 6, ROW_C + 66), "en ligne", font=pen.f["r"], fill=ink, anchor="ls")
     _segs(pen, x, ROW_C + 76, _t("24 dernières heures", "r"))
 
@@ -530,31 +531,22 @@ def _draw_homelab(pen, data):
     now_hour = None if now is None else now // 2
     for node, x in zip(nodes, XS[1:]):
         up = node.get("online", True)
+        side_x = x + 24 * PITCH + 12
         _square(pen.draw, x, ROW_C + 6, SQUARE, ink if up else RED, hollow=not up)
-        _spaced(pen, x + 13, ROW_C + 2, [(node.get("name", ""), True, None if up else RED)])
+        _spaced(pen, x + 13, ROW_C + 2, [(pen.fit(node.get("name", ""), "b12", 96), True, None if up else RED)])
         if not up:
-            _segs(pen, x + 110, ROW_C + 2, _t("hors ligne", "r12", RED))
-        else:
-            disk_c = RED if node.get("disk_bad") else None
-            segs = []
-            if node.get("mem_pct") is not None:
-                segs += _t("mém. ") + _num(node["mem_pct"], "%  ", "12")
-            if node.get("disk_pct") is not None:
-                segs += _t("disque ", "r12", disk_c) + [(str(node["disk_pct"]), "b12", disk_c), ("%", "r12", disk_c)]
-            _segs(pen, x + 110, ROW_C + 2, segs)
-        cpu = ((node.get("cpu") or []) + [None] * 24)[:24]
-        temp = ((node.get("temp") or []) + [None] * 24)[:24]
-        _blocks(pen.draw, x, ROW_C + 26, cpu, 6, ink, vmax=100)
-        cpu_known = [v for v in cpu if v is not None]
-        _side(pen, x + 24 * PITCH + 12, ROW_C + 62, _t("cpu"),
-              _t("pic ") + _num(round(max(cpu_known)), "%", "12") if cpu_known else [])
-        _blocks(pen.draw, x, ROW_C + 72, temp, 4, ink, vmin=35, vmax=70)
-        temp_known = [v for v in temp if v is not None]
-        hot = RED if node.get("temp_bad") else None
-        _segs(pen, x + 24 * PITCH + 12, ROW_C + 72, _t("temp."))
-        if temp_known:
-            _segs(pen, x + 24 * PITCH + 12, ROW_C + 87,
-                     _t("max ", "r12", hot) + [(str(round(max(temp_known))), "b12", hot), ("°", "r12", hot)])
+            _segs(pen, side_x, ROW_C + 2, _t("hors ligne", "r12", RED))
+        elif node.get("disk_pct") is not None:
+            c = RED if node.get("disk_bad") else None
+            _segs(pen, x + COL_W, ROW_C + 2, _t("disque ", "r12", c) + [(str(node["disk_pct"]), "b12", c), ("%", "r12", c)],
+                  right=True)
+        for label, key, rows, top in (("cpu", "cpu", 6, ROW_C + 26), ("mém.", "mem", 4, ROW_C + 72)):
+            values = ((node.get(key) or []) + [None] * 24)[:24]
+            _blocks(pen.draw, x, top, values, rows, ink, vmax=100)
+            known = [v for v in values if v is not None]
+            bottom = top + rows * PITCH
+            _side(pen, side_x, bottom, _t(label),
+                  _t("pic ") + _num(round(max(known)), "%", "12") if known else [])
         if now_hour is not None:
             for col in (0, 6, 12, 18):
                 _segs(pen, x + col * PITCH, ROW_C + 100, _t(f"{(now_hour + col) % 24}h"))

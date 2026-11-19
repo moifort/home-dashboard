@@ -1,7 +1,7 @@
 """Status-board aggregator — collects each domain's alert rules into the board.
 
 The rules themselves live in each domain's alerts.py (electricity, water, solar,
-network, crypto), declared as AlertRule descriptors. This module is the
+network, crypto, homelab), declared as AlertRule descriptors. This module is the
 cross-domain part: it runs every rule, groups the active items under their board
 section, and returns the rows the renderer draws.
 
@@ -12,13 +12,15 @@ domain (its data key absent) simply never fires. The board shows one row per
 """
 from app.crypto import alerts as crypto_alerts
 from app.electricity import alerts as electricity_alerts
+from app.homelab import alerts as homelab_alerts
 from app.network import alerts as network_alerts
 from app.solar import alerts as solar_alerts
 from app.water import alerts as water_alerts
 
 # Domain alert modules, in attach/registry order. Each exposes RULES (a list of
 # AlertRule) and BOARDS (a list of (label, present_fn)).
-_DOMAIN_ALERTS = (electricity_alerts, water_alerts, solar_alerts, network_alerts, crypto_alerts)
+_DOMAIN_ALERTS = (electricity_alerts, water_alerts, solar_alerts, network_alerts, crypto_alerts,
+                  homelab_alerts)
 
 # Every rule, flattened across domains. Order is irrelevant to the rendered board
 # (it sorts by severity); kept stable for predictability.
@@ -28,7 +30,7 @@ _RULES = [rule for mod in _DOMAIN_ALERTS for rule in mod.RULES]
 _BOARD_PRESENT = {label: fn for mod in _DOMAIN_ALERTS for label, fn in mod.BOARDS}
 
 # Canonical order of the board's rows (the order quiet sections are listed in).
-DOMAINS = ["EDF", "Eau", "Solaire", "Réseau", "Prises"]
+DOMAINS = ["EDF", "Eau", "Solaire", "Réseau", "Prises", "Home lab"]
 
 
 def build_alerts(data: dict) -> list[dict]:

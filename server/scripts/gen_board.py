@@ -216,10 +216,11 @@ def sans_home_lab(data):
 
 
 def pi_hors_ligne(data):
-    """One Pi stopped answering six hours ago, another one runs hot."""
-    down, hot = data["homelab"]["nodes"][1], data["homelab"]["nodes"][3]
-    down.update(online=False, cpu=down["cpu"][:18] + [None] * 6, temp=down["temp"][:18] + [None] * 6)
-    hot.update(temp_bad=True, temp=[t + 20 for t in hot["temp"]])
+    """One server stopped answering six hours ago: its history ends there."""
+    lab = data["homelab"]
+    down = lab["nodes"][1]
+    down.update(online=False, cpu=down["cpu"][:18] + [None] * 6, mem=down["mem"][:18] + [None] * 6)
+    lab["online"] -= 1
 
 
 # (sub-section, [scenario, ...]); the reference scenarios also get the dark theme.

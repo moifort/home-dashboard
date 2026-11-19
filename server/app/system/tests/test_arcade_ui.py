@@ -56,6 +56,7 @@ def test_home_lab_row_only_drawn_when_fed(data):
 
 def test_an_offline_pi_turns_the_counter_red(data):
     data["homelab"]["nodes"][1]["online"] = False
+    data["homelab"]["online"] = 3
     img = render_arcade(data)
     x, y = arcade.XS[0], arcade.ROW_C + 26  # the "3/4" figure, top-left pixel of the 3
     assert img.getpixel((x, y)) == (255, 0, 0)
