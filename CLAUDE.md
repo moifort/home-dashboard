@@ -35,12 +35,12 @@ server/app/
   __main__.py          # python -m app → server.main()
   server.py            # HTTP server + composition root (main wiring)
   dashboard_data.py    # orchestrator: CORE.build_core + each enabled OPTIONAL.attach()
-  registry.py          # CORE (electricity) + OPTIONAL (solar, crypto, power, network, water)
+  registry.py          # CORE (electricity) + OPTIONAL (solar, crypto, power, network, water, plants, battery, homelab)
   alerts.py            # cross-domain status-board aggregator (collects each domain's rules)
 
   electricity/         # Linky consumption (core) + power/ sub-domain (Cumulus, Lave-linge…)
-  water/  solar/  crypto/  network/                # the other 4 domains
-  rendering/           # renderer.py + converter.py + fonts/  (no business logic)
+  water/  solar/  crypto/  network/  homelab/  ... # the other domains
+  rendering/           # renderer.py (classic) + matrice.py + arcade.py + converter.py + fonts/
 
   module/              # transverse infra, ready to use
     db.py              #   connect() — the single SQLite primitive
@@ -185,10 +185,10 @@ arduino-cli monitor --port /dev/cu.usbmodem101 --config baudrate=115200
 - **After any UI change, regenerate `server/scripts/preview.png` and open it in the macOS Preview app** (`open -a Preview server/scripts/preview.png`) so the user can review the result
 
 ### Design board
-- "The board" is the **Home Dashboard Board**, a Design (canvas) artifact that shows every screen: one row per data scenario (full data, no alert, each optional domain missing, crypto states, first day, missing days…), the classic UI next to the matrice UI, grouped in sub-sections. Its link and the session that created it are kept in Claude's memory, not in this public repo. That session is never deleted (an artifact goes with the session that published it).
+- "The board" is the **Home Dashboard Board**, a Design (canvas) artifact that shows every screen: one row per data scenario (full data, no alert, each optional domain missing, crypto states, first day, missing days…), the classic UI next to the matrice UI and the arcade UI, grouped in sub-sections. Its link and the session that created it are kept in Claude's memory, not in this public repo. That session is never deleted (an artifact goes with the session that published it).
 - Each artboard is the real server render, not a redrawing: `server/scripts/gen_board.py` mutates the frozen render fixture per scenario and writes the PNGs to `.claude/board/project/img/` (git-ignored, next to the artboard files and `canvas.json`).
 - **After any UI change**, regenerate and republish the PNGs so the board never lags the code: `cd server && uv run --no-project --with-requirements requirements.txt python scripts/gen_board.py`, then publish the changed `project/img/*.png` to the board.
-- A new data state worth looking at is a new scenario function in `gen_board.py` plus its two artboards (classic, matrice) on the canvas.
+- A new data state worth looking at is a new scenario function in `gen_board.py` plus its three artboards (classic, matrice, arcade) on the canvas. The home lab scenarios only exist in arcade, the one UI that draws it.
 
 ### Board comments
 A comment the user sends to Claude from the board is handled like on the Shiori Board (`~/Code/shiori/docs/board.md`), adapted to a one-screen project where the board is the code's own render.
@@ -270,6 +270,17 @@ implementation gotchas per domain.
 ### Bottom table rendering (power sensors)
 - `renderer._draw_bottom_table`; `_build_bottom_rows` iterates `data["power_sensors"]` (one row per group, sorted by descending `avg_kwh`, no-history rows at the bottom) — the talon has its own line in the `Home` panel, not a row here. The table is its own **section**: a title row (`€/mois` / `Moy.` / `HC`, regular weight) sits **above** the 1px separator, in the same band as the Solaire title opposite — `_draw_bottom_table(region_top=WATER_SPLIT)` mirrors `_draw_chart`'s banner math so both separators share the same y, and the EDF chart's baseline aligns with the Eau chart's (`region_height = WATER_SPLIT + DIVIDER_GAP`).
 - 6-column grid anchored at `BOTTOM_COL_*` fractions of the 380px table: name left (truncated at 15 chars, `_short_name`), monthly cost left (`cost_text` + a glued `€`; the 9-day daily average priced over 30.44 days at the group's own HC/HP mix, peak-rate when no HC history), `kWh/j` right-aligned with the trend glued after it, `HC` % left (empty when `hc_pct is None`), 7-day sparkline hugging the right edge. The table's top is fixed; rows grow downward (`BOTTOM_ROW_H`).
+
+### Home lab / Komodo: `homelab/`
+- Source = the **Komodo Core API**, read-only, enabled by `KOMODO_URL` + `KOMODO_API_KEY` + `KOMODO_API_SECRET`. No table and no listener: Komodo keeps the history, `query.attach` reads it on each refresh. Komodo 2 has one route per request (`POST /read/ListServers`, params as the body); Komodo 1 has a single `/read` with `{"type", "params"}`. `komodo_client._read` tries the first and remembers the fallback on a 404/405.
+- `GetHistoricalServerStats` returns **200 records per page, newest first**, only at timestamps aligned on the asked granularity. We ask `1-min`, so 24 h = 8 pages per server: a coarser step is cheaper but misses any spike shorter than the step. `rules.hourly_max` folds the records into 24 columns ending at now (the hour's highest CPU % and memory %).
+- Komodo has **no temperature** (CPU, memory, disk, network only). The disk figure comes from the latest record; `disk_bad` uses the server's own Komodo `alerting_thresholds.disk_warning` (`DISK_WARN_PCT` = 90 when absent). `Disabled` servers are left out; a `NotOk` one is offline.
+- The screen has four server columns (`MAX_NODES`). Names sort the columns; only with more servers than columns do the ones with a problem come first. `online` / `total` count every server, shown or not.
+- Only the **arcade** UI draws the row (`arcade._draw_homelab`); the two alerts (`homelab/alerts.py`, board section `Home lab`) show on every UI. The render fixture carries four example servers (`build_fixture._demo_homelab`), one with a full disk.
+
+### Screen styles: `rendering/`
+- `DASHBOARD_UI` routes `render_dashboard` to `_render_classic`, `matrice.render_matrice` or `arcade.render_arcade`. Only the classic layout has a render golden; matrice and arcade are guarded by `test_matrice_ui.py` / `test_arcade_ui.py` (panel inks only, missing domains, the route).
+- Arcade draws its text with `arcade._segs`, word by word on whole pixels with a fixed 4px space: at 12px Arial's own 3px space reads as no space once thresholded. Its electricity counter shows the last 24 hours (`_last_24h` joins yesterday's and today's half-hours, `_hourly_max` keeps each hour's peak).
 
 ### Networking
 - The dashboard runs in `network_mode: bridge`, so it reaches co-located services (crypto bot, MQTT brokers) via their **LAN IP**, not `localhost`.

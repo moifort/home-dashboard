@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-20
+
+- **Home lab: your servers, read from Komodo**: a new optional domain lists the servers a Komodo Core instance watches and reads their last 24 hours of stats through its API (one record per minute, folded into the highest CPU and memory use of each hour, so a short spike stays visible). Komodo keeps the history, so the dashboard stores nothing. Two alerts join the board under `Home lab`: *pi-dns hors ligne* (a server offline) and *Disque pi-nas plein* (a disk past its Komodo warning threshold, 90% when none is set). Komodo exposes no temperature. New environment variables: `KOMODO_URL`, `KOMODO_API_KEY`, `KOMODO_API_SECRET` (all three set to enable).
+- **New screen style: `arcade`**: a pixel-art screen in the spirit of a video-game HUD, white on black, five columns and no frame. Big figures are 3×5 square glyphs, histories are columns of small squares, every gauge is a segmented life bar, each domain has its 8×8 icon and a plant's moisture is counted in drops. The electricity counter shows the last 24 hours instead of 9 days, and a third row shows the home lab: one server per column with its 24 hours of CPU and memory. Select it with `DASHBOARD_UI=arcade`; `classic` stays the default.
+- **New screen style: `matrice`**: a dot-matrix alternative to the classic layout, with no rules: four big figures with their 9-day history, today's 48 half-hours as a dot matrix, the alerts and a column of gauges. Select it with `DASHBOARD_UI=matrice`.
+- **`DASHBOARD_THEME`** picks `light` (black on white) or `dark` (white on black) for `matrice` and `arcade`. Left empty, each style keeps its own default: light for `matrice`, dark for `arcade`.
+
 ## 2026-09-24
 
 - **Firmware: a refresh the panel never confirmed is retried, and the SPI lines idle low in sleep**: when the panel's BUSY line never came back within 60s, the firmware only logged it and carried on as a clean cycle, so a half-drawn image could stay up for the whole 2h interval. The timeout is now recorded and the cycle goes to the quick 5-min retry path. Before cutting the panel's power, the DC, CS, MOSI and SCK lines are also pulled low, so none of them stays HIGH into the unpowered driver chips (a possible battery drain during deep sleep). Needs a re-flash of the ESP32; no new environment variable.

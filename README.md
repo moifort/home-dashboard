@@ -24,7 +24,8 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot: the price line over the period (cut off while the price sits outside the grid, with an arrow where it leaves) and a dot per validated cycle, black on a win, red on a loss. |
 | **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients per network. |
 | **Device battery** | Estimated charge % and days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
-| **Alerts**  | Anomalies to act on, one line each with its € impact and the active count on the title: consumption or standby spikes, a probable water leak, the water heater running on peak hours, a plug drifting out of off-peak, a solar disconnect, a new device on the network. Plus one event note: a broken solar production record. |
+| **Home lab** | One column per server watched by [Komodo](https://komo.do): its last 24 hours of CPU and memory, hour by hour (the hour's peak), its disk use, and how many servers are online. Shown by the `arcade` screen style. |
+| **Alerts**  | Anomalies to act on, one line each with its € impact and the active count on the title: consumption or standby spikes, a probable water leak, the water heater running on peak hours, a plug drifting out of off-peak, a solar disconnect, a new device on the network, a server offline or with a full disk. Plus one event note: a broken solar production record. |
 
 ## Hardware
 
@@ -150,6 +151,29 @@ UNIFI_SSID_MAIN=your_main_wifi_ssid
 </details>
 
 <details>
+<summary><b>Home lab (Komodo)</b></summary>
+
+Point the dashboard at your Komodo Core to see your servers: who is online, and each one's last 24 hours of CPU and memory. Komodo keeps the history, the dashboard only reads it. Create an API key pair in Komodo (Settings > Profile > API Keys) and use Komodo's LAN address. The row is drawn by the `arcade` screen style; the two alerts (a server offline, a disk past its Komodo warning threshold) show on every style.
+
+```env
+KOMODO_URL=http://192.168.1.50:9120
+KOMODO_API_KEY=your_komodo_api_key
+KOMODO_API_SECRET=your_komodo_api_secret
+```
+</details>
+
+<details>
+<summary><b>Screen style</b></summary>
+
+Three looks for the same data. `classic` (default) is the dense four-column layout of the preview above. `matrice` draws everything in dots, with no rules. `arcade` is pixel art in the spirit of a video-game HUD, white on black, with a home lab row.
+
+```env
+DASHBOARD_UI=arcade       # classic | matrice | arcade
+DASHBOARD_THEME=          # light | dark, for matrice and arcade; empty = the style's own default
+```
+</details>
+
+<details>
 <summary><b>ESP32 battery autonomy</b></summary>
 
 The `Home` panel shows an estimated remaining charge with the days since the last charge in parens (`Batt. 22% (4j)`), with average and record autonomy on `/status`. No extra sensor: the firmware reports its boot count and reset reason on each `/display` pull, and the server bounds each charge cycle on power-on events (power restored after a recharge or a flat battery). The % is derived from the cycle timing — the longest completed run is taken as a full charge, and the share of it not yet elapsed on the current run is the charge left — so it sharpens as more cycles accumulate; until a full cycle is on record the line shows days alone (`Batt. 4j`). On by default; set `BATTERY_MONITOR=false` to disable. The autonomy is most meaningful over a full discharge cycle (charge → flat → recharge); a top-up while the device is still running leaves no power-on signal. Reflash the firmware to start sending the telemetry.
@@ -232,8 +256,10 @@ flowchart TD
 
     CRYPTO["Crypto trading bot<br/>GraphQL"]:::mine
     UNIFI["UniFi gateway"]:::ext
+    KOMODO["Komodo<br/>home lab servers"]:::ext
     SERVER --> CRYPTO
     SERVER --> UNIFI
+    SERVER --> KOMODO
 
     classDef mine fill:#d4ecff,stroke:#0a6ebd,color:#062a44;
     classDef ext  fill:#eeeeee,stroke:#999999,color:#222222;
