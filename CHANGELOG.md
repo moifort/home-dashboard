@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-21
+
+- **Fix: the compose files pull the image that still gets updates**: `docker-compose.yml` and `docker-compose.casaos.yml` pointed at `ghcr.io/moifort/dashboard:main`, the image of the repository's former name, frozen on its 2026-05-29 build. CI publishes to `ghcr.io/moifort/home-dashboard:main`, and both files now use it. If your container was created from the old files, change its image by hand: the auto-update follows the old tag and never sees a new build. `/status` shows the running commit in `version`. No new environment variable.
+
 ## 2026-11-20
 
 - **Home lab: your servers, read from Komodo**: a new optional domain lists the servers a Komodo Core instance watches and reads their last 24 hours of stats through its API (one record per minute, folded into the highest CPU and memory use of each hour, so a short spike stays visible). Komodo keeps the history, so the dashboard stores nothing. Two alerts join the board under `Home lab`: *pi-dns hors ligne* (a server offline) and *Disque pi-nas plein* (a disk past its Komodo warning threshold, 90% when none is set). Komodo exposes no temperature. New environment variables: `KOMODO_URL`, `KOMODO_API_KEY`, `KOMODO_API_SECRET` (all three set to enable).
