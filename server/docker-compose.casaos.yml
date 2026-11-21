@@ -2,7 +2,7 @@ name: linky-dashboard
 
 services:
   linky-dashboard:
-    image: ghcr.io/moifort/dashboard:main
+    image: ghcr.io/moifort/home-dashboard:main
     container_name: linky-dashboard
     restart: unless-stopped
     pull_policy: always
@@ -103,12 +103,12 @@ services:
       retries: 3
     network_mode: bridge
     labels:
-      icon: https://raw.githubusercontent.com/moifort/dashboard/main/server/scripts/preview.png
+      icon: https://raw.githubusercontent.com/moifort/home-dashboard/main/server/scripts/preview.png
 
 x-casaos:
   author: moifort
   category: Utilities
-  icon: https://raw.githubusercontent.com/moifort/dashboard/main/server/scripts/preview.png
+  icon: https://raw.githubusercontent.com/moifort/home-dashboard/main/server/scripts/preview.png
   index: /
   port_map: "5000"
   scheme: http
