@@ -84,16 +84,18 @@ services:
       # boot count / reset reason on each /display pull and the server bounds each
       # charge cycle on power-on events. On by default; set "false" to disable.
       BATTERY_MONITOR: "true"
-      # Optional home lab row (arcade UI) and its two alerts: the servers a Komodo
-      # Core instance watches, with their last 24 hours of CPU and memory. Set the
+      # Optional home lab row (arcade UI) and its alerts: the servers a Komodo
+      # Core instance watches, with their memory, disk and containers. Set the
       # URL (LAN IP, bridge network) and an API key pair to enable; empty = off.
       KOMODO_URL: ""
       KOMODO_API_KEY: ""
       KOMODO_API_SECRET: ""
+      # Optional temperature of each server, read from a Prometheus node exporter
+      # running on it: "komodo-name=http://ip:9100/metrics;other=http://…".
+      HOMELAB_TEMP_URLS: ""
       # Screen style: "classic" (default), "matrice" (dot matrix) or "arcade"
       # (pixel art, the only one with the home lab row). DASHBOARD_THEME is
-      # "light" or "dark" for matrice and arcade; empty keeps each style's own
-      # default (light for matrice, dark for arcade).
+      # "light" or "dark" for matrice and arcade; empty = light.
       DASHBOARD_UI: classic
       DASHBOARD_THEME: ""
     healthcheck:

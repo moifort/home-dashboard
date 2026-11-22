@@ -24,7 +24,7 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot: the price line over the period (cut off while the price sits outside the grid, with an arrow where it leaves) and a dot per validated cycle, black on a win, red on a loss. |
 | **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients per network. |
 | **Device battery** | Estimated charge % and days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
-| **Home lab** | One column per server watched by [Komodo](https://komo.do), up to six: its last 24 hours of CPU and memory, hour by hour (the hour's peak), its disk use, and how many servers are online. Shown by the `arcade` screen style. |
+| **Home lab** | One card per server watched by [Komodo](https://komo.do), up to six: its temperature, memory and disk use, the containers running, and how many servers are online. Shown by the `arcade` screen style. |
 | **Alerts**  | Anomalies to act on, one line each with its € impact and the active count on the title: consumption or standby spikes, a probable water leak, the water heater running on peak hours, a plug drifting out of off-peak, a solar disconnect, a new device on the network, a server offline or with a full disk. Plus one event note: a broken solar production record. |
 
 ## Hardware
@@ -153,23 +153,29 @@ UNIFI_SSID_MAIN=your_main_wifi_ssid
 <details>
 <summary><b>Home lab (Komodo)</b></summary>
 
-Point the dashboard at your Komodo Core to see your servers: who is online, and each one's last 24 hours of CPU and memory. Komodo keeps the history, the dashboard only reads it. Create an API key pair in Komodo (Settings > Profile > API Keys) and use Komodo's LAN address. The row is drawn by the `arcade` screen style; the two alerts (a server offline, a disk past its Komodo warning threshold) show on every style.
+Point the dashboard at your Komodo Core to see your servers: who is online, and each one's memory, disk and running containers. The dashboard only reads Komodo and stores nothing. Create an API key pair in Komodo (Settings > Profile > API Keys) and use Komodo's LAN address. The row is drawn by the `arcade` screen style; the alerts (a server offline, a stopped container, a hot server, a disk past its Komodo warning threshold) show on every style.
 
 ```env
 KOMODO_URL=http://192.168.1.50:9120
 KOMODO_API_KEY=your_komodo_api_key
 KOMODO_API_SECRET=your_komodo_api_secret
 ```
+
+Komodo measures no temperature. To show it, run a [Prometheus node exporter](https://github.com/prometheus/node_exporter) on each server (the `thermal_zone` collector is enough) and list their metrics pages, keyed by the server's Komodo name:
+
+```env
+HOMELAB_TEMP_URLS=pi-nas=http://192.168.1.51:9100/metrics;pi-dns=http://192.168.1.52:9100/metrics
+```
 </details>
 
 <details>
 <summary><b>Screen style</b></summary>
 
-Three looks for the same data. `classic` (default) is the dense four-column layout of the preview above. `matrice` draws everything in dots, with no rules. `arcade` is pixel art in the spirit of a video-game HUD, white on black, with a home lab row.
+Three looks for the same data. `classic` (default) is the dense four-column layout of the preview above. `matrice` draws everything in dots, with no rules. `arcade` is pixel art in the spirit of a video-game HUD, with a home lab row. Both are black on white unless `DASHBOARD_THEME=dark`.
 
 ```env
 DASHBOARD_UI=arcade       # classic | matrice | arcade
-DASHBOARD_THEME=          # light | dark, for matrice and arcade; empty = the style's own default
+DASHBOARD_THEME=          # light | dark, for matrice and arcade; empty = light
 ```
 </details>
 
