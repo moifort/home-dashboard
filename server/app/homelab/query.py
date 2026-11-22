@@ -1,5 +1,6 @@
 """Home lab domain queries (read side): read Komodo, attach the panel."""
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from app.homelab import rules
@@ -23,12 +24,18 @@ def attach(data: dict):
         return
     now_ms = int(time.time() * 1000)
     since_ms = now_ms - rules.HOURS * rules.HOUR_MS
-    nodes = [
-        rules.build_node(s, komodo_client.fetch_history(URL, API_KEY, API_SECRET, s["id"], since_ms), now_ms)
-        for s in servers if s.get("state") != "Disabled"
-    ]
-    if not nodes:
+    servers = [s for s in servers if s.get("state") != "Disabled"]
+    if not servers:
         return
+
+    def node(server):
+        records = komodo_client.fetch_history(URL, API_KEY, API_SECRET, server["id"], since_ms, now_ms)
+        return rules.build_node(server, records, now_ms)
+
+    # One thread per server: 8 pages each, read one after the other, would keep
+    # the battery-powered screen waiting for its image.
+    with ThreadPoolExecutor(max_workers=len(servers)) as pool:
+        nodes = list(pool.map(node, servers))
     data["homelab"] = rules.build_panel(nodes)
     _last_homelab_time = datetime.now(PARIS_TZ).isoformat()
 

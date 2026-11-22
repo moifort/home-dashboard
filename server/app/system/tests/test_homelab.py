@@ -49,10 +49,10 @@ def test_panel_sorts_by_name_and_counts_every_server():
 
 
 def test_panel_with_more_servers_than_columns_shows_problems_first():
-    nodes = [_node(f"pi-{c}") for c in "abcde"] + [_node("pi-z", online=False)]
+    nodes = [_node(f"pi-{c}") for c in "abcdefg"] + [_node("pi-z", online=False)]
     panel = rules.build_panel(nodes)
-    assert [n["name"] for n in panel["nodes"]] == ["pi-z", "pi-a", "pi-b", "pi-c"]
-    assert (panel["online"], panel["total"]) == (5, 6)
+    assert [n["name"] for n in panel["nodes"]] == ["pi-z", "pi-a", "pi-b", "pi-c", "pi-d", "pi-e"]
+    assert (panel["online"], panel["total"]) == (7, 8)
 
 
 def test_alerts():
@@ -127,7 +127,7 @@ def test_fetch_servers_returns_none_when_komodo_is_down(komodo):
     assert komodo_client.fetch_servers("http://komodo", "k", "s") is None
 
 
-def test_fetch_history_pages_until_the_window_is_covered(komodo):
+def test_fetch_history_walks_every_page_of_the_window(komodo):
     since = NOW - 24 * H
 
     def handler(url, body):
@@ -137,9 +137,23 @@ def test_fetch_history_pages_until_the_window_is_covered(komodo):
         stats = [{"ts": first - i * 60_000, "cpu_perc": 1.0} for i in range(200)]
         return _Resp(200, {"stats": stats, "next_page": body["page"] + 1})
     session = komodo(handler)
-    records = komodo_client.fetch_history("http://komodo", "k", "s", "s1", since)
-    assert len(session.calls) == 8          # 1 440 minutes, 200 per page
+    records = komodo_client.fetch_history("http://komodo", "k", "s", "s1", since, NOW)
+    assert [body["page"] for _, body, _ in session.calls] == list(range(8))  # 1 440 minutes, 200 per page
     assert len(records) == 1440 and all(r["ts"] > since for r in records)
+
+
+def test_fetch_history_reads_past_a_gap(komodo):
+    """Komodo returns next_page = null as soon as a page misses one record (Core
+    restarted, server offline for a while): the older pages must still be read."""
+    def handler(url, body):
+        first = NOW - body["page"] * 200 * 60_000
+        count = 150 if body["page"] == 2 else 200   # 50 minutes missing on page 2
+        return _Resp(200, {"stats": [{"ts": first - i * 60_000} for i in range(count)],
+                           "next_page": None if count < 200 else body["page"] + 1})
+    session = komodo(handler)
+    records = komodo_client.fetch_history("http://komodo", "k", "s", "s1", NOW - 24 * H, NOW)
+    assert len(session.calls) == 8
+    assert min(r["ts"] for r in records) == NOW - 24 * H + 60_000
 
 
 def test_fetch_history_keeps_what_it_read_before_an_error(komodo):
@@ -148,7 +162,7 @@ def test_fetch_history_keeps_what_it_read_before_an_error(komodo):
             return _Resp(500)
         return _Resp(200, {"stats": [{"ts": NOW - 60_000, "cpu_perc": 3.0}] * 200, "next_page": 1})
     komodo(handler)
-    assert len(komodo_client.fetch_history("http://komodo", "k", "s", "s1", NOW - 24 * H)) == 200
+    assert len(komodo_client.fetch_history("http://komodo", "k", "s", "s1", NOW - 24 * H, NOW)) == 200
 
 
 def test_attach_builds_the_panel_and_skips_disabled_servers(monkeypatch):

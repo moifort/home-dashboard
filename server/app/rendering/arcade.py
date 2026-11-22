@@ -31,6 +31,8 @@ HEAD_Y, ROW_A, ROW_B, ROW_C = 16, 46, 198, 334
 PITCH, SQUARE = 6, 5     # chart cell pitch / lit square size
 LINE_H = 18              # one text row of the house columns
 SPACE = 4                # width of a space between two words
+LAB_MAX = 6              # servers the home lab row can show
+LAB_PITCH = 167          # column pitch when more than four servers share the row
 GAP = [("   ", "r", None)]
 
 # 3×5 square glyphs for the big figures. "," reuses ".".
@@ -515,9 +517,11 @@ def _draw_screen(pen, x, data):
 
 def _draw_homelab(pen, data):
     """One server per column with its last 24 hours: the hour's highest CPU and
-    memory use, so a short spike stays visible. The disk is a figure."""
+    memory use, so a short spike stays visible. The disk is a figure. Up to four
+    servers sit on the screen's columns, with the peak figures beside the charts;
+    five or six get narrower columns, with the figures under the charts."""
     lab, home = data["homelab"], data.get("home") or {}
-    nodes = (lab.get("nodes") or [])[:4]
+    nodes = (lab.get("nodes") or [])[:LAB_MAX]
     x, ink = XS[0], pen.ink
     online = lab.get("online", sum(1 for n in nodes if n.get("online", True)))
     total = lab.get("total", len(nodes))
@@ -527,30 +531,45 @@ def _draw_homelab(pen, data):
     pen.draw.text((x + w + 6, ROW_C + 66), "en ligne", font=pen.f["r"], fill=ink, anchor="ls")
     _segs(pen, x, ROW_C + 76, _t("24 dernières heures", "r"))
 
+    compact = len(nodes) > len(XS) - 1
+    chart_w = 24 * PITCH
+    xs = [XS[1] + i * LAB_PITCH for i in range(LAB_MAX)] if compact else XS[1:]
+    width = chart_w if compact else COL_W
+    # (label, data key, rows, top of the chart)
+    charts = ((("cpu", "cpu", 6, 24), ("mém.", "mem", 4, 80)) if compact
+              else (("cpu", "cpu", 6, 26), ("mém.", "mem", 4, 72)))
+    axis_y = ROW_C + (122 if compact else 100)
     now = _now_slot(home)
     now_hour = None if now is None else now // 2
-    for node, x in zip(nodes, XS[1:]):
+    for node, x in zip(nodes, xs):
         up = node.get("online", True)
-        side_x = x + 24 * PITCH + 12
         _square(pen.draw, x, ROW_C + 6, SQUARE, ink if up else RED, hollow=not up)
-        _spaced(pen, x + 13, ROW_C + 2, [(pen.fit(node.get("name", ""), "b12", 96), True, None if up else RED)])
         if not up:
-            _segs(pen, side_x, ROW_C + 2, _t("hors ligne", "r12", RED))
+            state = _t("hors ligne", "r12", RED)
         elif node.get("disk_pct") is not None:
             c = RED if node.get("disk_bad") else None
-            _segs(pen, x + COL_W, ROW_C + 2, _t("disque ", "r12", c) + [(str(node["disk_pct"]), "b12", c), ("%", "r12", c)],
-                  right=True)
-        for label, key, rows, top in (("cpu", "cpu", 6, ROW_C + 26), ("mém.", "mem", 4, ROW_C + 72)):
+            state = _t("disque ", "r12", c) + [(str(node["disk_pct"]), "b12", c), ("%", "r12", c)]
+        else:
+            state = []
+        name_w = width - 13 - _segs_w(pen, state) - 22  # the spaced label runs wider than its text
+        _spaced(pen, x + 13, ROW_C + 2, [(pen.fit(node.get("name", ""), "b12", name_w), True, None if up else RED)])
+        _segs(pen, x + width, ROW_C + 2, state, right=True)
+        for label, key, rows, top in charts:
             values = ((node.get(key) or []) + [None] * 24)[:24]
+            top += ROW_C
             _blocks(pen.draw, x, top, values, rows, ink, vmax=100)
             known = [v for v in values if v is not None]
+            peak = _t("pic ") + _num(round(max(known)), "%", "12") if known else []
             bottom = top + rows * PITCH
-            _side(pen, side_x, bottom, _t(label),
-                  _t("pic ") + _num(round(max(known)), "%", "12") if known else [])
+            if compact:
+                _segs(pen, x, bottom + 2, _t(label))
+                _segs(pen, x + chart_w, bottom + 2, peak, right=True)
+            else:
+                _side(pen, x + chart_w + 12, bottom, _t(label), peak)
         if now_hour is not None:
             for col in (0, 6, 12, 18):
-                _segs(pen, x + col * PITCH, ROW_C + 100, _t(f"{(now_hour + col) % 24}h"))
-        pen.draw.text((x + 24 * PITCH - 10, ROW_C + 100), "▲", font=pen.f["r12"], fill=ink)
+                _segs(pen, x + col * PITCH, axis_y, _t(f"{(now_hour + col) % 24}h"))
+        pen.draw.text((x + chart_w - 10, axis_y), "▲", font=pen.f["r12"], fill=ink)
 
 
 # ---- the screen -------------------------------------------------------------

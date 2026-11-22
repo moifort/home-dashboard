@@ -223,6 +223,18 @@ def pi_hors_ligne(data):
     lab["online"] -= 1
 
 
+def six_serveurs(data):
+    """More servers than the screen has columns: the home lab row goes compact."""
+    lab = data["homelab"]
+    for name, shift in (("pi-media", 3), ("pi-zigbee", 9)):
+        base = lab["nodes"][0]
+        lab["nodes"].append(dict(base, name=name, disk_pct=22 + shift, disk_bad=False,
+                                 cpu=base["cpu"][shift:] + base["cpu"][:shift],
+                                 mem=base["mem"][shift:] + base["mem"][:shift]))
+    lab["nodes"].sort(key=lambda n: n["name"])
+    lab["online"] = lab["total"] = len(lab["nodes"])
+
+
 # (sub-section, [scenario, ...]); the reference scenarios also get the dark theme.
 SECTIONS = [
     ("reference", [complet, tout_va_bien]),
@@ -233,10 +245,10 @@ SECTIONS = [
     ("electricite", [premier_jour, jours_manquants, debut_de_journee, batterie_faible,
                      beaucoup_de_prises]),
     ("reseau-plantes", [reseau_degrade, plantes_a_arroser]),
-    ("homelab", [sans_home_lab, pi_hors_ligne]),
+    ("homelab", [sans_home_lab, pi_hors_ligne, six_serveurs]),
 ]
 DARK = {"complet", "tout_va_bien"}
-ARCADE_ONLY = {"sans_home_lab", "pi_hors_ligne"}
+ARCADE_ONLY = {"sans_home_lab", "pi_hors_ligne", "six_serveurs"}
 
 
 def main():

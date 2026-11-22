@@ -9,7 +9,7 @@ highest reading, None when Komodo has no record for that hour.
 """
 HOURS = 24
 HOUR_MS = 3_600_000
-MAX_NODES = 4            # the screen has four columns for servers
+MAX_NODES = 6            # the screen fits six server columns
 DISK_WARN_PCT = 90.0     # used when the server carries no Komodo disk threshold
 
 

@@ -62,6 +62,18 @@ def test_an_offline_pi_turns_the_counter_red(data):
     assert img.getpixel((x, y)) == (255, 0, 0)
 
 
+def test_six_servers_fit_the_row(data):
+    """Five or six servers switch the row to narrow columns, inside the margins."""
+    lab = data["homelab"]
+    lab["nodes"] += [dict(lab["nodes"][0], name=f"pi-{i}") for i in (5, 6)]
+    lab["online"] = lab["total"] = 6
+    img = render_arcade(data)
+    assert {c for _, c in img.getcolors(maxcolors=1 << 16)} <= INKS
+    row = img.crop((0, arcade.ROW_C, 1360, 480))
+    left, top, right, bottom = row.getbbox()
+    assert left >= arcade.XS[0] - 2 and right <= 1360 - arcade.XS[0] and bottom <= 480 - arcade.ROW_C - 4
+
+
 def test_switch_routes_to_arcade_dark_by_default(data, monkeypatch):
     monkeypatch.setattr(config, "DASHBOARD_UI", "arcade")
     monkeypatch.setattr(config, "DASHBOARD_THEME", "")
