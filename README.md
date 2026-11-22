@@ -24,7 +24,7 @@ E-paper screen for the home. It reads your smart-home data and renders: electric
 | **Crypto** | A trading-bot stats banner (return %, profit, portfolio) with a price-grid snapshot: the price line over the period (cut off while the price sits outside the grid, with an arrow where it leaves) and a dot per validated cycle, black on a win, red on a loss. |
 | **Network** | UniFi internet & Wi-Fi quality, latency, data usage and top clients per network. |
 | **Device battery** | Estimated charge % and days since the ESP32 was last charged, in the `Home` panel, with average/record autonomy on `/status` — inferred from the device's boot telemetry, no extra sensor. |
-| **Home lab** | One column per server watched by [Komodo](https://komo.do): its last 24 hours of CPU and memory, hour by hour (the hour's peak), its disk use, and how many servers are online. Shown by the `arcade` screen style. |
+| **Home lab** | One column per server watched by [Komodo](https://komo.do), up to six: its last 24 hours of CPU and memory, hour by hour (the hour's peak), its disk use, and how many servers are online. Shown by the `arcade` screen style. |
 | **Alerts**  | Anomalies to act on, one line each with its € impact and the active count on the title: consumption or standby spikes, a probable water leak, the water heater running on peak hours, a plug drifting out of off-peak, a solar disconnect, a new device on the network, a server offline or with a full disk. Plus one event note: a broken solar production record. |
 
 ## Hardware

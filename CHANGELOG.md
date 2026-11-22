@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-22
+
+- **Home lab: the full 24 hours, up to six servers, read in the background**: three fixes from the first run against a real Komodo. The history stopped after 17 hours: Komodo ends its paging as soon as one record is missing, so the pages are now walked over the whole window. The row showed four servers out of six: it now fits six, with narrower columns and the peak figures under the charts from the fifth server on. And reading 24 hours of one-minute records for six servers took Komodo about 12 seconds while the battery-powered screen waited for its image: a background task now reads Komodo every 30 minutes and the render uses that copy (dropped after 90 minutes without a successful read). No new environment variable.
+
 ## 2026-11-21
 
 - **Fix: the compose files pull the image that still gets updates**: `docker-compose.yml` and `docker-compose.casaos.yml` pointed at `ghcr.io/moifort/dashboard:main`, the image of the repository's former name, frozen on its 2026-05-29 build. CI publishes to `ghcr.io/moifort/home-dashboard:main`, and both files now use it. If your container was created from the old files, change its image by hand: the auto-update follows the old tag and never sees a new build. `/status` shows the running commit in `version`. No new environment variable.
