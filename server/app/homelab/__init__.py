@@ -1,9 +1,10 @@
 """Home lab domain: the servers Komodo watches (the `home lab` row of the arcade UI).
 
 Komodo already polls every server and keeps the history, so this domain owns no
-table and no listener: on each refresh it lists the servers and reads their last
-24 hours of stats from the Komodo Core API, then folds them into one column per
-hour (the hour's highest CPU and memory use, so a short spike stays visible).
+table: a background reader lists the servers and reads their last 24 hours of
+stats from the Komodo Core API every half hour, folds them into one column per
+hour (the hour's highest CPU and memory use, so a short spike stays visible) and
+keeps the result in memory for the render.
 The point of entry exposes the uniform slice API (enabled / init_schema / start /
 attach / status). Remove the whole folder to drop it.
 """

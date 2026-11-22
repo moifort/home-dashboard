@@ -165,18 +165,43 @@ def test_fetch_history_keeps_what_it_read_before_an_error(komodo):
     assert len(komodo_client.fetch_history("http://komodo", "k", "s", "s1", NOW - 24 * H, NOW)) == 200
 
 
-def test_attach_builds_the_panel_and_skips_disabled_servers(monkeypatch):
-    from app.homelab import query
-    monkeypatch.setattr(query.komodo_client, "fetch_servers", lambda *a: [
-        {"id": "s1", "name": "pi-nas", "state": "Ok", "disk_warning": None},
-        {"id": "s2", "name": "pi-old", "state": "Disabled", "disk_warning": None}])
-    monkeypatch.setattr(query.komodo_client, "fetch_history", lambda *a: [])
-    data = {}
-    query.attach(data)
-    assert [n["name"] for n in data["homelab"]["nodes"]] == ["pi-nas"]
-    assert data["homelab"]["total"] == 1
+@pytest.fixture
+def reader(monkeypatch):
+    """The command module with an empty cache and a scripted Komodo."""
+    from app.homelab import command
+    monkeypatch.setattr(command, "_cache", None)
+    calls = []
 
-    monkeypatch.setattr(query.komodo_client, "fetch_servers", lambda *a: None)
-    data = {}
-    query.attach(data)
-    assert "homelab" not in data
+    def script(servers):
+        monkeypatch.setattr(command.komodo_client, "fetch_servers", lambda *a: calls.append("list") or servers)
+        monkeypatch.setattr(command.komodo_client, "fetch_history", lambda *a: [])
+    command.script, command.calls = script, calls
+    return command
+
+
+def test_attach_reads_komodo_once_then_serves_the_cache(reader):
+    from app.homelab import query
+    reader.script([{"id": "s1", "name": "pi-nas", "state": "Ok", "disk_warning": None},
+                   {"id": "s2", "name": "pi-old", "state": "Disabled", "disk_warning": None}])
+    first, second = {}, {}
+    query.attach(first)
+    query.attach(second)
+    assert [n["name"] for n in first["homelab"]["nodes"]] == ["pi-nas"]  # disabled server left out
+    assert first["homelab"]["total"] == 1 and second == first
+    assert reader.calls == ["list"]                                      # the second render hit no network
+    assert query.status()["last_homelab"]
+
+
+def test_attach_drops_a_stale_panel_when_komodo_is_down(reader, monkeypatch):
+    from app.homelab import query
+    reader.script([{"id": "s1", "name": "pi-nas", "state": "Ok", "disk_warning": None}])
+    reader.refresh()
+    reader.script(None)                                                  # Komodo stops answering
+    kept = {}
+    query.attach(kept)
+    assert "homelab" in kept                                             # still fresh: served from memory
+    panel, read_at = reader._cache
+    monkeypatch.setattr(reader, "_cache", (panel, read_at - reader.STALE_S - 1))
+    stale = {}
+    query.attach(stale)
+    assert "homelab" not in stale
