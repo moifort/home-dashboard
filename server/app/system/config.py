@@ -31,7 +31,7 @@ RENDER_MODE = os.environ.get("RENDER_MODE", "4color")
 # Screen UI: "classic" (the dense four-column layout), "matrice" (dot-matrix,
 # rule-free) or "arcade" (pixel art, video-game HUD). DASHBOARD_THEME applies to
 # matrice and arcade: "light" (black on white) or "dark" (white on black). Left
-# empty, each UI keeps its own default: light for matrice, dark for arcade.
+# empty, both default to light.
 DASHBOARD_UI = os.environ.get("DASHBOARD_UI", "classic").strip().lower()
 DASHBOARD_THEME = os.environ.get("DASHBOARD_THEME", "").strip().lower()
 DB_PATH = os.environ.get("DB_PATH", "/data/linky.db")

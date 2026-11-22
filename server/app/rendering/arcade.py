@@ -1,18 +1,20 @@
 """The "Arcade" UI: a pixel-art screen borrowed from video-game HUDs.
 
-Selected with DASHBOARD_UI=arcade (see app.system.config). White pixels on a black
-screen by default (DASHBOARD_THEME=light flips it). No frame and no rule: five
+Selected with DASHBOARD_UI=arcade (see app.system.config). Black pixels on a white
+screen by default (DASHBOARD_THEME=dark flips it). No frame and no rule: five
 columns and whitespace. One vocabulary, drawn pixel-exact so nothing gets
 re-thresholded on the e-paper:
   - big figures in 3×5 square glyphs,
   - columns of small squares for a history (an unlit cell stays a 1px dot),
+  - a hollow square is always off-peak hours, a filled one peak hours,
   - segmented bars, like a life bar, for anything that is a gauge,
   - one 8×8 icon per domain, drops for a plant's moisture.
 Red is reserved for alerts and bad trends.
 
 Layout (1360×480, 48px margins, 5 columns of 216px every 262px):
   header   date · current tariff period · refresh schedule
-  row A    counters: électricité (last 24 h), eau, solaire, crypto, alertes
+  row A    counters: électricité, eau, solaire (the rolling days on the left,
+           the last 24 hours on the right), crypto, alertes
   row B    the house: maison, prises, plantes, réseau, écran
   row C    home lab: one server per column, its last 24 hours (CPU, memory)
 Absent domains leave their slot out; alertes, écran and the home lab title keep
@@ -31,6 +33,9 @@ HEAD_Y, ROW_A, ROW_B, ROW_C = 16, 46, 198, 334
 PITCH, SQUARE = 6, 5     # chart cell pitch / lit square size
 LINE_H = 18              # one text row of the house columns
 SPACE = 4                # width of a space between two words
+DAYS_MAX = 9             # rolling days a counter's left chart can show
+CHART_ROWS = 5           # height of a counter's charts, in squares
+X_24H = COL_W - 24 * PITCH  # left edge of a counter's 24 h chart, in its column
 LAB_MAX = 6              # servers the home lab row can show
 LAB_PITCH = 167          # column pitch when more than four servers share the row
 GAP = [("   ", "r", None)]
@@ -114,6 +119,22 @@ def _blocks(draw, x, y, values, rows, ink, vmax=None, vmin=0, hollow=None, fill_
             if j < lit:
                 _square(draw, cx, cy, SQUARE, (fill_at and fill_at(i)) or ink,
                         hollow=bool(hollow and hollow(i)))
+            else:
+                draw.point((cx + SQUARE // 2, cy + SQUARE // 2), fill=ink)
+
+
+def _stacks(draw, x, y, pairs, rows, ink):
+    """One column per (peak, off-peak) pair, scaled on the highest total: the
+    peak share in filled squares at the bottom, the off-peak share hollow on top."""
+    totals = [(a or 0) + (b or 0) for a, b in pairs]
+    vmax = max(totals, default=0) or 1
+    for i, ((peak, _), total) in enumerate(zip(pairs, totals)):
+        lit = 0 if not total else max(1, round(total / vmax * rows))
+        filled = round((peak or 0) / total * lit) if total else 0
+        for j in range(rows):
+            cx, cy = x + i * PITCH, y + (rows - 1 - j) * PITCH
+            if j < lit:
+                _square(draw, cx, cy, SQUARE, ink, hollow=j >= filled)
             else:
                 draw.point((cx + SQUARE // 2, cy + SQUARE // 2), fill=ink)
 
@@ -219,6 +240,14 @@ def _side(pen, x, y, line1, line2):
     _segs(pen, x, y - 15, line2)
 
 
+def _captions(pen, x, bottom, n_days, peak):
+    """The line under a counter's two charts: the days on the left, the 24 hours
+    and their peak on the right."""
+    _segs(pen, x, bottom + 3, _num(n_days, " j", "12"))
+    _segs(pen, x + X_24H, bottom + 3, _num(24, " h", "12"))
+    _segs(pen, x + COL_W, bottom + 3, peak, right=True)
+
+
 def _t(text, key="r12", color=None):
     return [(str(text), key, color)]
 
@@ -271,6 +300,28 @@ def _hourly_max(slots):
     return out
 
 
+def _hourly_sum(slots):
+    """48 half-hours → 24 hours, each the sum of its two halves."""
+    out = []
+    for i in range(0, len(slots) - 1, 2):
+        pair = [v for v in slots[i:i + 2] if v is not None]
+        out.append(sum(pair) if pair else None)
+    return out
+
+
+def _off_peak_hours(slots, now_slot, hc) -> set:
+    """Which of the 24 columns of _hourly_max are off-peak: the ones whose
+    highest half-hour falls in an HC slot."""
+    out = set()
+    if now_slot is None:
+        return out
+    for i in range(0, len(slots) - 1, 2):
+        pair = [(v, (now_slot + i + k) % 48) for k, v in enumerate(slots[i:i + 2]) if v is not None]
+        if pair and max(pair)[1] in hc:
+            out.add(i // 2)
+    return out
+
+
 def _alert_items(data):
     return [(msg, fig, positive) for row in data.get("alert_board") or [] if row.get("alert")
             for msg, fig, _money, positive in row.get("items") or []]
@@ -291,7 +342,7 @@ def _hero(pen, x, icon, label, figure, unit, sub, color=None):
     if unit:
         pen.draw.text((x + w + 6, ROW_A + 66), unit, font=pen.f["r"], fill=color or pen.ink, anchor="ls")
     _segs(pen, x, ROW_A + 76, sub)
-    return ROW_A + 130
+    return ROW_A + 126
 
 
 def _draw_electricity(pen, x, data):
@@ -303,16 +354,20 @@ def _draw_electricity(pen, x, data):
     if today:
         sub += GAP + _t("auj. ", "r") + _num(f"{(today.get('hc_kwh') or 0) + (today.get('hp_kwh') or 0):.1f}", "kWh")
     bottom = _hero(pen, x, "bolt", "électricité", stats.get("avg_kwh"), "kWh/j", sub)
-    slots = _last_24h(days, _now_slot(home))
-    hours = _hourly_max(slots) or [None] * 24
-    _blocks(pen.draw, x, bottom - 30, hours, 5, pen.ink, vmax=INTRADAY_MAX_W)
+    top, shown = bottom - CHART_ROWS * PITCH, days[-DAYS_MAX:]
+    _stacks(pen.draw, x, top, [(d.get("hp_kwh"), d.get("hc_kwh")) for d in shown], CHART_ROWS, pen.ink)
+    now = _now_slot(home)
+    slots = _last_24h(days, now)
+    off_peak = _off_peak_hours(slots, now, _hc_slots(home))
+    _blocks(pen.draw, x + X_24H, top, _hourly_max(slots) or [None] * 24, CHART_ROWS, pen.ink,
+            vmax=INTRADAY_MAX_W, hollow=lambda i: i in off_peak)
     known = [v for v in slots if v is not None]
     peak = _t("pic ") + _num(f"{max(known) / 1000:.1f}", "kW", "12") if known else []
-    _side(pen, x + 24 * PITCH + 12, bottom, _t("24 h"), peak)
+    _captions(pen, x, bottom, len(shown), peak)
 
 
 def _draw_water(pen, x, data):
-    days, ws = data["water_days"], data.get("water_stats") or {}
+    days, ws, home = data["water_days"], data.get("water_stats") or {}, data.get("home")
     today = days[-1] if days[-1].get("today") else None
     sub = _trend(ws.get("avg_pct"), True, pen.ink)
     if today and today.get("liters") is not None:
@@ -320,31 +375,33 @@ def _draw_water(pen, x, data):
     if ws.get("cost_text"):
         sub += GAP + _num(ws["cost_text"], "€")
     bottom = _hero(pen, x, "drop", "eau", ws.get("avg_text"), "L/j", sub)
-    liters = [d.get("liters") for d in days]
-    last_done = max((i for i, d in enumerate(days) if not d.get("today")), default=None)
+    top, shown = bottom - CHART_ROWS * PITCH, days[-DAYS_MAX:]
+    last_done = max((i for i, d in enumerate(shown) if not d.get("today")), default=None)
     leak = last_done if _has_bad_alert(data, "Eau") else None
-    _blocks(pen.draw, x, bottom - 30, liters, 5, pen.ink,
-            hollow=lambda i: today is not None and i == len(days) - 1,
+    _blocks(pen.draw, x, top, [d.get("liters") for d in shown], CHART_ROWS, pen.ink,
             fill_at=lambda i: RED if i == leak else None)
-    known = [v for v in liters if v is not None]
-    peak = _t("pic ") + _num(round(max(known)), "L", "12") if known else []
-    _side(pen, x + len(days) * PITCH + 12, bottom, _t(f"{len(days)} jours"), peak)
+    hours = _hourly_sum(_last_24h(days, _now_slot(home))) or [None] * 24
+    _blocks(pen.draw, x + X_24H, top, hours, CHART_ROWS, pen.ink)
+    known = [v for v in hours if v is not None]
+    peak = _t("pic ") + _num(round(max(known)), "L/h", "12") if known else []
+    _captions(pen, x, bottom, len(shown), peak)
 
 
 def _draw_solar(pen, x, data):
-    days, ps = data["production_days"], data.get("production_stats") or {}
+    days, ps, home = data["production_days"], data.get("production_stats") or {}, data.get("home")
     sub = _trend(ps.get("avg_kwh_pct"), False, pen.ink)
     if ps.get("autonomy_pct") is not None:
         sub += GAP + _t("autonomie ", "r") + _num(round(ps["autonomy_pct"]), "%")
     if ps.get("savings_eur") is not None:
         sub += GAP + _num(f"{ps['savings_eur']:.2f}", "€")
     bottom = _hero(pen, x, "sun", "solaire", ps.get("avg_kwh"), "kWh/j", sub)
-    kwh = [d.get("pv_kwh") for d in days]
-    _blocks(pen.draw, x, bottom - 30, kwh, 5, pen.ink,
-            hollow=lambda i: bool(days[-1].get("today")) and i == len(days) - 1)
-    known = [v for v in kwh if v]
-    best = _t("max ") + _num(f"{max(known):.1f}", "kWh", "12") if known else []
-    _side(pen, x + len(days) * PITCH + 12, bottom, _t(f"{len(days)} jours"), best)
+    top, shown = bottom - CHART_ROWS * PITCH, days[-DAYS_MAX:]
+    _blocks(pen.draw, x, top, [d.get("pv_kwh") for d in shown], CHART_ROWS, pen.ink)
+    hours = _hourly_max(_last_24h(days, _now_slot(home))) or [None] * 24
+    _blocks(pen.draw, x + X_24H, top, hours, CHART_ROWS, pen.ink)
+    known = [v for v in hours if v]
+    best = _t("max ") + _num(round(max(known)), "W", "12") if known else []
+    _captions(pen, x, bottom, len(shown), best)
 
 
 def _draw_crypto(pen, x, data):
@@ -361,9 +418,8 @@ def _draw_crypto(pen, x, data):
     prices = [p for _, p in grid.get("points") or []][-24:]
     if prices:
         floor = min(prices) - (max(prices) - min(prices)) / 4
-        _blocks(pen.draw, x, bottom - 30, prices, 5, pen.ink, vmin=floor)
-        _side(pen, x + len(prices) * PITCH + 12, bottom, _t("prix"),
-              _t(grid.get("current_price_text", ""), "b12"))
+        _blocks(pen.draw, x, bottom - CHART_ROWS * PITCH, prices, CHART_ROWS, pen.ink, vmin=floor)
+        _segs(pen, x, bottom + 3, _t("prix ") + _t(grid.get("current_price_text", ""), "b12"))
 
 
 def _draw_alerts(pen, x, data):
@@ -411,7 +467,8 @@ def _draw_house(pen, x, data):
              + _trend(talon.get("trend_pct"), True, pen.ink), right)
         y += LINE_H
     if stats.get("hc_ratio") is not None:
-        _row(pen, x, y, _t("heures creuses ", "r") + _num(round(stats["hc_ratio"]), "% ")
+        _square(pen.draw, x, y + 5, 7, pen.ink, hollow=True)
+        _row(pen, x + 12, y, _t("heures creuses ", "r") + _num(round(stats["hc_ratio"]), "% ")
              + _trend(stats.get("hc_ratio_pct"), False, pen.ink))
         y += LINE_H
     hc = _hc_slots(home)
@@ -574,8 +631,8 @@ def _draw_homelab(pen, data):
 
 # ---- the screen -------------------------------------------------------------
 
-def render_arcade(data: dict, theme: str = "dark") -> Image.Image:
-    dark = theme != "light"
+def render_arcade(data: dict, theme: str = "light") -> Image.Image:
+    dark = theme == "dark"
     paper, ink = ((0, 0, 0), (255, 255, 255)) if dark else ((255, 255, 255), (0, 0, 0))
     img = Image.new("RGB", (WIDTH, HEIGHT), paper)
     draw = ImageDraw.Draw(img)
@@ -586,7 +643,8 @@ def render_arcade(data: dict, theme: str = "dark") -> Image.Image:
     x = _spaced(pen, XS[0], HEAD_Y, [(home.get("date_text", ""), True, None)])
     period = _period_text(home)
     if period:
-        _spaced(pen, x + 14, HEAD_Y, [(period[0], False, None), (period[1], True, None)])
+        _square(draw, x + 14, HEAD_Y + 4, 7, ink, hollow=period[0].startswith("heures creuses"))
+        _spaced(pen, x + 26, HEAD_Y, [(period[0], False, None), (period[1], True, None)])
     if home.get("last_text"):
         segs = [("maj ", False, None), (home["last_text"], True, None)]
         if home.get("next_text"):
