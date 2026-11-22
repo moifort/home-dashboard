@@ -13,8 +13,8 @@ Red is reserved for alerts and bad trends.
 
 Layout (1360×480, 48px margins, 5 columns of 216px every 262px):
   header   date · current tariff period · refresh schedule
-  row A    counters: électricité, eau, solaire (the rolling days on the left,
-           the last 24 hours on the right), crypto, alertes
+  row A    counters: électricité, eau, solaire, crypto (the rolling days on the
+           left, the last 24 hours on the right), alertes
   row B    the house: maison, prises, plantes, réseau, écran
   row C    home lab: one server per column, its last 24 hours (CPU, memory)
 Absent domains leave their slot out; alertes, écran and the home lab title keep
@@ -322,6 +322,18 @@ def _off_peak_hours(slots, now_slot, hc) -> set:
     return out
 
 
+def _closes(points, step_s, n):
+    """The last price of each of the n step_s-second windows ending at the last
+    point, oldest first (None for a window without a point)."""
+    out = [None] * n
+    last = points[-1][0]
+    for t, price in points:
+        k = n - 1 - int((last - t) // step_s)
+        if k >= 0:
+            out[k] = price
+    return out
+
+
 def _alert_items(data):
     return [(msg, fig, positive) for row in data.get("alert_board") or [] if row.get("alert")
             for msg, fig, _money, positive in row.get("items") or []]
@@ -415,11 +427,17 @@ def _draw_crypto(pen, x, data):
                                           ("%", "r", None)]
     label = "crypto · test" if crypto.get("sandbox") else "crypto"
     bottom = _hero(pen, x, "coin", label, crypto.get("pct_text"), "%", sub, color=bad)
-    prices = [p for _, p in grid.get("points") or []][-24:]
-    if prices:
-        floor = min(prices) - (max(prices) - min(prices)) / 4
-        _blocks(pen.draw, x, bottom - CHART_ROWS * PITCH, prices, CHART_ROWS, pen.ink, vmin=floor)
-        _segs(pen, x, bottom + 3, _t("prix ") + _t(grid.get("current_price_text", ""), "b12"))
+    points = grid.get("points") or []
+    if not points:
+        return
+    top = bottom - CHART_ROWS * PITCH
+    span_days = -(-(points[-1][0] - points[0][0]) // 86400)  # ceil
+    days = _closes(points, 86400, max(1, min(DAYS_MAX, int(span_days))))
+    for cx, prices in ((x, days), (x + X_24H, _closes(points, 3600, 24))):
+        known = [p for p in prices if p is not None]
+        floor = min(known) - (max(known) - min(known)) / 4
+        _blocks(pen.draw, cx, top, prices, CHART_ROWS, pen.ink, vmin=floor)
+    _captions(pen, x, bottom, len(days), _t(grid.get("current_price_text", ""), "b12"))
 
 
 def _draw_alerts(pen, x, data):

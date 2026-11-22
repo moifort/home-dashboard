@@ -10,6 +10,26 @@ frozen input of the layer-2 render golden.
 """
 from app.alerts import build_board
 
+GRID_LAST_TS = 1780401600  # 2026-06-02 12:00 UTC, the hour of the frozen refresh
+GRID_HOURS = 168           # the bot serves a week of hourly prices
+
+
+def anchor_ts(i: float, n_anchors: int) -> float:
+    """Epoch seconds of the i-th of n anchor prices spread over the week."""
+    return GRID_LAST_TS - (GRID_HOURS - 1) * 3600 * (1 - i / (n_anchors - 1))
+
+
+def hourly_prices(anchors) -> list:
+    """A week of hourly (epoch s, price) points drawn through the anchor prices,
+    the shape the crypto bot returns."""
+    out = []
+    for h in range(GRID_HOURS):
+        pos = h / (GRID_HOURS - 1) * (len(anchors) - 1)
+        i = min(int(pos), len(anchors) - 2)
+        price = anchors[i] + (anchors[i + 1] - anchors[i]) * (pos - i)
+        out.append((GRID_LAST_TS - (GRID_HOURS - 1 - h) * 3600, round(price, 1)))
+    return out
+
 
 def _demo_homelab() -> dict:
     """Home lab: needs a live Komodo → four example servers in the shape
@@ -67,12 +87,12 @@ def apply_demo_panels(data: dict) -> dict:
         data["crypto_grid"] = {
             "lower": 96000.0, "upper": 104000.0, "levels": 8,
             "current_price": 101500.0, "current_price_text": "$101 500",
-            "points": [(i, float(p)) for i, p in enumerate(_grid_prices)],
+            "points": hourly_prices(_grid_prices),
             # Validated cycles, on grid levels: two winners (black), one loser (red).
             "cycles": [
-                {"time": 1.5, "price": 100571.4, "profit": 11.2},
-                {"time": 7.4, "price": 101714.3, "profit": 9.8},
-                {"time": 10.2, "price": 102857.1, "profit": -4.5},
+                {"time": anchor_ts(1.5, 12), "price": 100571.4, "profit": 11.2},
+                {"time": anchor_ts(7.4, 12), "price": 101714.3, "profit": 9.8},
+                {"time": anchor_ts(10.2, 12), "price": 102857.1, "profit": -4.5},
             ],
             "skips": [{"price": 97000.0, "side": "buy", "kind": "insufficient_funds"}],
         }

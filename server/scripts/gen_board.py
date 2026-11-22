@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.alerts import build_board  # noqa: E402
 from app.rendering.renderer import render_dashboard  # noqa: E402
+from app.system.tests.fixtures.build_fixture import hourly_prices  # noqa: E402
 
 FIXTURE = ROOT / "app" / "system" / "tests" / "fixtures" / "dashboard_data.json"
 DEFAULT_OUT = ROOT.parent / ".claude" / "board" / "project" / "img"
@@ -123,7 +124,7 @@ def crypto_sandbox(data):
 def crypto_hors_grille(data):
     prices = [101000, 102200, 103400, 103900, 104800, 105600, 105100, 104300,
               103700, 104900, 106200, 106800]
-    data["crypto_grid"].update(points=[[i, float(p)] for i, p in enumerate(prices)],
+    data["crypto_grid"].update(points=[list(tp) for tp in hourly_prices(prices)],
                                current_price=106800.0, current_price_text="$106 800",
                                skips=[])
 

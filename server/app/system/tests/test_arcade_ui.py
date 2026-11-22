@@ -95,6 +95,11 @@ def test_hourly_max_keeps_a_short_peak():
     assert arcade._hourly_max([300, 2900, None, 400, None, None]) == [2900, 400, None]
 
 
+def test_closes_keep_the_last_price_of_each_window():
+    points = [(0, 10.0), (1800, 11.0), (3600, 12.0), (9000, 15.0), (10800, 16.0)]
+    assert arcade._closes(points, 3600, 4) == [10.0, 12.0, None, 16.0]
+
+
 def test_hourly_sum_adds_the_two_halves():
     assert arcade._hourly_sum([3, 4, None, 5, None, None]) == [7, 5, None]
 
