@@ -6,12 +6,9 @@ per request (`/read/ListServers`, the params as the body); Komodo 1 has a single
 `/read` route with a typed body, used as a fallback when the first form is not
 found.
 
-Historical stats come by pages of 200 timestamps, newest first, on the granularity
-asked: one record per minute here, so 24 hours are 8 pages per server. A coarser
-step would be cheaper but would miss any spike shorter than the step. A page only
-holds the records Komodo has for its 200 timestamps, and `next_page` is null as
-soon as one is missing (Core restarted, server offline for a while): the pages
-are therefore walked by number over the whole window, never by `next_page`.
+Two requests feed the panel: `ListServers` carries each server's state, its
+alert thresholds and its latest stats (memory, disk), and
+`ListAllDockerContainers` every container with its server and state.
 """
 import logging
 
@@ -20,9 +17,6 @@ import requests
 logger = logging.getLogger(__name__)
 
 TIMEOUT_S = 10
-GRANULARITY = "1-min"
-STEP_MS = 60_000   # one GRANULARITY step
-PAGE_SIZE = 200    # timestamps per page (Komodo's STATS_PER_PAGE)
 
 _session: requests.Session | None = None
 _legacy_route = False
@@ -50,9 +44,14 @@ def _read(url: str, key: str, secret: str, name: str, params: dict):
     return resp.json()
 
 
+def _pct(used, total):
+    return None if not total or used is None else used / total * 100
+
+
 def fetch_servers(url: str, key: str, secret: str) -> list | None:
-    """Every server Komodo knows as {"id", "name", "state", "disk_warning"}
-    (state: "Ok", "NotOk" or "Disabled"). None on any error."""
+    """Every server Komodo knows as {"id", "name", "state", "mem_pct", "disk_pct",
+    "mem_warning", "disk_warning"} (state: "Ok", "NotOk" or "Disabled"; the
+    percentages are None while Komodo has no stats). None on any error."""
     try:
         items = _read(url, key, secret, "ListServers", {})
     except (requests.RequestException, ValueError) as exc:
@@ -61,25 +60,27 @@ def fetch_servers(url: str, key: str, secret: str) -> list | None:
     servers = []
     for item in items or []:
         info = item.get("info") or {}
+        stats, limits = info.get("stats") or {}, info.get("alerting_thresholds") or {}
         servers.append({
             "id": item.get("id"), "name": item.get("name") or "",
             "state": info.get("state"),
-            "disk_warning": (info.get("alerting_thresholds") or {}).get("disk_warning"),
+            "mem_pct": _pct(stats.get("mem_used_gb"), stats.get("mem_total_gb")),
+            "disk_pct": _pct(stats.get("disk_used_gb"), stats.get("disk_total_gb")),
+            "mem_warning": limits.get("mem_warning"),
+            "disk_warning": limits.get("disk_warning"),
         })
     return servers
 
 
-def fetch_history(url: str, key: str, secret: str, server_id: str, since_ms: int, now_ms: int) -> list:
-    """A server's stat records between since_ms and now_ms (unordered). Returns
-    what was read before any error, so one failing server only loses its own
-    history."""
-    records = []
-    pages = -(-(now_ms - since_ms) // (PAGE_SIZE * STEP_MS))  # ceil
+def fetch_containers(url: str, key: str, secret: str) -> dict | None:
+    """{server id: (running, total)} over every container. None on any error."""
     try:
-        for page in range(pages):
-            body = _read(url, key, secret, "GetHistoricalServerStats",
-                         {"server": server_id, "granularity": GRANULARITY, "page": page})
-            records += body.get("stats") or []
+        items = _read(url, key, secret, "ListAllDockerContainers", {"servers": []})
     except (requests.RequestException, ValueError) as exc:
-        logger.warning("Komodo history failed for %s: %s", server_id, exc)
-    return [r for r in records if r.get("ts", 0) > since_ms]
+        logger.warning("Komodo ListAllDockerContainers failed: %s", exc)
+        return None
+    counts = {}
+    for item in items or []:
+        running, total = counts.get(item.get("server_id"), (0, 0))
+        counts[item.get("server_id")] = (running + (item.get("state") == "running"), total + 1)
+    return counts

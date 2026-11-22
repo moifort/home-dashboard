@@ -62,6 +62,26 @@ def test_an_offline_pi_turns_the_counter_red(data):
     assert img.getpixel((x, y)) == (255, 0, 0)
 
 
+def test_home_lab_card_marks_what_is_wrong_in_red(data):
+    """A healthy card is black; a hot server and a stopped container turn red."""
+    def reds(d):
+        x = arcade.XS[1]
+        card = render_arcade(d).crop((x, arcade.ROW_C, x + arcade.COL_W, 480))
+        return sum(n for n, c in card.getcolors() if c == (255, 0, 0))
+    assert reds(data) == 0
+    hot = copy.deepcopy(data)
+    hot["homelab"]["nodes"][0].update(temp=74, temp_bad=True)
+    down = copy.deepcopy(data)
+    down["homelab"]["nodes"][0]["up"] -= 1
+    assert reds(hot) > 0 and reds(down) > 0
+
+
+def test_home_lab_card_survives_missing_figures(data):
+    for node in data["homelab"]["nodes"]:
+        node.update(temp=None, mem_pct=None, disk_pct=None, up=None, containers=None)
+    render_arcade(data)
+
+
 def test_six_servers_fit_the_row(data):
     """Five or six servers switch the row to narrow columns, inside the margins."""
     lab = data["homelab"]

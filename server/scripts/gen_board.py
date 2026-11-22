@@ -217,21 +217,26 @@ def sans_home_lab(data):
 
 
 def pi_hors_ligne(data):
-    """One server stopped answering six hours ago: its history ends there."""
+    """One server stopped answering: its card only says so."""
     lab = data["homelab"]
-    down = lab["nodes"][1]
-    down.update(online=False, cpu=down["cpu"][:18] + [None] * 6, mem=down["mem"][:18] + [None] * 6)
+    lab["nodes"][1]["online"] = False
     lab["online"] -= 1
 
 
+def pi_en_difficulte(data):
+    """A hot server with a stopped container, and one short on memory."""
+    lab = data["homelab"]
+    lab["nodes"][0].update(temp=74, temp_bad=True, up=4)
+    lab["nodes"][2].update(mem_pct=93, mem_bad=True)
+
+
 def six_serveurs(data):
-    """More servers than the screen has columns: the home lab row goes compact."""
+    """More servers than the screen has columns: the cards get narrower."""
     lab = data["homelab"]
     for name, shift in (("pi-media", 3), ("pi-zigbee", 9)):
         base = lab["nodes"][0]
-        lab["nodes"].append(dict(base, name=name, disk_pct=22 + shift, disk_bad=False,
-                                 cpu=base["cpu"][shift:] + base["cpu"][:shift],
-                                 mem=base["mem"][shift:] + base["mem"][:shift]))
+        lab["nodes"].append(dict(base, name=name, temp=base["temp"] + shift, mem_pct=base["mem_pct"] - shift,
+                                 disk_pct=22 + shift, disk_bad=False))
     lab["nodes"].sort(key=lambda n: n["name"])
     lab["online"] = lab["total"] = len(lab["nodes"])
 
@@ -246,10 +251,10 @@ SECTIONS = [
     ("electricite", [premier_jour, jours_manquants, debut_de_journee, batterie_faible,
                      beaucoup_de_prises]),
     ("reseau-plantes", [reseau_degrade, plantes_a_arroser]),
-    ("homelab", [sans_home_lab, pi_hors_ligne, six_serveurs]),
+    ("homelab", [sans_home_lab, pi_hors_ligne, pi_en_difficulte, six_serveurs]),
 ]
 DARK = {"complet", "tout_va_bien"}
-ARCADE_ONLY = {"sans_home_lab", "pi_hors_ligne", "six_serveurs"}
+ARCADE_ONLY = {"sans_home_lab", "pi_hors_ligne", "pi_en_difficulte", "six_serveurs"}
 
 
 def main():

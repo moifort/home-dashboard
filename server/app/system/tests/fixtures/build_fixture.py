@@ -33,22 +33,16 @@ def hourly_prices(anchors) -> list:
 
 def _demo_homelab() -> dict:
     """Home lab: needs a live Komodo → four example servers in the shape
-    homelab.rules.build_panel returns. Each carries its last 24 hours, oldest first
-    (the hour's highest CPU and memory use, in %); the last column is the hour of
-    the refresh. pi-nas is past its disk threshold."""
-    def day(base, spikes):  # spikes: {column: %}
-        return [spikes.get(i, base + (i * 7) % 5) for i in range(24)]
-
-    nodes = [
-        ("pi-casa", 37, day(8, {5: 41, 13: 87, 14: 52}), day(46, {13: 58, 14: 55})),  # nightly backup
-        ("pi-dns", 18, day(2, {}), day(20, {})),
-        ("pi-lab", 44, day(6, {0: 63, 1: 78, 2: 30}), day(33, {0: 52, 1: 71, 2: 49})),
-        ("pi-nas", 91, day(18, {12: 74, 13: 96, 14: 91, 15: 60}), day(58, {13: 83, 14: 80})),
+    homelab.rules.build_panel returns. pi-nas is past its disk threshold."""
+    nodes = [  # name, °C, memory %, disk %, containers
+        ("pi-casa", 48, 46, 37, 5), ("pi-dns", 44, 20, 18, 2),
+        ("pi-lab", 52, 33, 44, 3), ("pi-nas", 57, 58, 91, 4),
     ]
     return {"online": 4, "total": 4, "nodes": [{
-        "name": name, "online": True, "cpu": cpu, "mem": mem,
-        "disk_pct": disk, "disk_bad": disk >= 90,
-    } for name, disk, cpu, mem in nodes]}
+        "name": name, "online": True, "temp": temp, "temp_bad": False,
+        "mem_pct": mem, "mem_bad": False, "disk_pct": disk, "disk_bad": disk >= 90,
+        "up": count, "containers": count,
+    } for name, temp, mem, disk, count in nodes]}
 
 
 def apply_demo_panels(data: dict) -> dict:
